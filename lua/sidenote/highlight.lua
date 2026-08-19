@@ -5,6 +5,9 @@
 ---@class sidenote.highlight
 local M = {}
 
+---Prose shown as virtual text beneath annotated code.
+M.PROSE = "SidenoteProse"
+
 ---@type table<sidenote.Status, string>
 M.GROUPS = {
     attached = "SidenoteAttached",
@@ -44,6 +47,7 @@ function M.setup()
     for status, group in pairs(M.GROUPS) do
         vim.api.nvim_set_hl(0, group, { link = LINKS[status], default = true })
     end
+    vim.api.nvim_set_hl(0, M.PROSE, { link = "Comment", default = true })
 end
 
 return M

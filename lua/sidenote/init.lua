@@ -68,6 +68,18 @@ function M.browse_project(path)
     return require("sidenote.browser").open_project(from, config())
 end
 
+---Show an annotation in the configured preview surface.
+---@param entry sidenote.session.Entry
+---@param cfg sidenote.Config
+local function preview(entry, cfg)
+    require("sidenote.preview").show(entry, {
+        style = cfg.preview.style,
+        max_lines = cfg.preview.max_lines,
+        filetype = cfg.filetype,
+        bufnr = vim.api.nvim_get_current_buf(),
+    })
+end
+
 ---Glance at the annotation under the cursor without leaving the code.
 ---@return boolean shown
 function M.view()
@@ -75,8 +87,7 @@ function M.view()
     if not entry then
         return false
     end
-    local cfg = config()
-    require("sidenote.preview").show(entry, cfg.preview, cfg.filetype)
+    preview(entry, config())
     return true
 end
 
@@ -107,8 +118,7 @@ local function jump(direction)
     end
 
     vim.api.nvim_win_set_cursor(0, { target.line_start, 0 })
-    local cfg = config()
-    require("sidenote.preview").show(target, cfg.preview, cfg.filetype)
+    preview(target, config())
     return true
 end
 
