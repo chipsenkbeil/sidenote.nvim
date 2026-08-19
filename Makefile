@@ -15,7 +15,7 @@ else
 endif
 
 lint: ## Static-check the Lua sources
-	@luacheck $(LUA_DIRS) --globals vim describe it before_each after_each assert
+	@luacheck $(LUA_DIRS)
 
 fmt: ## Format the Lua sources
 	@stylua $(LUA_DIRS)
