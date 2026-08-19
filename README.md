@@ -50,8 +50,9 @@ xmap <Leader>na <Plug>(SidenoteAdd)
 nmap <Leader>nv <Plug>(SidenoteView)
 nmap <Leader>no <Plug>(SidenoteOpen)
 
-" The editable listing of this file's notes
+" The editable listing of this file's notes, and of the whole project's
 nmap <Leader>nb <Plug>(SidenoteBrowse)
+nmap <Leader>nB <Plug>(SidenoteBrowseProject)
 ```
 
 Annotate a line, write your note, save. A sign appears in the gutter. Edit the
@@ -173,6 +174,10 @@ sidenote: apply 5 changes?
 `<CR>` opens the real prose file, which is where you get org (or markdown)
 highlighting. `<Tab>` and `<S-Tab>` move between columns.
 
+`-` widens to **every annotation in the project**, sorted by path then line. It
+edits exactly the same way; a new row there creates a note on whichever file its
+location names.
+
 Deleting every orphaned row with `dd` and saving is the whole cleanup story.
 
 ## Commands
@@ -180,8 +185,11 @@ Deleting every orphaned row with `dd` and saving is the whole cleanup story.
 One command with subcommand completion:
 
 ```
-:Sidenote add | browse | refresh | view | open | next | prev
+:Sidenote add | browse | project | refresh | view | open | next | prev
 ```
+
+`:Sidenote project [path]` opens the project-wide listing; without an argument
+it uses the project containing the current file.
 
 ## For agents
 

@@ -146,11 +146,22 @@ describe("browser.apply.validate", function()
         assert.contains(errors[1].message, "source buffer")
     end)
 
-    it("rejects creating an annotation on a file other than the one being browsed", function()
+    it("allows creating an annotation on any file the location names", function()
+        -- A project listing spans many files, so a create means the file the
+        -- row points at rather than whatever the browser was opened on
         local p = project()
         local state = state_of(p.source)
         local row =
             { kind = "note", state = "open", location = "other.lua", prose = { "x" }, lnum = 1 }
+        local action = { kind = "create", lnum = 1, lossy = false, prose = row.prose, row = row }
+        assert.eq_deep(apply.validate({ action }, state), {})
+    end)
+
+    it("rejects creating an annotation on a file that does not exist", function()
+        local p = project()
+        local state = state_of(p.source)
+        local row =
+            { kind = "note", state = "open", location = "ghost.lua", prose = { "x" }, lnum = 1 }
         local action = { kind = "create", lnum = 1, lossy = false, prose = row.prose, row = row }
         assert.eq(#apply.validate({ action }, state), 1)
     end)

@@ -129,10 +129,8 @@ CHECKS.create = function(action, state)
     if wanted.scope ~= "file" then
         return "a new annotation from the browser covers a whole file; only a source buffer has a selection"
     end
-    if absolute(state, wanted.path) ~= state.path then
-        return ("a new annotation is created on %s, the file being browsed"):format(
-            relative(state, state.path)
-        )
+    if vim.fn.filereadable(absolute(state, wanted.path)) ~= 1 then
+        return ("%s does not exist"):format(wanted.path)
     end
     return nil
 end
@@ -218,7 +216,17 @@ APPLIERS.rescope = reanchor
 
 APPLIERS.create = function(action, state)
     local row = action.row
-    local result, err = capture.run(state.source, {
+    local wanted, parse_err = location.parse(row.location)
+    if not wanted then
+        return false, parse_err
+    end
+
+    -- Captured through a buffer on the file the location names, so a create
+    -- means the same thing in a project listing as in a single file's
+    local bufnr = vim.fn.bufadd(absolute(state, wanted.path))
+    vim.fn.bufload(bufnr)
+
+    local result, err = capture.run(bufnr, {
         scope = "file",
         kind = row.kind,
         config = state.config,

@@ -51,6 +51,7 @@ describe("sidenote public API", function()
         for _, name in ipairs({
             "add",
             "browse",
+            "browse_project",
             "refresh",
             "entries",
             "at_cursor",
@@ -67,7 +68,16 @@ end)
 describe("command and mapping coverage", function()
     it("registers a <Plug> mapping for every user-facing verb", function()
         local src = entry_source()
-        for _, name in ipairs({ "Add", "Browse", "Refresh", "View", "Open", "ViewNext", "ViewPrev" }) do
+        for _, name in ipairs({
+            "Add",
+            "Browse",
+            "BrowseProject",
+            "Refresh",
+            "View",
+            "Open",
+            "ViewNext",
+            "ViewPrev",
+        }) do
             assert.contains(src, ("<Plug>(Sidenote%s)"):format(name))
         end
     end)
@@ -75,7 +85,16 @@ describe("command and mapping coverage", function()
     it("completes every subcommand the command actually handles", function()
         local src = entry_source()
         local listed = src:match("local SUBCOMMANDS = (%b{})")
-        for _, name in ipairs({ "add", "browse", "refresh", "view", "open", "next", "prev" }) do
+        for _, name in ipairs({
+            "add",
+            "browse",
+            "project",
+            "refresh",
+            "view",
+            "open",
+            "next",
+            "prev",
+        }) do
             assert.contains(listed, ('"%s"'):format(name))
         end
     end)

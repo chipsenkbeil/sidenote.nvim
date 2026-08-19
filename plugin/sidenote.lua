@@ -3,7 +3,7 @@ if vim.g.loaded_sidenote then
 end
 vim.g.loaded_sidenote = true
 
-local SUBCOMMANDS = { "add", "browse", "refresh", "view", "open", "next", "prev" }
+local SUBCOMMANDS = { "add", "browse", "project", "refresh", "view", "open", "next", "prev" }
 
 ---@param err string
 local function report(err)
@@ -29,6 +29,11 @@ vim.api.nvim_create_user_command("Sidenote", function(cmd)
         add(cmd.range > 0 and "range" or "lines", cmd.line1, cmd.line2)
     elseif subcommand == "browse" then
         local _, err = require("sidenote").browse()
+        if err then
+            report(err)
+        end
+    elseif subcommand == "project" then
+        local _, err = require("sidenote").browse_project(cmd.fargs[2])
         if err then
             report(err)
         end
@@ -70,6 +75,13 @@ vim.keymap.set("n", "<Plug>(SidenoteBrowse)", function()
         report(err)
     end
 end, { desc = "Open the editable listing of this file's annotations" })
+
+vim.keymap.set("n", "<Plug>(SidenoteBrowseProject)", function()
+    local _, err = require("sidenote").browse_project()
+    if err then
+        report(err)
+    end
+end, { desc = "Open the editable listing of every annotation in the project" })
 
 vim.keymap.set("n", "<Plug>(SidenoteRefresh)", function()
     require("sidenote").refresh()

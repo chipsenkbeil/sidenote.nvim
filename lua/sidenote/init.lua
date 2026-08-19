@@ -53,6 +53,21 @@ function M.browse(bufnr)
     return require("sidenote.browser").open(bufnr or vim.api.nvim_get_current_buf(), config())
 end
 
+---Open the editable listing of every annotation in the project.
+---@param path? string any file inside the project, defaulting to the current one
+---@return integer|nil browser
+---@return string|nil err
+function M.browse_project(path)
+    local from = path
+    if not from or from == "" then
+        from = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
+    end
+    if from == "" then
+        from = vim.fn.getcwd()
+    end
+    return require("sidenote.browser").open_project(from, config())
+end
+
 ---Glance at the annotation under the cursor without leaving the code.
 ---@return boolean shown
 function M.view()

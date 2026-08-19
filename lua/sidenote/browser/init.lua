@@ -9,14 +9,17 @@ local hash = require("sidenote.core.hash")
 -- the browser's own renderer already owns the name
 local indicator = require("sidenote.render")
 local parse = require("sidenote.browser.parse")
+local project = require("sidenote.store.project")
 local render = require("sidenote.browser.render")
+local scan = require("sidenote.scan")
 local session = require("sidenote.session")
 local store = require("sidenote.store")
 local strategy = require("sidenote.store.strategy")
 
 ---@class sidenote.browser.State
----@field path string absolute path of the source file being browsed
----@field source integer buffer the annotations were resolved against
+---@field scope "file"|"project" how wide a set the listing covers
+---@field path string absolute path of the source file, or of the project root
+---@field source integer|nil buffer the annotations came from, absent for a project
 ---@field config sidenote.Config configuration the browser was opened with
 ---@field rows sidenote.browser.Row[] what was rendered, in buffer order
 
@@ -36,10 +39,9 @@ M.FOLDEXPR = [[getline(v:lnum) =~ '^/' ? '>1' : '1']]
 ---@type table<integer, sidenote.browser.State>
 local states = {}
 
----@param path string
+---@param name string full buffer name of a listing
 ---@return integer|nil bufnr
-local function existing(path)
-    local name = M.SCHEME .. path
+local function existing(name)
     for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
         if vim.api.nvim_buf_get_name(bufnr) == name then
             return bufnr
@@ -56,13 +58,21 @@ local function prose_of(entry, filetype)
     return render.normalize(text and hash.split(text) or {})
 end
 
----@param source integer
----@param cfg sidenote.Config
+---Resolve whatever set the listing covers.
+---
+---A file listing resolves against its buffer, so unsaved edits count; a project
+---listing resolves against the whole store, preferring a loaded buffer where
+---there is one.
+---@param state sidenote.browser.State
 ---@return sidenote.browser.Row[]
-local function rows_for(source, cfg)
+local function rows_for(state)
+    local entries = state.scope == "project"
+            and scan.project({ path = state.path, config = state.config })
+        or session.entries(state.source, state.config)
+
     local out = {}
-    for i, entry in ipairs(session.entries(source, cfg)) do
-        out[i] = { entry = entry, prose = prose_of(entry, cfg.filetype) }
+    for i, entry in ipairs(entries) do
+        out[i] = { entry = entry, prose = prose_of(entry, state.config.filetype) }
     end
     return out
 end
@@ -108,7 +118,7 @@ end
 ---@param bufnr integer
 ---@param state sidenote.browser.State
 local function paint(bufnr, state)
-    state.rows = rows_for(state.source, state.config)
+    state.rows = rows_for(state)
     local lines, headers = render.rows(state.rows)
 
     vim.bo[bufnr].modifiable = true
@@ -187,31 +197,45 @@ local function bind(bufnr)
     map("<S-Tab>", function()
         step(bufnr, M.prev_column)
     end, "Jump to the previous column")
+
+    -- `-` is likely taken by oil in a source buffer, but it is free in here and
+    -- means what it means there: go up
+    map("-", function()
+        local state = states[bufnr]
+        if not state or state.scope == "project" then
+            return
+        end
+        local _, err = M.open_project(state.path, state.config)
+        if err then
+            vim.notify("sidenote: " .. err, vim.log.levels.ERROR)
+        end
+    end, "Widen to every annotation in the project")
 end
 
----Open the browser for a source buffer, in the current window.
----@param source integer
----@param cfg? sidenote.Config
----@return integer|nil bufnr
----@return string|nil err
-function M.open(source, cfg)
-    cfg = cfg or config.get()
-
-    local target, target_err = buffer.target(source, { scope = "file" })
-    if not target then
-        return nil, target_err
+---Name a listing after what it covers.
+---
+---Absolute, so two projects open at once cannot collide on one relative path;
+---a trailing slash marks a project listing, the way a directory reads.
+---@param state sidenote.browser.State
+---@return string
+local function name_for(state)
+    if state.scope == "project" then
+        return M.SCHEME .. state.path .. "/"
     end
-    local _, roots_err = strategy.resolve(target.path, cfg)
-    if roots_err then
-        return nil, roots_err
-    end
+    return M.SCHEME .. state.path
+end
 
-    local bufnr = existing(target.path)
+---Show a listing in the current window, reusing its buffer if one exists.
+---@param state sidenote.browser.State
+---@return integer bufnr
+local function show(state)
+    local name = name_for(state)
+    local bufnr = existing(name)
     if not bufnr then
         bufnr = vim.api.nvim_create_buf(true, false)
         vim.bo[bufnr].buftype = "acwrite"
         vim.bo[bufnr].swapfile = false
-        vim.api.nvim_buf_set_name(bufnr, M.SCHEME .. target.path)
+        vim.api.nvim_buf_set_name(bufnr, name)
         vim.api.nvim_create_autocmd("BufWipeout", {
             buffer = bufnr,
             once = true,
@@ -235,8 +259,58 @@ function M.open(source, cfg)
     vim.bo[bufnr].filetype = "sidenote"
     configure(winid)
 
-    paint(bufnr, { path = target.path, source = source, config = cfg, rows = {} })
-    return bufnr, nil
+    paint(bufnr, state)
+    return bufnr
+end
+
+---Open the listing for one source buffer, in the current window.
+---@param source integer
+---@param cfg? sidenote.Config
+---@return integer|nil bufnr
+---@return string|nil err
+function M.open(source, cfg)
+    cfg = cfg or config.get()
+
+    local target, target_err = buffer.target(source, { scope = "file" })
+    if not target then
+        return nil, target_err
+    end
+    local _, roots_err = strategy.resolve(target.path, cfg)
+    if roots_err then
+        return nil, roots_err
+    end
+
+    return show({
+        scope = "file",
+        path = target.path,
+        source = source,
+        config = cfg,
+        rows = {},
+    })
+end
+
+---Open the listing for a whole project, in the current window.
+---
+---`path` may be any file inside the project; the root is found from it the same
+---way the store's is.
+---@param path string
+---@param cfg? sidenote.Config
+---@return integer|nil bufnr
+---@return string|nil err
+function M.open_project(path, cfg)
+    cfg = cfg or config.get()
+
+    local resolved = vim.uv.fs_realpath(path) or path
+    local root = project.root(resolved)
+    if not root then
+        return nil,
+            ("no project root at or above %s; expected one of %s"):format(
+                resolved,
+                table.concat(project.MARKERS, ", ")
+            )
+    end
+
+    return show({ scope = "project", path = root, source = nil, config = cfg, rows = {} })
 end
 
 ---What the browser last rendered, which is the baseline an edit is diffed
