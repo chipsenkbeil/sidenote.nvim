@@ -1,0 +1,6 @@
+# stylua-version: 2.4.1
+column_width = 100
+indent_width = 4
+indent_type = "Spaces"
+syntax = "All"
+call_parentheses = "Input"

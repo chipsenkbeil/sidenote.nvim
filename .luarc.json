@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime": {
+    "version": "Lua 5.1"
+  },
+  "workspace": {
+    "library": [
+      "$VIMRUNTIME",
+      "$VIMRUNTIME/lua",
+      "lua",
+      ".addons/sidenote"
+    ],
+    "ignoreDir": [
+      ".addons"
+    ],
+    "checkThirdParty": "Disable"
+  },
+  "diagnostics": {
+    "globals": ["vim"],
+    "groupFileStatus": {
+      "strict": "Opened",
+      "strong": "Opened"
+    },
+    "groupSeverity": {
+      "strong": "Warning",
+      "strict": "Warning"
+    },
+    "unusedLocalExclude": ["_*"],
+    "disable": ["luadoc-miss-see-name", "no-unknown"]
+  }
+}
