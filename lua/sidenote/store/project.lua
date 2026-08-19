@@ -5,7 +5,8 @@ local M = {}
 ---Root markers in priority order.
 ---
 ---`.annotations` leads so that creating that directory is enough to declare a
----project, with no VCS and no configuration.
+---project, with no VCS and no configuration. `*.rockspec` is a glob rather than
+---a name, since its version is part of the filename.
 M.MARKERS = {
     ".annotations",
     ".git",
@@ -15,13 +16,24 @@ M.MARKERS = {
     "package.json",
     "go.mod",
     "pyproject.toml",
+    "*.rockspec",
 }
+
+---@param dir string
+---@param marker string a filename, or a glob when it holds a `*`
+---@return boolean
+local function present(dir, marker)
+    if not marker:find("*", 1, true) then
+        return vim.uv.fs_stat(dir .. "/" .. marker) ~= nil
+    end
+    return #vim.fn.glob(dir .. "/" .. marker, true, true) > 0
+end
 
 ---@param dir string
 ---@return boolean
 local function is_root(dir)
     for _, marker in ipairs(M.MARKERS) do
-        if vim.uv.fs_stat(dir .. "/" .. marker) then
+        if present(dir, marker) then
             return true
         end
     end

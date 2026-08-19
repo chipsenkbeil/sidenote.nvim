@@ -104,8 +104,8 @@ and always show me both".
 A project root is found by looking for, in order: `.annotations/` itself, then
 `.git` / `.jj` / `.hg`, then `Cargo.toml` / `package.json` / `go.mod` /
 `pyproject.toml` / `*.rockspec`. The first of those is what makes
-`mkdir .annotations` enough to opt a plain directory in, with no repo and no
-config.
+`mkdir .annotations` enough to opt a plain directory in — no repo, no config,
+nothing else on disk.
 
 **In-repo notes are committed by default.** The plugin writes files and does
 nothing else; if you want them ignored, that is your `.gitignore` to edit.
