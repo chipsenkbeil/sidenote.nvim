@@ -45,27 +45,43 @@ function M.at_cursor()
     return nil
 end
 
+---@class sidenote.BrowseOpts
+---@field bufnr? integer source buffer, defaulting to the current one
+---@field filter? sidenote.browser.Filter which annotations survive into the listing
+
 ---Open the editable listing of this file's annotations.
----@param bufnr? integer defaults to the current buffer
+---@param opts? sidenote.BrowseOpts
 ---@return integer|nil browser
 ---@return string|nil err
-function M.browse(bufnr)
-    return require("sidenote.browser").open(bufnr or vim.api.nvim_get_current_buf(), config())
+function M.browse(opts)
+    opts = opts or {}
+    return require("sidenote.browser").open(opts.bufnr or vim.api.nvim_get_current_buf(), {
+        config = config(),
+        filter = opts.filter,
+    })
 end
 
+---@class sidenote.BrowseProjectOpts
+---@field path? string any file inside the project, defaulting to the current one
+---@field filter? sidenote.browser.Filter which annotations survive into the listing
+
 ---Open the editable listing of every annotation in the project.
----@param path? string any file inside the project, defaulting to the current one
+---@param opts? sidenote.BrowseProjectOpts
 ---@return integer|nil browser
 ---@return string|nil err
-function M.browse_project(path)
-    local from = path
+function M.browse_project(opts)
+    opts = opts or {}
+    local from = opts.path
     if not from or from == "" then
         from = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
     end
     if from == "" then
         from = vim.fn.getcwd()
     end
-    return require("sidenote.browser").open_project(from, config())
+    return require("sidenote.browser").open_project(from, {
+        config = config(),
+        filter = opts.filter,
+    })
 end
 
 ---Show an annotation in the configured preview surface.

@@ -16,11 +16,17 @@ local session = require("sidenote.session")
 local store = require("sidenote.store")
 local strategy = require("sidenote.store.strategy")
 
+---@class sidenote.browser.Filter
+---@field status? sidenote.Status keep only annotations the resolver put here
+---@field kind? "note"|"todo" keep only notes or only requests to act
+---@field state? string keep only one lifecycle position
+
 ---@class sidenote.browser.State
 ---@field scope "file"|"project" how wide a set the listing covers
 ---@field path string absolute path of the source file, or of the project root
 ---@field source integer|nil buffer the annotations came from, absent for a project
 ---@field config sidenote.Config configuration the browser was opened with
+---@field filter sidenote.browser.Filter which annotations survive into the listing
 ---@field rows sidenote.browser.Row[] what was rendered, in buffer order
 
 ---An oil-style editable listing of one file's annotations.
@@ -63,6 +69,15 @@ end
 ---A file listing resolves against its buffer, so unsaved edits count; a project
 ---listing resolves against the whole store, preferring a loaded buffer where
 ---there is one.
+---@param entry sidenote.session.Entry
+---@param filter sidenote.browser.Filter
+---@return boolean
+local function survives(entry, filter)
+    return (filter.status == nil or entry.status == filter.status)
+        and (filter.kind == nil or entry.record.kind == filter.kind)
+        and (filter.state == nil or entry.record.state == filter.state)
+end
+
 ---@param state sidenote.browser.State
 ---@return sidenote.browser.Row[]
 local function rows_for(state)
@@ -70,9 +85,13 @@ local function rows_for(state)
             and scan.project({ path = state.path, config = state.config })
         or session.entries(state.source, state.config)
 
+    -- Filtered rows are absent from the baseline too, not merely hidden: a
+    -- write must never delete an annotation the listing did not show
     local out = {}
-    for i, entry in ipairs(entries) do
-        out[i] = { entry = entry, prose = prose_of(entry, state.config.filetype) }
+    for _, entry in ipairs(entries) do
+        if survives(entry, state.filter) then
+            out[#out + 1] = { entry = entry, prose = prose_of(entry, state.config.filetype) }
+        end
     end
     return out
 end
@@ -205,7 +224,12 @@ local function bind(bufnr)
         if not state or state.scope == "project" then
             return
         end
-        local _, err = M.open_project(state.path, state.config)
+        -- The filter travels with you: widening a listing of orphans should
+        -- show the project's orphans, not everything it holds
+        local _, err = M.open_project(state.path, {
+            config = state.config,
+            filter = state.filter,
+        })
         if err then
             vim.notify("sidenote: " .. err, vim.log.levels.ERROR)
         end
@@ -226,6 +250,9 @@ local function name_for(state)
 end
 
 ---Show a listing in the current window, reusing its buffer if one exists.
+---
+---A filter is not part of the name, so re-opening the same listing with a
+---different one narrows the view you already have rather than making a second.
 ---@param state sidenote.browser.State
 ---@return integer bufnr
 local function show(state)
@@ -263,13 +290,18 @@ local function show(state)
     return bufnr
 end
 
+---@class sidenote.browser.OpenOpts
+---@field config? sidenote.Config resolved configuration, read from vim.g when omitted
+---@field filter? sidenote.browser.Filter which annotations survive into the listing
+
 ---Open the listing for one source buffer, in the current window.
 ---@param source integer
----@param cfg? sidenote.Config
+---@param opts? sidenote.browser.OpenOpts
 ---@return integer|nil bufnr
 ---@return string|nil err
-function M.open(source, cfg)
-    cfg = cfg or config.get()
+function M.open(source, opts)
+    opts = opts or {}
+    local cfg = opts.config or config.get()
 
     local target, target_err = buffer.target(source, { scope = "file" })
     if not target then
@@ -285,6 +317,7 @@ function M.open(source, cfg)
         path = target.path,
         source = source,
         config = cfg,
+        filter = opts.filter or {},
         rows = {},
     })
 end
@@ -294,11 +327,12 @@ end
 ---`path` may be any file inside the project; the root is found from it the same
 ---way the store's is.
 ---@param path string
----@param cfg? sidenote.Config
+---@param opts? sidenote.browser.OpenOpts
 ---@return integer|nil bufnr
 ---@return string|nil err
-function M.open_project(path, cfg)
-    cfg = cfg or config.get()
+function M.open_project(path, opts)
+    opts = opts or {}
+    local cfg = opts.config or config.get()
 
     local resolved = vim.uv.fs_realpath(path) or path
     local root = project.root(resolved)
@@ -310,7 +344,14 @@ function M.open_project(path, cfg)
             )
     end
 
-    return show({ scope = "project", path = root, source = nil, config = cfg, rows = {} })
+    return show({
+        scope = "project",
+        path = root,
+        source = nil,
+        config = cfg,
+        filter = opts.filter or {},
+        rows = {},
+    })
 end
 
 ---What the browser last rendered, which is the baseline an edit is diffed

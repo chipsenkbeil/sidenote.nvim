@@ -178,7 +178,30 @@ highlighting. `<Tab>` and `<S-Tab>` move between columns.
 edits exactly the same way; a new row there creates a note on whichever file its
 location names.
 
-Deleting every orphaned row with `dd` and saving is the whole cleanup story.
+### Filtering
+
+Either listing narrows by `kind`, `state`, or anchor `status`:
+
+```vim
+:Sidenote browse  --kind=todo
+:Sidenote project --status=orphaned
+:Sidenote project --kind=todo --state=open
+```
+
+Filters combine, and re-filtering narrows the listing you already have rather
+than opening a second one. `-` carries the filter with it, so widening a view of
+orphans shows the project's orphans.
+
+**A filtered-out row is absent, not hidden.** Saving a filtered listing can
+never touch an annotation it did not show you.
+
+Deleting every orphaned row with `dd` and saving is the whole cleanup story:
+
+```vim
+:Sidenote project --status=orphaned
+```
+
+then `VGd` and `:w`.
 
 ## Commands
 

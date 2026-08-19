@@ -62,7 +62,7 @@ end
 ---@param source integer
 ---@return sidenote.browser.State
 local function state_of(source)
-    return assert(browser.state(assert(browser.open(source, opts()))))
+    return assert(browser.state(assert(browser.open(source, { config = opts() }))))
 end
 
 ---@param state sidenote.browser.State
@@ -373,7 +373,7 @@ describe("browser edit to action, end to end", function()
     it("turns an edited summary into prose on disk", function()
         local p = project()
         local id = annotate(p.source, 4, { "the note" })
-        local bufnr = assert(browser.open(p.source, opts()))
+        local bufnr = assert(browser.open(p.source, { config = opts() }))
         local state = assert(browser.state(bufnr))
 
         local edited = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)

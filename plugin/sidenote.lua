@@ -10,6 +10,26 @@ local function report(err)
     vim.notify("sidenote: " .. err, vim.log.levels.ERROR)
 end
 
+---Split a listing subcommand's arguments into a path and a filter.
+---
+---`--status=`, `--kind=` and `--state=` narrow the listing; anything else
+---positional is the project path.
+---@param fargs string[]
+---@return string|nil path
+---@return sidenote.browser.Filter filter
+local function listing_args(fargs)
+    local path, filter = nil, {}
+    for i = 2, #fargs do
+        local key, value = fargs[i]:match("^%-%-(%w+)=(.+)$")
+        if key then
+            filter[key] = value
+        else
+            path = fargs[i]
+        end
+    end
+    return path, filter
+end
+
 ---@param scope "file"|"lines"|"range"
 ---@param first integer
 ---@param last integer
@@ -28,12 +48,16 @@ vim.api.nvim_create_user_command("Sidenote", function(cmd)
     if subcommand == "add" then
         add(cmd.range > 0 and "range" or "lines", cmd.line1, cmd.line2)
     elseif subcommand == "browse" then
-        local _, err = require("sidenote").browse()
-        if err then
+        local path, filter = listing_args(cmd.fargs)
+        local _, err = require("sidenote").browse({ filter = filter })
+        if path then
+            report("browse takes no path; use :Sidenote project " .. path)
+        elseif err then
             report(err)
         end
     elseif subcommand == "project" then
-        local _, err = require("sidenote").browse_project(cmd.fargs[2])
+        local path, filter = listing_args(cmd.fargs)
+        local _, err = require("sidenote").browse_project({ path = path, filter = filter })
         if err then
             report(err)
         end
