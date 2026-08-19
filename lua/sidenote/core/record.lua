@@ -18,6 +18,8 @@ local hash = require("sidenote.core.hash")
 ---@field col_start integer first annotated byte column, 1-based, or 0 outside range scope
 ---@field col_end integer last annotated byte column, inclusive
 ---@field text string verbatim anchored bytes, or "" for file scope
+---@field prefix string verbatim lines immediately above the anchor
+---@field suffix string verbatim lines immediately below the anchor
 ---@field text_sha string hash of the anchored bytes
 ---@field norm_sha string hash of the anchored bytes with whitespace collapsed
 ---@field prefix_sha string hash of the normalized lines above the anchor
@@ -92,6 +94,10 @@ function M.capture(opts)
         col_start = scope == "range" and (opts.col_start or 1) or 0,
         col_end = scope == "range" and (opts.col_end or 1) or 0,
         text = text,
+        -- Kept verbatim, not only as a hash: the fuzzy tier grades context by
+        -- similarity, and a hash can only answer same-or-different
+        prefix = prefix,
+        suffix = suffix,
         text_sha = hash.sha256(text),
         norm_sha = hash.sha256(hash.normalize(text)),
         prefix_sha = hash.sha256(hash.normalize(prefix)),

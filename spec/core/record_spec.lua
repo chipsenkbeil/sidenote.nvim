@@ -53,6 +53,19 @@ describe("record.capture", function()
         assert.eq(rec.suffix_sha, hash.sha256(hash.normalize("\nreturn M")))
     end)
 
+    it("keeps the context verbatim, not only as a hash", function()
+        -- The fuzzy tier grades context by similarity; a hash can only answer
+        -- same-or-different, which zeroes the whole term on any edit above
+        local rec = capture()
+        assert.eq(rec.prefix, "local M = {}\n")
+        assert.eq(rec.suffix, "\nreturn M")
+    end)
+
+    it("captures empty context at the very start of a file", function()
+        local rec = capture({ scope = "lines", line_start = 1, line_end = 1 })
+        assert.eq(rec.prefix, "")
+    end)
+
     it("hashes the whole file", function()
         assert.eq(capture().file_sha, hash.sha256(CONTENT))
     end)
