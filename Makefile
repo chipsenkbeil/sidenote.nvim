@@ -1,7 +1,7 @@
-.PHONY: help test lint fmt fmt-check
+.PHONY: help test lint fmt fmt-check style check
 
 NVIM ?= nvim
-LUA_DIRS := lua spec harness
+LUA_DIRS := lua spec harness plugin
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -22,3 +22,8 @@ fmt: ## Format the Lua sources
 
 fmt-check: ## Fail if any source is unformatted
 	@stylua --check $(LUA_DIRS)
+
+style: ## Audit the mechanical lua-style rules
+	@luajit scripts/style_audit.lua $$(find $(LUA_DIRS) -name '*.lua')
+
+check: test lint fmt-check style ## Everything CI runs
