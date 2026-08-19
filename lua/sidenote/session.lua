@@ -15,6 +15,26 @@ local strategy = require("sidenote.store.strategy")
 ---@class sidenote.session
 local M = {}
 
+---Bind a record, the store it came from, and what the resolver concluded.
+---
+---The only constructor for `sidenote.session.Entry`, so a field added to that
+---type cannot be forgotten by one of the places that build them.
+---@param root string store root the record was read from
+---@param rec sidenote.Annotation
+---@param resolution sidenote.Resolution
+---@return sidenote.session.Entry
+function M.entry(root, rec, resolution)
+    return {
+        id = rec.id,
+        status = resolution.status,
+        line_start = resolution.line_start,
+        line_end = resolution.line_end,
+        root = root,
+        record = rec,
+        resolution = resolution,
+    }
+end
+
 ---Resolve every annotation targeting a buffer, against the buffer's current
 ---text rather than the file on disk, so unsaved edits are accounted for.
 ---
@@ -47,16 +67,7 @@ function M.entries(bufnr, cfg)
                 local rec = store.read(root, id)
                 if rec and rec.path == wanted then
                     seen[id] = true
-                    local resolution = resolve.resolve(rec, target.content)
-                    entries[#entries + 1] = {
-                        id = rec.id,
-                        status = resolution.status,
-                        line_start = resolution.line_start,
-                        line_end = resolution.line_end,
-                        root = root,
-                        record = rec,
-                        resolution = resolution,
-                    }
+                    entries[#entries + 1] = M.entry(root, rec, resolve.resolve(rec, target.content))
                 end
             end
         end

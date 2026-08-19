@@ -1,5 +1,6 @@
 local project = require("sidenote.store.project")
 local resolve = require("sidenote.core.resolve")
+local session = require("sidenote.session")
 local store = require("sidenote.store")
 local strategy = require("sidenote.store.strategy")
 
@@ -78,15 +79,7 @@ function M.project(opts)
         end
 
         local resolution = resolve.resolve(rec, cache[rec.path].content)
-        entries[#entries + 1] = {
-            id = rec.id,
-            status = resolution.status,
-            line_start = resolution.line_start,
-            line_end = resolution.line_end,
-            root = held.root,
-            record = rec,
-            resolution = resolution,
-        }
+        entries[#entries + 1] = session.entry(held.root, rec, resolution)
     end
 
     table.sort(entries, function(a, b)
