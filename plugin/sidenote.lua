@@ -3,28 +3,40 @@ if vim.g.loaded_sidenote then
 end
 vim.g.loaded_sidenote = true
 
-local SUBCOMMANDS = { "add", "refresh" }
+local SUBCOMMANDS = { "add", "refresh", "view", "open", "next", "prev" }
 
 ---@param err string
 local function report(err)
     vim.notify("sidenote: " .. err, vim.log.levels.ERROR)
 end
 
+---@param scope "file"|"lines"|"range"
+---@param first integer
+---@param last integer
+local function add(scope, first, last)
+    local sidenote = require("sidenote")
+    local _, err = sidenote.add({ scope = scope, range = { first, 0, last, 0 } })
+    if err then
+        report(err)
+        return
+    end
+    sidenote.refresh()
+end
+
 vim.api.nvim_create_user_command("Sidenote", function(cmd)
     local subcommand = cmd.fargs[1]
     if subcommand == "add" then
-        local scope = cmd.range > 0 and "range" or "lines"
-        local _, err = require("sidenote").add({
-            scope = scope,
-            range = { cmd.line1, 0, cmd.line2, 0 },
-        })
-        if err then
-            report(err)
-        else
-            require("sidenote").refresh()
-        end
+        add(cmd.range > 0 and "range" or "lines", cmd.line1, cmd.line2)
     elseif subcommand == "refresh" then
         require("sidenote").refresh()
+    elseif subcommand == "view" or subcommand == "open" then
+        if not require("sidenote")[subcommand]() then
+            report("no annotation under the cursor")
+        end
+    elseif subcommand == "next" or subcommand == "prev" then
+        if not require("sidenote")[subcommand]() then
+            report("no annotation to jump to")
+        end
     else
         report(("unknown command %q"):format(tostring(subcommand)))
     end
@@ -44,18 +56,28 @@ vim.keymap.set({ "n", "x" }, "<Plug>(SidenoteAdd)", function()
     if first > last then
         first, last = last, first
     end
-    local scope = first == last and "lines" or "range"
-    local _, err = require("sidenote").add({ scope = scope, range = { first, 0, last, 0 } })
-    if err then
-        report(err)
-    else
-        require("sidenote").refresh()
-    end
+    add(first == last and "lines" or "range", first, last)
 end, { desc = "Annotate the current line or selection" })
 
 vim.keymap.set("n", "<Plug>(SidenoteRefresh)", function()
     require("sidenote").refresh()
 end, { desc = "Re-resolve and repaint annotations" })
+
+vim.keymap.set("n", "<Plug>(SidenoteView)", function()
+    require("sidenote").view()
+end, { desc = "Preview the annotation under the cursor" })
+
+vim.keymap.set("n", "<Plug>(SidenoteOpen)", function()
+    require("sidenote").open()
+end, { desc = "Open the annotation under the cursor for writing" })
+
+vim.keymap.set("n", "<Plug>(SidenoteViewNext)", function()
+    require("sidenote").next()
+end, { desc = "Jump to the next annotation and preview it" })
+
+vim.keymap.set("n", "<Plug>(SidenoteViewPrev)", function()
+    require("sidenote").prev()
+end, { desc = "Jump to the previous annotation and preview it" })
 
 local group = vim.api.nvim_create_augroup("sidenote", { clear = true })
 vim.api.nvim_create_autocmd({ "BufReadPost", "BufWritePost" }, {

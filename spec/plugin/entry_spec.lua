@@ -46,11 +46,45 @@ describe("plugin entry point", function()
 end)
 
 describe("sidenote public API", function()
-    it("exposes add, refresh, and entries", function()
+    it("exposes every verb the command and mappings call", function()
         local sidenote = require("sidenote")
-        assert.is_type(sidenote.add, "function")
-        assert.is_type(sidenote.refresh, "function")
-        assert.is_type(sidenote.entries, "function")
+        for _, name in ipairs({
+            "add",
+            "refresh",
+            "entries",
+            "at_cursor",
+            "view",
+            "open",
+            "next",
+            "prev",
+        }) do
+            assert.is_type(sidenote[name], "function", "missing API function: " .. name)
+        end
+    end)
+end)
+
+describe("command and mapping coverage", function()
+    it("registers a <Plug> mapping for every user-facing verb", function()
+        local src = entry_source()
+        for _, name in ipairs({ "Add", "Refresh", "View", "Open", "ViewNext", "ViewPrev" }) do
+            assert.contains(src, ("<Plug>(Sidenote%s)"):format(name))
+        end
+    end)
+
+    it("completes every subcommand the command actually handles", function()
+        local src = entry_source()
+        local listed = src:match("local SUBCOMMANDS = (%b{})")
+        for _, name in ipairs({ "add", "refresh", "view", "open", "next", "prev" }) do
+            assert.contains(listed, ('"%s"'):format(name))
+        end
+    end)
+
+    it("never lists a subcommand it cannot handle", function()
+        -- A completion entry that errors is worse than no completion at all
+        local src = entry_source()
+        for name in src:match("local SUBCOMMANDS = (%b{})"):gmatch('"(%w+)"') do
+            assert.contains(src, ('subcommand == "%s"'):format(name))
+        end
     end)
 end)
 
