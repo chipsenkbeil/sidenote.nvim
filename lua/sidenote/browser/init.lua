@@ -469,6 +469,23 @@ function M.write(bufnr, opts)
         return 0, { "not a sidenote browser" }
     end
 
+    -- Checked before anything is parsed: a row whose own location cannot be
+    -- read back would otherwise diff as a move to a truncated path
+    local unreadable = {}
+    for i, row in ipairs(state.rows) do
+        if render.ambiguous(row) then
+            local complaint = "%s holds consecutive spaces, which a listing cannot tell from a"
+                .. " column boundary; edit this annotation from the source buffer"
+            unreadable[#unreadable + 1] = {
+                lnum = i,
+                message = complaint:format(row.entry.record.path),
+            }
+        end
+    end
+    if #unreadable > 0 then
+        return 0, reported(unreadable)
+    end
+
     local rows, errors = parse.buffer(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
     if #errors > 0 then
         return 0, reported(errors)

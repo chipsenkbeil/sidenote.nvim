@@ -155,6 +155,10 @@ already happened once here. Check `jj st` after every absorb.
   summary column sits behind the location column's padding, so its *own*
   leading whitespace was indistinguishable from the gap and was being eaten.
   Body lines keep their indentation; the summary line cannot.
+- **A path with two consecutive spaces cannot be shown in a listing**, for the
+  same reason: it reads as a column boundary. `browser.write` refuses such a
+  buffer outright and names the row. Capture, the store and the CLI handle
+  those paths fine — the restriction belongs only to the column-separated view.
 - **No required `setup()`.** Config is `vim.g.sidenote`, validated in
   `config.lua`, which returns defaults *alongside* any error so a bad config
   degrades rather than disabling the plugin.

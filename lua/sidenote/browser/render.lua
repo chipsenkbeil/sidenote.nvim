@@ -64,6 +64,18 @@ function M.normalize(prose)
     return out
 end
 
+---Whether a row's location would survive being read back out of the buffer.
+---
+---Columns are separated by a run of two or more spaces, so a path holding such
+---a run is indistinguishable from a column boundary and would parse as a
+---truncated location with the rest spilling into the summary. Rare, and worth
+---catching rather than applying.
+---@param row sidenote.browser.Row
+---@return boolean
+function M.ambiguous(row)
+    return location.format(row.entry.record):find("%s%s") ~= nil
+end
+
 ---@param row sidenote.browser.Row
 ---@param prose string[] the row's normalized prose
 ---@return string[] cells kind, state, location and summary, unpadded

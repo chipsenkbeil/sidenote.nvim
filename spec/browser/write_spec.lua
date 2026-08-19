@@ -188,6 +188,31 @@ describe("browser.write", function()
         assert.eq_deep(assert(browser.state(bufnr)).rows, {})
     end)
 
+    it("refuses to write when a path holds consecutive spaces", function()
+        -- Such a path is indistinguishable from a column boundary, and would
+        -- otherwise diff as a move to a truncated location
+        local root = vim.fn.tempname()
+        vim.fn.mkdir(root .. "/.annotations", "p")
+        local path = root .. "/two  spaces.lua"
+        local fh = assert(io.open(path, "w"))
+        fh:write(table.concat(SOURCE, "\n") .. "\n")
+        fh:close()
+
+        local source = vim.fn.bufadd(path)
+        vim.fn.bufload(source)
+        annotate(source, 4, { "the note" })
+
+        local bufnr = assert(browser.open(source, { config = opts() }))
+        local applied, problems = browser.write(bufnr, {
+            confirm = function()
+                error("a dialog appeared for a listing that cannot be read back")
+            end,
+        })
+        assert.eq(applied, 0)
+        assert.eq(#problems, 1)
+        assert.contains(problems[1], "consecutive spaces")
+    end)
+
     it("intercepts :w through a BufWriteCmd on the browser buffer", function()
         local bufnr = assert(browser.open(project_buffer(), { config = opts() }))
         local found = vim.api.nvim_get_autocmds({ event = "BufWriteCmd", buffer = bufnr })
