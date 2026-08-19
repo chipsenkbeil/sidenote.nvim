@@ -234,4 +234,31 @@ describe("browser render and parse round-trip", function()
     it("round-trips a summary holding two consecutive spaces", function()
         round_trips({ "two  spaces", "body" })
     end)
+
+    it("round-trips a summary that opens with whitespace", function()
+        -- The summary sits behind the location column's padding, so parsing
+        -- cannot tell its own leading spaces from the gap
+        round_trips({ "  leading spaces", "body" })
+    end)
+
+    it("round-trips a summary that opens with a tab", function()
+        round_trips({ "\ttab first", "body" })
+    end)
+
+    it("round-trips a summary with trailing whitespace", function()
+        round_trips({ "trailing spaces   ", "body" })
+    end)
+
+    it("round-trips a body line that indents itself further", function()
+        -- Body lines keep their own indentation; only the summary cannot
+        round_trips({ "summary", "    a code block", "        deeper still" })
+    end)
+
+    it("round-trips prose whose every line is blank", function()
+        round_trips({ "   ", "" })
+    end)
+
+    it("round-trips a summary of nothing but whitespace", function()
+        round_trips({ "  ", "a real body line" })
+    end)
 end)

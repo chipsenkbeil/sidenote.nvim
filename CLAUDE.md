@@ -148,6 +148,13 @@ already happened once here. Check `jj st` after every absorb.
   not parse back reports an edit nobody made. `diff` is pure. Only `apply`
   writes, and validation that needs the filesystem lives there rather than in
   the parser.
+- **`render.normalize` is the canonical form, and all three sides use it.** The
+  rendered lines, the parsed result, and the browser's diff baseline. Any rule
+  that lives in only one of them turns an untouched row into a phantom `write`
+  that then silently rewrites the note. This has already happened once: the
+  summary column sits behind the location column's padding, so its *own*
+  leading whitespace was indistinguishable from the gap and was being eaten.
+  Body lines keep their indentation; the summary line cannot.
 - **No required `setup()`.** Config is `vim.g.sidenote`, validated in
   `config.lua`, which returns defaults *alongside* any error so a bad config
   degrades rather than disabling the plugin.

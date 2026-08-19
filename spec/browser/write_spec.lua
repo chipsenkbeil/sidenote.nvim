@@ -68,6 +68,38 @@ describe("browser.write", function()
         assert.eq_deep(problems, {})
     end)
 
+    it("applies nothing for prose of any awkward shape", function()
+        -- The load-bearing property of the whole write path: a row nobody
+        -- touched must never be reported as edited, whatever it holds
+        local shapes = {
+            { "plain" },
+            { "  leading spaces", "body" },
+            { "\ttab first", "body" },
+            { "trailing spaces   ", "body" },
+            { "two  consecutive  spaces" },
+            { "summary", "", "after a blank" },
+            { "summary", "    an indented block" },
+            { "summary", "note  open      looks.lua:1    like a header row" },
+            { ("x"):rep(300) },
+            { "unicode: café — ✓ ↩", "body" },
+            {},
+        }
+
+        local source = project_buffer()
+        for i, prose in ipairs(shapes) do
+            annotate(source, math.min(i, #SOURCE), prose)
+        end
+
+        local bufnr = assert(browser.open(source, { config = opts() }))
+        local applied, problems = browser.write(bufnr, {
+            confirm = function()
+                error("a dialog appeared for a buffer nobody edited")
+            end,
+        })
+        assert.eq(applied, 0)
+        assert.eq_deep(problems, {})
+    end)
+
     it("deletes the annotation behind a row that was removed", function()
         local source = project_buffer()
         local id = annotate(source, 4, { "the note", "with a body" })

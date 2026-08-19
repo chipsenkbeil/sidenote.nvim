@@ -37,17 +37,26 @@ M.GAP = 2
 ---Spaces prefixing every prose line below the summary.
 M.PROSE_INDENT = 4
 
----Drop trailing blank lines from a note's prose.
+---The canonical form of a note's prose: what rendering can reproduce exactly.
 ---
----Exported because the browser keeps the result as its diff baseline, and a
+---Two rules. Trailing blank lines go, and the summary line loses the
+---whitespace at either end of it.
+---
+---The summary is the only line that cannot carry its own leading whitespace,
+---because it sits behind the location column's padding and parsing cannot tell
+---one run of spaces from the other. Trailing whitespace goes for a second
+---reason: the renderer strips the end of every line so a save hook does not
+---produce a diff on its own.
+---
+---Exported because the browser keeps the result as its diff baseline. A
 ---baseline normalized differently from what was rendered would report an edit
----nobody made.
+---nobody made, and then apply it.
 ---@param prose string[]
 ---@return string[]
 function M.normalize(prose)
     local out = {}
     for i, line in ipairs(prose) do
-        out[i] = line
+        out[i] = i == 1 and line:match("^%s*(.-)%s*$") or line
     end
     while #out > 0 and not out[#out]:match("%S") do
         out[#out] = nil
