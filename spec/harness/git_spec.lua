@@ -14,7 +14,7 @@ local function fixture()
     sh("git config user.email t@t && git config user.name t")
     sh("printf 'aaa\\nbbb\\nccc\\nddd\\n' > f.txt")
     sh("git add f.txt && git commit -qm one")
-    -- Insert two lines at the top and delete 'ccc'.
+    -- Insert two lines at the top and delete 'ccc'
     sh("printf 'zero\\nhalf\\naaa\\nbbb\\nddd\\n' > f.txt")
     sh("git add f.txt && git commit -qm two")
     return dir
@@ -40,7 +40,7 @@ end)
 
 describe("git.alive", function()
     it("maps a surviving line to its new number", function()
-        -- 'aaa' was line 1 at HEAD~1 and is line 3 at HEAD.
+        -- 'aaa' was line 1 at HEAD~1 and is line 3 at HEAD
         assert.eq(
             git.alive(fixture(), { base_rev = "HEAD~1", path = "f.txt", ranges = { { 1, 1 } } })[1],
             3

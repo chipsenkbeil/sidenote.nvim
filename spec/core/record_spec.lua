@@ -89,7 +89,7 @@ describe("record.capture", function()
 
     it("gives a line annotation no columns, since it covers whole lines", function()
         -- The location grammar derives scope from the presence of columns, so a
-        -- non-zero column here would make `lines` render as `range`.
+        -- non-zero column here would make `lines` render as `range`
         local rec = capture({ scope = "lines", line_start = 4, line_end = 4 })
         assert.eq(rec.col_start, 0)
         assert.eq(rec.col_end, 0)

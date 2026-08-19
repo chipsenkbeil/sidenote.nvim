@@ -201,7 +201,7 @@ function M.eq_deep(a, b, msg)
 end
 
 -- Callable, so Lua's builtin form still works inside a spec:
--- `local fh = assert(io.open(path, "r"))`.
+-- `local fh = assert(io.open(path, "r"))`
 setmetatable(M, {
     __call = function(_, value, ...)
         if not value then

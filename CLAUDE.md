@@ -62,19 +62,29 @@ exact equality when the value is computable.
 ## Style
 
 The global `lua-style` skill governs **all** Lua here, tests and comments
-included. `make style` checks only the mechanical half. The rules that actually
-get violated in practice:
+included. `make style` now checks most of the mechanical half:
 
 - Every `---@field` gets a description. No exceptions.
 - Never a bare `table` type; an inline table type with four or more fields gets
   promoted to a named, documented type.
 - At most three positional parameters; past that, an `opts` table typed as a
   named `<owner>.Opts` class.
+- Every parameter of a documented function carries an `@param`. Functions with
+  no doc block at all are left alone, since a half-documented signature is the
+  smell worth flagging.
 - Inline `--` comments run to at most two lines, are capitalized, and take no
-  trailing period. `---` doc summaries are one sentence, then a blank `---`,
-  then details.
+  trailing period. A bare `--` is a paragraph break and starts a fresh block; a
+  comment opening on a code identifier (`math.random …`) is left uncapitalized.
+- `---` doc summaries are one sentence, then a blank `---`, then details.
 - A leading underscore marks an *unused* binding only; `_x` as a private name is
   banned, `__x` is the private tier.
+
+**A file's opening comment is its header** and is exempt from all three comment
+rules — it is documentation about the module, not a note bound to a statement.
+
+What is still left to reading: whether a comment says something worth saying,
+naming, and layering. Verify a change to the audit against deliberate
+violations; a checker reporting zero is indistinguishable from a broken one.
 
 ## Working with the stack
 
