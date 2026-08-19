@@ -81,13 +81,16 @@ describe("render.paint", function()
     end)
 
     it("highlights the whole range when the style is highlight", function()
+        -- The extmark end is exclusive, so covering lines 2 through 4 means
+        -- ending at row 4; ending at row 3 leaves the last line unmarked
         local bufnr = scratch(LINES)
         render.paint(
             bufnr,
             { { id = "a", status = "attached", line_start = 2, line_end = 4 } },
             { style = "highlight" }
         )
-        assert.eq(marks(bufnr)[1][4].end_row, 3)
+        assert.eq(marks(bufnr)[1][2], 1)
+        assert.eq(marks(bufnr)[1][4].end_row, 4)
     end)
 
     it("puts the sign at end of line when the style is virt_text", function()
@@ -125,5 +128,47 @@ describe("render repaint", function()
         render.paint(bufnr, entries, { style = "sign" })
         render.paint(bufnr, entries, { style = "sign" })
         assert.eq(#marks(bufnr), 1)
+    end)
+end)
+
+describe("render.paint span styles", function()
+    it("gives underline a different look from highlight", function()
+        -- They were the same mark, so the option did nothing
+        local bufnr = scratch(LINES)
+        local entries = { { id = "1", status = "attached", line_start = 2, line_end = 2 } }
+
+        render.paint(bufnr, entries, { style = "highlight" })
+        local highlighted = marks(bufnr)[1][4]
+        render.paint(bufnr, entries, { style = "underline" })
+        local underlined = marks(bufnr)[1][4]
+
+        assert.neq(underlined.hl_group, highlighted.hl_group)
+        assert.falsy(underlined.hl_eol, "an underline belongs under the text, not past it")
+        assert.truthy(highlighted.hl_eol)
+    end)
+
+    it("underlines through a group linked to the diagnostic underline family", function()
+        highlight.setup()
+        for status, group in pairs(highlight.UNDERLINES) do
+            local hl = vim.api.nvim_get_hl(0, { name = group, link = true })
+            assert.match(
+                hl.link,
+                "^DiagnosticUnderline",
+                status .. " links to " .. tostring(hl.link)
+            )
+        end
+    end)
+
+    it("marks the last line of a buffer without erroring", function()
+        local bufnr = scratch(LINES)
+        local count = vim.api.nvim_buf_line_count(bufnr)
+        assert.eq(
+            render.paint(
+                bufnr,
+                { { id = "1", status = "attached", line_start = count, line_end = count } },
+                { style = "highlight" }
+            ),
+            1
+        )
     end)
 end)

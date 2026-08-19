@@ -35,8 +35,19 @@ local function mark_opts(entry, style)
     if style == "virt_text" then
         return { virt_text = { { highlight.SIGNS[entry.status], group } }, virt_text_pos = "eol" }
     end
-    if style == "highlight" or style == "underline" then
-        return { end_row = entry.line_end - 1, end_col = 0, hl_group = group, hl_eol = true }
+
+    -- `end_row` is the line *after* the last annotated one, since the range is
+    -- exclusive; stopping at `line_end - 1` leaves a range's last line unmarked
+    if style == "highlight" then
+        return { end_row = entry.line_end, end_col = 0, hl_group = group, hl_eol = true }
+    end
+    if style == "underline" then
+        -- No hl_eol: an underline belongs under the text, not trailing off it
+        return {
+            end_row = entry.line_end,
+            end_col = 0,
+            hl_group = highlight.UNDERLINES[entry.status],
+        }
     end
     return nil
 end

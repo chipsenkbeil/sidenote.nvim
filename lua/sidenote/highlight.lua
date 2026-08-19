@@ -8,6 +8,21 @@ local M = {}
 ---Prose shown as virtual text beneath annotated code.
 M.PROSE = "SidenoteProse"
 
+---Severity ordering, expressed by borrowing the diagnostic vocabulary: an
+---exact anchor is information, a guessed one is a hint, and anything the
+---resolver declined to place is a warning or worse.
+---
+---Written once and used for every family of groups below, so the ordering
+---cannot drift between them.
+---@type table<sidenote.Status, string>
+local SEVERITY = {
+    attached = "Info",
+    drifted = "Hint",
+    ambiguous = "Warn",
+    orphaned = "Warn",
+    filegone = "Error",
+}
+
 ---@type table<sidenote.Status, string>
 M.GROUPS = {
     attached = "SidenoteAttached",
@@ -16,6 +31,14 @@ M.GROUPS = {
     orphaned = "SidenoteOrphaned",
     filegone = "SidenoteFilegone",
 }
+
+---Groups for the `underline` indicator, which marks the annotated text itself
+---rather than tinting the whole line.
+---@type table<sidenote.Status, string>
+M.UNDERLINES = {}
+for status in pairs(M.GROUPS) do
+    M.UNDERLINES[status] = "SidenoteUnderline" .. status:sub(1, 1):upper() .. status:sub(2)
+end
 
 ---Gutter glyph per status, one distinct mark each.
 ---
@@ -31,21 +54,14 @@ M.SIGNS = {
     filegone = "✗",
 }
 
----Severity ordering, expressed by borrowing the diagnostic groups: an exact
----anchor is information, a guessed one is a hint, and anything the resolver
----declined to place is a warning or worse.
----@type table<sidenote.Status, string>
-local LINKS = {
-    attached = "DiagnosticSignInfo",
-    drifted = "DiagnosticSignHint",
-    ambiguous = "DiagnosticSignWarn",
-    orphaned = "DiagnosticSignWarn",
-    filegone = "DiagnosticSignError",
-}
-
 function M.setup()
     for status, group in pairs(M.GROUPS) do
-        vim.api.nvim_set_hl(0, group, { link = LINKS[status], default = true })
+        local link = "DiagnosticSign" .. SEVERITY[status]
+        vim.api.nvim_set_hl(0, group, { link = link, default = true })
+    end
+    for status, group in pairs(M.UNDERLINES) do
+        local link = "DiagnosticUnderline" .. SEVERITY[status]
+        vim.api.nvim_set_hl(0, group, { link = link, default = true })
     end
     vim.api.nvim_set_hl(0, M.PROSE, { link = "Comment", default = true })
 end
