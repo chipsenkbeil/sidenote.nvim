@@ -39,7 +39,8 @@ moves. See |sidenote-anchoring|.
 ==============================================================================
 2. REQUIREMENTS                                         *sidenote-requirements*
 
-Neovim 0.10 or newer, developed and tested against 0.12. No dependencies.
+Neovim 0.11 or newer — that is where |vim.fs.relpath()| arrived, which the store
+uses to keep every record's path project-relative. No dependencies.
 
 Optional, and independently useful: >
 

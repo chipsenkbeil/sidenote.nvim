@@ -19,8 +19,12 @@ moves. That is the part of this plugin with actual engineering in it; see
 
 ## Requirements
 
-Neovim 0.10 or newer, developed and tested against 0.12. **No dependencies.**
-Some things are better if you have them, and none are required:
+Neovim **0.11 or newer** — that is where `vim.fs.relpath` arrived, which the
+store uses to keep every record's path project-relative. CI runs the suite
+against each 0.11 point release and nightly.
+
+**No dependencies.** Some things are better if you have them, and none are
+required:
 
 | optional | buys |
 |---|---|

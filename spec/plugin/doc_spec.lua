@@ -47,6 +47,35 @@ describe("vimdoc", function()
     end)
 end)
 
+describe("the documented Neovim version", function()
+    ---Lowest version the workflow actually runs the suite against.
+    ---@return string
+    local function ci_floor()
+        local workflow = read(".github/workflows/tests.yml")
+        local matrix = assert(workflow:match("version:%s*\n(.-)\n%s*os:"))
+        local lowest
+        for version in matrix:gmatch("v(%d+%.%d+%.%d+)") do
+            lowest = lowest or version
+        end
+        return assert(lowest, "no pinned versions in the matrix")
+    end
+
+    it("matches the floor CI proves, in the help", function()
+        -- Claiming a version nothing runs against is a claim nobody checked
+        assert.contains(help(), "Neovim " .. ci_floor():match("^%d+%.%d+"))
+    end)
+
+    it("matches the floor CI proves, in the README", function()
+        assert.contains(read("README.md"), "Neovim **" .. ci_floor():match("^%d+%.%d+"))
+    end)
+
+    it("names the API that sets the floor, so raising it is a decision", function()
+        for _, doc in ipairs({ help(), read("README.md") }) do
+            assert.contains(doc, "vim.fs.relpath")
+        end
+    end)
+end)
+
 describe("vimdoc coverage", function()
     -- Each of these walks a real list and asserts the count too: a coverage
     -- test that iterates nothing passes without proving anything
