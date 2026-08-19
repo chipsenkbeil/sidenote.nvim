@@ -23,6 +23,19 @@ local score = require("sidenote.core.score")
 ---@class sidenote.core.resolve
 local M = {}
 
+---Statuses the ladder can conclude with, in worsening order.
+---
+---Exported so a caller validating user input checks against the set this
+---module actually produces rather than a copy of it.
+---@type string[]
+M.STATUS_NAMES = { "attached", "drifted", "ambiguous", "orphaned", "filegone" }
+
+---@type table<string, boolean>
+M.STATUSES = {}
+for _, name in ipairs(M.STATUS_NAMES) do
+    M.STATUSES[name] = true
+end
+
 ---Score at or above which a fuzzy match is placed.
 M.ACCEPT = 0.80
 

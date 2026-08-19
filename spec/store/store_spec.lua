@@ -152,3 +152,51 @@ describe("store.delete", function()
         assert.eq(store.delete(root(), "nope", "org"), false)
     end)
 end)
+
+describe("store.prose_file", function()
+    it("prefers the configured extension when it is there", function()
+        local dir, annotation = root(), rec()
+        store.create(dir, annotation, "org")
+        assert.eq(
+            store.prose_file(dir, annotation.id, "org"),
+            store.prose_path(dir, annotation.id, "org")
+        )
+    end)
+
+    it("falls back to whatever extension is actually on disk", function()
+        -- A store written while `filetype` was org has to stay readable after
+        -- that setting changes, and a headless run has no config at all
+        local dir, annotation = root(), rec()
+        store.create(dir, annotation, "org")
+        assert.eq(
+            store.prose_file(dir, annotation.id, "txt"),
+            store.prose_path(dir, annotation.id, "org")
+        )
+    end)
+
+    it("never mistakes the metadata sidecar for prose", function()
+        local dir, annotation = root(), rec()
+        store.create(dir, annotation, "json")
+        assert.falsy(store.prose_file(dir, annotation.id, "md"):match("%.metadata%.json$"))
+    end)
+
+    it("is nil when the annotation has no prose file at all", function()
+        local dir, annotation = root(), rec()
+        store.update(dir, annotation)
+        assert.is_nil(store.prose_file(dir, annotation.id, "txt"))
+    end)
+
+    it("reads prose through the extension on disk, not the one asked for", function()
+        local dir, annotation = root(), rec()
+        store.create(dir, annotation, "org")
+        store.write_prose({ root = dir, id = annotation.id, filetype = "org", lines = { "hello" } })
+        assert.eq(store.prose(dir, annotation.id, "txt"), "hello\n")
+    end)
+
+    it("deletes the prose file whatever extension it carries", function()
+        local dir, annotation = root(), rec()
+        store.create(dir, annotation, "org")
+        assert.truthy(store.delete(dir, annotation.id, "txt"))
+        assert.is_nil(store.prose_file(dir, annotation.id, "org"))
+    end)
+end)

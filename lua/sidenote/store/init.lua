@@ -122,12 +122,44 @@ function M.read(root, id)
     return record.decode(raw)
 end
 
+---Path of the prose file that actually exists for an annotation.
+---
+---Reads fall back to whatever extension is on disk rather than trusting the
+---configured one. A store written while `filetype` was `org` has to stay
+---readable after that setting changes, and a headless run has no user config
+---to consult at all. Writes still use the configured extension.
+---@param root string
+---@param id string
+---@param filetype string extension to prefer
+---@return string|nil
+function M.prose_file(root, id, filetype)
+    local preferred = M.prose_path(root, id, filetype)
+    if vim.uv.fs_stat(preferred) then
+        return preferred
+    end
+
+    local handle = vim.uv.fs_scandir(root)
+    if not handle then
+        return nil
+    end
+    while true do
+        local name = vim.uv.fs_scandir_next(handle)
+        if not name then
+            return nil
+        end
+        if name:sub(1, #id + 1) == id .. "." and not name:match("%.metadata%.json$") then
+            return root .. "/" .. name
+        end
+    end
+end
+
 ---@param root string
 ---@param id string
 ---@param filetype string
 ---@return string|nil
 function M.prose(root, id, filetype)
-    return read_file(M.prose_path(root, id, filetype))
+    local path = M.prose_file(root, id, filetype)
+    return path and read_file(path) or nil
 end
 
 ---Every annotation id present in a store root, sorted.
@@ -185,8 +217,13 @@ function M.delete(root, id, filetype)
     if not vim.uv.fs_stat(M.meta_path(root, id)) then
         return false
     end
+    -- Whichever extension is actually there, so changing `filetype` cannot
+    -- strand a prose file with no record beside it
+    local prose = M.prose_file(root, id, filetype)
     os.remove(M.meta_path(root, id))
-    os.remove(M.prose_path(root, id, filetype))
+    if prose then
+        os.remove(prose)
+    end
     return true
 end
 
