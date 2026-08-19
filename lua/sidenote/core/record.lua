@@ -57,8 +57,17 @@ M.SCHEMA = 1
 M.CONTEXT = 3
 
 local SCOPES = { file = true, lines = true, range = true }
-local KINDS = { note = true, todo = true }
-local STATES = {
+
+---Whether the note is information or a request to act.
+---
+---Exported so the browser validates the column it renders against the same set
+---this module writes.
+---@type table<string, boolean>
+M.KINDS = { note = true, todo = true }
+
+---Lifecycle positions a record may hold.
+---@type table<string, boolean>
+M.STATES = {
     open = true,
     -- Reserved for the future agent `answer` verb; nothing produces it yet
     answered = true,
@@ -127,10 +136,10 @@ function M.validate(rec)
     if not SCOPES[rec.scope] then
         return false, ("scope: expected file|lines|range, got %s"):format(tostring(rec.scope))
     end
-    if not KINDS[rec.kind] then
+    if not M.KINDS[rec.kind] then
         return false, ("kind: expected note|todo, got %s"):format(tostring(rec.kind))
     end
-    if not STATES[rec.state] then
+    if not M.STATES[rec.state] then
         return false,
             ("state: expected open|answered|resolved|wontfix|archived, got %s"):format(
                 tostring(rec.state)

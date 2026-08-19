@@ -1,0 +1,126 @@
+local location = require("sidenote.location")
+
+---@class sidenote.browser.Action
+---@field kind "write"|"change"|"rescope"|"move"|"create"|"delete" what to do
+---@field id string|nil annotation acted on, absent for a create
+---@field lossy boolean whether applying it discards something unrecoverable
+---@field field string|nil column that changed, for a change
+---@field from string|nil value being replaced, for change, rescope and move
+---@field to string|nil value replacing it, for change, rescope and move
+---@field prose string[]|nil the note's new prose, for write and create
+---@field row sidenote.browser.Parsed|nil the typed row, for a create
+
+---Turns an edited buffer into the actions that would make it true.
+---
+---Compares against what was rendered rather than against the store, so an
+---untouched row can never produce an action. Pure, and blind to whether any of
+---the actions are possible: that is the applying layer's job.
+---@class sidenote.browser.diff
+local M = {}
+
+---Columns whose edit means the same thing whatever the value.
+local COLUMNS = { "kind", "state" }
+
+---@param a string[]
+---@param b string[]
+---@return boolean
+local function same_lines(a, b)
+    if #a ~= #b then
+        return false
+    end
+    for i, line in ipairs(a) do
+        if line ~= b[i] then
+            return false
+        end
+    end
+    return true
+end
+
+---A location edit is a move when the path changed and a rescope otherwise.
+---
+---Only widening to file scope is lossy: every other edit re-anchors from the
+---file as it is now, so nothing that could be recovered is discarded.
+---@param row sidenote.browser.Row
+---@param parsed sidenote.browser.Parsed
+---@return sidenote.browser.Action|nil
+local function relocation(row, parsed)
+    local rec = row.entry.record
+    local from = location.format(rec)
+    if from == parsed.location then
+        return nil
+    end
+
+    local wanted = location.parse(parsed.location)
+    local moved = wanted ~= nil and wanted.path ~= rec.path
+    return {
+        kind = moved and "move" or "rescope",
+        id = rec.id,
+        from = from,
+        to = parsed.location,
+        lossy = not moved and wanted ~= nil and wanted.scope == "file" and rec.scope ~= "file",
+    }
+end
+
+---@param before sidenote.browser.State what the browser rendered
+---@param after sidenote.browser.Parsed[] what the user left behind
+---@return sidenote.browser.Action[]
+function M.compute(before, after)
+    local rendered = {}
+    for _, row in ipairs(before.rows) do
+        rendered[row.entry.id] = row
+    end
+
+    local actions, kept = {}, {}
+    for _, parsed in ipairs(after) do
+        local row = parsed.id and rendered[parsed.id]
+        if not row then
+            actions[#actions + 1] = {
+                kind = "create",
+                lossy = false,
+                prose = parsed.prose,
+                row = parsed,
+            }
+        else
+            kept[parsed.id] = true
+            for _, column in ipairs(COLUMNS) do
+                local was = row.entry.record[column]
+                if was ~= parsed[column] then
+                    actions[#actions + 1] = {
+                        kind = "change",
+                        id = parsed.id,
+                        lossy = false,
+                        field = column,
+                        from = was,
+                        to = parsed[column],
+                    }
+                end
+            end
+
+            local moved = relocation(row, parsed)
+            if moved then
+                actions[#actions + 1] = moved
+            end
+
+            if not same_lines(row.prose, parsed.prose) then
+                actions[#actions + 1] = {
+                    kind = "write",
+                    id = parsed.id,
+                    lossy = false,
+                    prose = parsed.prose,
+                }
+            end
+        end
+    end
+
+    for _, row in ipairs(before.rows) do
+        local id = row.entry.id
+        if not kept[id] then
+            -- Lossy: unlike every other action this destroys a document the
+            -- user wrote, not a record the store can rebuild
+            actions[#actions + 1] = { kind = "delete", id = id, lossy = true }
+        end
+    end
+    return actions
+end
+
+return M
