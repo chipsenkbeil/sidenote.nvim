@@ -109,8 +109,7 @@ describe("browser syntax", function()
 
     it("conceals the id prefix with a class that covers a whole ULID", function()
         -- A hex class would conceal only the leading digits of a Crockford
-        -- base32 id and leave the rest of it on screen. Only rules are checked:
-        -- the comment naming the trap is the thing that prevents it
+        -- base32 id, leaving the rest of it on screen
         local src = syntax_source()
         assert.contains(src, [[syn match sidenoteId /^\/\S\+ / conceal]])
         for line in src:gmatch("[^\n]+") do

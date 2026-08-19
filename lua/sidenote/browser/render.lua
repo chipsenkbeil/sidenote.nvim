@@ -98,8 +98,12 @@ local function header(id, cell, width)
 end
 
 ---Render every row as one header line plus its indented prose.
+---
+---The second return is the buffer line each row's header landed on, which is
+---where a caller places that annotation's status sign.
 ---@param rows sidenote.browser.Row[]
----@return string[]
+---@return string[] lines
+---@return integer[] headers one line number per row, in the same order
 function M.rows(rows)
     local prose, all = {}, {}
     for i, row in ipairs(rows) do
@@ -109,16 +113,17 @@ function M.rows(rows)
 
     local width = widths(all)
     local indent = (" "):rep(M.PROSE_INDENT)
-    local lines = {}
+    local lines, headers = {}, {}
     for i, row in ipairs(rows) do
         lines[#lines + 1] = header(row.entry.id, all[i], width)
+        headers[i] = #lines
         for n = 2, #prose[i] do
             -- A blank line stays empty rather than indented, since a
             -- trim-trailing-whitespace hook would strip the indent anyway
             lines[#lines + 1] = prose[i][n]:match("%S") and (indent .. prose[i][n]) or ""
         end
     end
-    return lines
+    return lines, headers
 end
 
 return M

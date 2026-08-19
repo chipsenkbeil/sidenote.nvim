@@ -4,6 +4,7 @@ local location = require("sidenote.location")
 ---@field kind "write"|"change"|"rescope"|"move"|"create"|"delete" what to do
 ---@field id string|nil annotation acted on, absent for a create
 ---@field lossy boolean whether applying it discards something unrecoverable
+---@field lnum integer|nil row the edit was read from, so an error can name it
 ---@field field string|nil column that changed, for a change
 ---@field from string|nil value being replaced, for change, rescope and move
 ---@field to string|nil value replacing it, for change, rescope and move
@@ -55,6 +56,7 @@ local function relocation(row, parsed)
     return {
         kind = moved and "move" or "rescope",
         id = rec.id,
+        lnum = parsed.lnum,
         from = from,
         to = parsed.location,
         lossy = not moved and wanted ~= nil and wanted.scope == "file" and rec.scope ~= "file",
@@ -76,6 +78,7 @@ function M.compute(before, after)
         if not row then
             actions[#actions + 1] = {
                 kind = "create",
+                lnum = parsed.lnum,
                 lossy = false,
                 prose = parsed.prose,
                 row = parsed,
@@ -88,6 +91,7 @@ function M.compute(before, after)
                     actions[#actions + 1] = {
                         kind = "change",
                         id = parsed.id,
+                        lnum = parsed.lnum,
                         lossy = false,
                         field = column,
                         from = was,
@@ -105,6 +109,7 @@ function M.compute(before, after)
                 actions[#actions + 1] = {
                     kind = "write",
                     id = parsed.id,
+                    lnum = parsed.lnum,
                     lossy = false,
                     prose = parsed.prose,
                 }

@@ -199,3 +199,94 @@ describe("record JSON round-trip", function()
         assert.is_type(err, "string")
     end)
 end)
+
+describe("record.reanchor", function()
+    local LATER = "2026-09-01T12:00:00Z"
+
+    ---@param over? table<string, any> fields overriding the re-anchor defaults
+    ---@return sidenote.Annotation
+    ---@return sidenote.Annotation original
+    local function reanchor(over)
+        local original = capture({ kind = "todo" })
+        original.state = "wontfix"
+        local opts = {
+            path = "lua/m.lua",
+            content = CONTENT,
+            scope = "lines",
+            line_start = 7,
+            line_end = 7,
+            now = LATER,
+        }
+        for key, value in pairs(over or {}) do
+            opts[key] = value
+        end
+        return record.reanchor(original, opts), original
+    end
+
+    it("keeps the identity and the lifecycle the user owns", function()
+        local fresh, original = reanchor()
+        assert.eq(fresh.id, original.id)
+        assert.eq(fresh.kind, "todo")
+        assert.eq(fresh.state, "wontfix", "a re-anchor is not a fresh capture")
+        assert.eq(fresh.project_key, original.project_key)
+    end)
+
+    it("keeps the original capture instant", function()
+        -- The annotation did not stop existing; only its anchor moved
+        local fresh, original = reanchor()
+        assert.eq(fresh.captured, original.captured)
+        assert.eq(fresh.verified, LATER)
+    end)
+
+    it("re-captures the anchor from the file as it is now", function()
+        -- Not a search for the old text: editing a location asserts where the
+        -- annotation belongs, which beats any resolver inference
+        local fresh = reanchor()
+        assert.eq(fresh.text, "return M")
+        assert.eq(fresh.text_sha, hash.sha256("return M"))
+        assert.eq(fresh.line_start, 7)
+    end)
+
+    it("refreshes the surrounding context, not only the anchor", function()
+        local fresh, original = reanchor()
+        assert.neq(fresh.prefix, original.prefix)
+        assert.eq(fresh.prefix_sha, hash.sha256(hash.normalize(fresh.prefix)))
+    end)
+
+    it("clears the symbol and treesitter path, which described the old place", function()
+        local fresh = reanchor()
+        assert.eq(fresh.symbol, "")
+        assert.eq(fresh.ts_path, "")
+    end)
+
+    it("empties the anchor when widening to file scope", function()
+        local fresh = reanchor({ scope = "file" })
+        assert.eq(fresh.text, "")
+        assert.eq(fresh.line_start, 0)
+        assert.eq(fresh.line_end, 0)
+    end)
+
+    it("keeps columns at zero outside range scope", function()
+        -- A column here would make the grammar render `lines` as a range
+        local fresh = reanchor()
+        assert.eq(fresh.col_start, 0)
+        assert.eq(fresh.col_end, 0)
+    end)
+
+    it("carries the anchor to a different file on a move", function()
+        local other = "one\ntwo\nthree\n"
+        local fresh = reanchor({
+            path = "lua/other.lua",
+            content = other,
+            line_start = 2,
+            line_end = 2,
+        })
+        assert.eq(fresh.path, "lua/other.lua")
+        assert.eq(fresh.text, "two")
+        assert.eq(fresh.file_sha, hash.sha256(other))
+    end)
+
+    it("produces a record the store will accept", function()
+        assert.truthy(record.validate(reanchor()))
+    end)
+end)

@@ -76,6 +76,13 @@ describe("browser.open", function()
         assert.contains(vim.wo[winid].foldexpr, "^/")
     end)
 
+    it("turns wrapping off, so expanding a row does not change its shape", function()
+        -- A closed fold never wraps whatever 'wrap' says, so leaving it on
+        -- makes one row reflow the moment it is opened
+        assert(browser.open(project_buffer(), opts()))
+        assert.falsy(vim.wo[vim.api.nvim_get_current_win()].wrap)
+    end)
+
     it("reuses the buffer when the same source is browsed again", function()
         local source = project_buffer()
         local first = assert(browser.open(source, opts()))

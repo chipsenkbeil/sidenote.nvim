@@ -37,6 +37,17 @@ describe("highlight.SIGNS", function()
             assert.lte(vim.fn.strdisplaywidth(highlight.SIGNS[status]), 2)
         end
     end)
+
+    it("gives every status its own glyph", function()
+        -- The browser lists annotations away from their source, so the sign is
+        -- the only thing carrying status; sharing one would erase the difference
+        local seen = {}
+        for _, status in ipairs(STATUSES) do
+            local sign = highlight.SIGNS[status]
+            assert.is_nil(seen[sign], ("%s and %s share %q"):format(status, seen[sign] or "", sign))
+            seen[sign] = status
+        end
+    end)
 end)
 
 describe("highlight.setup", function()

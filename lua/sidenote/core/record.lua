@@ -120,6 +120,49 @@ function M.capture(opts)
     }
 end
 
+---@class sidenote.core.record.ReanchorOpts
+---@field path string annotated file, relative to the project root
+---@field content string full text of the file the annotation now points into
+---@field scope "file"|"lines"|"range" what the annotation now covers
+---@field now string ISO-8601 instant the anchor was re-captured
+---@field line_start? integer required outside file scope
+---@field line_end? integer required outside file scope
+---@field col_start? integer defaults to 1 in range scope
+---@field col_end? integer defaults to 1 in range scope
+
+---Re-capture a record's anchor at a location its owner asserted.
+---
+---Takes the file as it is now rather than searching it for the old anchor
+---text: someone editing a location is telling us where the annotation belongs,
+---which beats any inference the resolver could make. That is what makes this
+---the manual repair for a cross-file move.
+---
+---Identity and everything the user owns survive — `id`, `kind`, `state` and
+---`captured`. The anchor, its context, every hash and `verified` are refreshed.
+---`symbol` and `ts_path` are cleared, since both described the old location.
+---@param rec sidenote.Annotation
+---@param opts sidenote.core.record.ReanchorOpts
+---@return sidenote.Annotation
+function M.reanchor(rec, opts)
+    local fresh = M.capture({
+        id = rec.id,
+        project_key = rec.project_key,
+        path = opts.path,
+        content = opts.content,
+        scope = opts.scope,
+        line_start = opts.line_start,
+        line_end = opts.line_end,
+        col_start = opts.col_start,
+        col_end = opts.col_end,
+        kind = rec.kind,
+        vcs = rec.vcs,
+        now = opts.now,
+    })
+    fresh.state = rec.state
+    fresh.captured = rec.captured
+    return fresh
+end
+
 ---@param rec sidenote.Annotation
 ---@return boolean ok
 ---@return string|nil err

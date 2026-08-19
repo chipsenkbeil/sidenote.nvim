@@ -77,6 +77,26 @@ function M.create(root, rec, filetype)
     return write_file(M.prose_path(root, rec.id, filetype), "")
 end
 
+---@class sidenote.store.WriteProseOpts
+---@field root string store root the annotation lives in
+---@field id string annotation whose prose is being written
+---@field filetype string extension the prose file carries
+---@field lines string[] prose to write, one line per entry
+
+---Write a note's prose, the one sanctioned path into a user-owned file.
+---
+---Every other write in this module touches metadata alone. This exists because
+---the browser lets prose be edited in place, and it runs only as the direct
+---application of text the user typed and then confirmed — never on capture,
+---never on write-back, never on repair.
+---@param opts sidenote.store.WriteProseOpts
+---@return boolean ok
+---@return string|nil err
+function M.write_prose(opts)
+    local path = M.prose_path(opts.root, opts.id, opts.filetype)
+    return write_file(path, table.concat(opts.lines, "\n") .. "\n")
+end
+
 ---Persist a changed record. Touches metadata only.
 ---@param root string
 ---@param rec sidenote.Annotation

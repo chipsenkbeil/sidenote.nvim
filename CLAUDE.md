@@ -116,6 +116,16 @@ already happened once here. Check `jj st` after every absorb.
 - **An annotation is two files.** Prose the user owns, metadata the plugin owns.
   `store.update` writes metadata only, and a test proves it by making the prose
   file read-only and asserting the update still succeeds.
+- **`store.write_prose` is the one sanctioned writer of a prose file**, and it
+  exists solely for the browser. Invariant 3 was amended in slice 6: prose is
+  never written on capture, write-back or repair, and only ever as the direct
+  application of text the user typed and then confirmed. Nothing else may call
+  it.
+- **The browser splits by how it fails.** `render` and `parse` are pure and
+  inverse — a round-trip test pins them together, because a render that does
+  not parse back reports an edit nobody made. `diff` is pure. Only `apply`
+  writes, and validation that needs the filesystem lives there rather than in
+  the parser.
 - **No required `setup()`.** Config is `vim.g.sidenote`, validated in
   `config.lua`, which returns defaults *alongside* any error so a bad config
   degrades rather than disabling the plugin.
@@ -136,6 +146,25 @@ already happened once here. Check `jj st` after every absorb.
 - **`nvim_open_win` speaks `above`/`below`; the config speaks `top`/`bottom`.**
   `window.lua` maps between them so nvim's vocabulary never leaks into user
   config.
+- **`foldtext = ""` renders a closed fold as its own line, conceal included.**
+  Verified on 0.12.4. This is what lets the browser hide prose behind real
+  folds without the concealed id reappearing on every collapsed row.
+- **A vim operator applies to a whole closed fold**, so `dd` on a collapsed
+  browser row deletes the annotation and all its prose. The browser gets that
+  for free rather than implementing it.
+- **`foldminlines` defaults to 1, which leaves a one-line fold open.** A note
+  with no body is exactly that, so the browser sets it to 0 to keep "every
+  annotation is a closed fold" true.
+- **Set fold options only once the lines exist.** A fold created after
+  `foldlevel` was last set opens regardless of it, so `browser.paint` re-closes
+  after filling the buffer.
+- **The browser's concealed id needs `syntax` enabled.** It comes from
+  `syntax/sidenote.vim`, exactly as oil does it and as the spec specifies, so
+  `:syntax off` leaves raw ULIDs on every row. Verified. An extmark `conceal`
+  would not have that dependency, if it ever becomes a real complaint.
+- **`concealcursor` is what hides the id on the line you are on.** Without it
+  every other row conceals and the cursor's row does not, which reads as a
+  rendering bug rather than as a setting.
 
 ## Anchoring, and why the thresholds are what they are
 
@@ -163,5 +192,6 @@ What the measurements established, and what a change here must not undo:
 
 ## Status
 
-Slices 1–5 are implemented as a ten-change stack. Plans exist for slice 6 (the
-oil-style browser) and slice 7 (the agent interface); neither is started.
+Slices 1–6 are implemented as a fourteen-change stack. A plan exists for slice
+7 (the agent interface), unstarted. The browser is per-file only; the
+project-wide view and filtering are deliberately deferred.

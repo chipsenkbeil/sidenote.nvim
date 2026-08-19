@@ -14,13 +14,18 @@ M.GROUPS = {
     filegone = "SidenoteFilegone",
 }
 
+---Gutter glyph per status, one distinct mark each.
+---
+---Beside visible code the highlight alone would carry the difference, but the
+---browser lists annotations away from their source, where the status is the
+---whole point and has to survive a colourless terminal.
 ---@type table<sidenote.Status, string>
 M.SIGNS = {
     attached = "▍",
-    drifted = "▍",
+    drifted = "╎",
     ambiguous = "?",
     orphaned = "!",
-    filegone = "!",
+    filegone = "✗",
 }
 
 ---Severity ordering, expressed by borrowing the diagnostic groups: an exact

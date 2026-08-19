@@ -45,6 +45,14 @@ function M.at_cursor()
     return nil
 end
 
+---Open the editable listing of this file's annotations.
+---@param bufnr? integer defaults to the current buffer
+---@return integer|nil browser
+---@return string|nil err
+function M.browse(bufnr)
+    return require("sidenote.browser").open(bufnr or vim.api.nvim_get_current_buf(), config())
+end
+
 ---Glance at the annotation under the cursor without leaving the code.
 ---@return boolean shown
 function M.view()

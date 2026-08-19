@@ -1,6 +1,14 @@
+local apply = require("sidenote.browser.apply")
 local buffer = require("sidenote.buffer")
 local config = require("sidenote.config")
+local confirm = require("sidenote.browser.confirm")
+local diff = require("sidenote.browser.diff")
+local editor = require("sidenote.editor")
 local hash = require("sidenote.core.hash")
+-- `sidenote.render` paints status indicators, which is what it is doing here;
+-- the browser's own renderer already owns the name
+local indicator = require("sidenote.render")
+local parse = require("sidenote.browser.parse")
 local render = require("sidenote.browser.render")
 local session = require("sidenote.session")
 local store = require("sidenote.store")
@@ -64,7 +72,7 @@ end
 ---Setting them on the buffer instead would silently do nothing and leave every
 ---id on screen.
 ---@param winid integer
-local function dress(winid)
+local function configure(winid)
     local wo = vim.wo[winid]
     wo.conceallevel = 3
     wo.concealcursor = "nvic"
@@ -78,6 +86,9 @@ local function dress(winid)
     -- default of 1. Zero keeps "every annotation is a closed fold" true
     wo.foldminlines = 0
     wo.fillchars = vim.o.fillchars == "" and "fold: " or (vim.o.fillchars .. ",fold: ")
+    -- A closed fold never wraps, so leaving wrap on would change a row's shape
+    -- the moment it is expanded. Summaries are untruncated and can be long
+    wo.wrap = false
 end
 
 ---Collapse every annotation, so the browser reads as an index.
@@ -98,11 +109,84 @@ end
 ---@param state sidenote.browser.State
 local function paint(bufnr, state)
     state.rows = rows_for(state.source, state.config)
+    local lines, headers = render.rows(state.rows)
+
     vim.bo[bufnr].modifiable = true
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, render.rows(state.rows))
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     vim.bo[bufnr].modified = false
     states[bufnr] = state
+
+    -- Anchor status is not a column, so the sign column is the only place it
+    -- appears; the source-buffer gutter already defines the glyphs
+    ---@type sidenote.render.Entry[]
+    local marks = {}
+    for i, row in ipairs(state.rows) do
+        marks[i] = {
+            id = row.entry.id,
+            status = row.entry.status,
+            line_start = headers[i],
+            line_end = headers[i],
+        }
+    end
+    indicator.paint(bufnr, marks, { style = "sign" })
     close_all(bufnr)
+end
+
+---@param applied integer
+---@param problems string[]
+local function report(applied, problems)
+    if #problems > 0 then
+        vim.notify("sidenote: " .. table.concat(problems, "\n"), vim.log.levels.ERROR)
+    elseif applied > 0 then
+        local plural = applied == 1 and "" or "s"
+        vim.notify(("sidenote: applied %d change%s"):format(applied, plural))
+    end
+end
+
+---Move the cursor to whichever column `find` picks out.
+---@param bufnr integer
+---@param find fun(text: string, col: integer): integer|nil
+local function step(bufnr, find)
+    local winid = vim.api.nvim_get_current_win()
+    local lnum, col = unpack(vim.api.nvim_win_get_cursor(winid))
+    local text = vim.api.nvim_buf_get_lines(bufnr, lnum - 1, lnum, false)[1] or ""
+    -- Cursor columns are 0-based bytes; parsed fields are 1-based
+    local target = find(text, col + 1)
+    if target then
+        vim.api.nvim_win_set_cursor(winid, { lnum, target - 1 })
+    end
+end
+
+---Mappings that live only inside a browser buffer.
+---
+---Fold verbs are deliberately absent: expansion is real folds, so `za`, `zR`
+---and the user's own fold mappings already do the right thing.
+---@param bufnr integer
+local function bind(bufnr)
+    ---@param lhs string
+    ---@param rhs function
+    ---@param desc string
+    local function map(lhs, rhs, desc)
+        vim.keymap.set("n", lhs, rhs, { buffer = bufnr, desc = desc, nowait = true })
+    end
+
+    map("<CR>", function()
+        local row = M.row_at(bufnr, vim.fn.line("."))
+        local state = states[bufnr]
+        if not row or not state then
+            return
+        end
+        local where = vim.tbl_extend("force", state.config.editor, { focus = true })
+        editor.open(row.entry, where, state.config.filetype)
+    end, "Open this note's prose for writing")
+
+    map("<Tab>", function()
+        step(bufnr, M.next_column)
+    end, "Jump to the next column")
+
+    map("<S-Tab>", function()
+        step(bufnr, M.prev_column)
+    end, "Jump to the previous column")
 end
 
 ---Open the browser for a source buffer, in the current window.
@@ -136,12 +220,20 @@ function M.open(source, cfg)
                 states[bufnr] = nil
             end,
         })
+        vim.api.nvim_create_autocmd("BufWriteCmd", {
+            buffer = bufnr,
+            desc = "Confirm and apply the edits made to this listing",
+            callback = function()
+                report(M.write(bufnr))
+            end,
+        })
+        bind(bufnr)
     end
 
     local winid = vim.api.nvim_get_current_win()
     vim.api.nvim_win_set_buf(winid, bufnr)
     vim.bo[bufnr].filetype = "sidenote"
-    dress(winid)
+    configure(winid)
 
     paint(bufnr, { path = target.path, source = source, config = cfg, rows = {} })
     return bufnr, nil
@@ -165,6 +257,127 @@ function M.rerender(bufnr)
     end
     paint(bufnr, state)
     return true
+end
+
+---The annotation a buffer line belongs to, header or prose alike.
+---@param bufnr integer
+---@param lnum integer 1-based
+---@return sidenote.browser.Row|nil
+function M.row_at(bufnr, lnum)
+    local state = states[bufnr]
+    if not state then
+        return nil
+    end
+    for n = lnum, 1, -1 do
+        local text = vim.api.nvim_buf_get_lines(bufnr, n - 1, n, false)[1] or ""
+        local id = text:match("^/(%S+) ")
+        if id then
+            for _, row in ipairs(state.rows) do
+                if row.entry.id == id then
+                    return row
+                end
+            end
+            return nil
+        end
+    end
+    return nil
+end
+
+---Byte column each field of a header line starts at, in written order.
+---@param text string
+---@return integer[]
+local function column_starts(text)
+    local row = parse.header(text)
+    if not row then
+        return {}
+    end
+    local starts = {}
+    for i, column in ipairs(render.COLUMNS) do
+        starts[i] = row.fields[column.name].first
+    end
+    return starts
+end
+
+---Where `<Tab>` should land from byte column `col`, or nil at the last column.
+---@param text string
+---@param col integer 1-based byte column
+---@return integer|nil
+function M.next_column(text, col)
+    for _, start in ipairs(column_starts(text)) do
+        if start > col then
+            return start
+        end
+    end
+    return nil
+end
+
+---Where `<S-Tab>` should land from byte column `col`, or nil at the first.
+---@param text string
+---@param col integer 1-based byte column
+---@return integer|nil
+function M.prev_column(text, col)
+    local previous = nil
+    for _, start in ipairs(column_starts(text)) do
+        if start >= col then
+            return previous
+        end
+        previous = start
+    end
+    return previous
+end
+
+---@class sidenote.browser.WriteOpts
+---@field confirm? sidenote.browser.ConfirmFn asks before anything is applied, defaulting to the dialog
+
+---@param problems sidenote.browser.ParseError[]
+---@return string[]
+local function reported(problems)
+    local out = {}
+    for i, problem in ipairs(problems) do
+        out[i] = ("line %d: %s"):format(problem.lnum, problem.message)
+    end
+    return out
+end
+
+---Apply what the buffer now says, after asking.
+---
+---Parsing and validation both run before the dialog, so it can never offer an
+---action that would fail. A refusal leaves the buffer exactly as it is, ready
+---to be corrected and written again.
+---@param bufnr integer
+---@param opts? sidenote.browser.WriteOpts
+---@return integer applied
+---@return string[] problems
+function M.write(bufnr, opts)
+    local state = states[bufnr]
+    if not state then
+        return 0, { "not a sidenote browser" }
+    end
+
+    local rows, errors = parse.buffer(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
+    if #errors > 0 then
+        return 0, reported(errors)
+    end
+
+    local actions = diff.compute(state, rows)
+    if #actions == 0 then
+        vim.bo[bufnr].modified = false
+        return 0, {}
+    end
+
+    local impossible = apply.validate(actions, state)
+    if #impossible > 0 then
+        return 0, reported(impossible)
+    end
+
+    local ask = opts and opts.confirm or confirm.ask
+    if not ask(actions) then
+        return 0, {}
+    end
+
+    local applied, failures = apply.run(actions, state)
+    M.rerender(bufnr)
+    return applied, failures
 end
 
 return M
