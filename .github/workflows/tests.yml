@@ -1,0 +1,96 @@
+name: tests
+
+# The gate itself lives in the Makefile, so `make test` and `make style` here
+# are the same commands run locally. This YAML only decides what to install and
+# which Neovim versions to run against.
+#
+# The two path lists are duplicated because GitHub Actions does not support
+# YAML anchors.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "lua/**"
+      - "spec/**"
+      - "cli/**"
+      - "plugin/**"
+      - "syntax/**"
+      - "harness/**"
+      - "scripts/**"
+      - "doc/**"
+      - "Makefile"
+      - "stylua.toml"
+      - ".github/workflows/tests.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "lua/**"
+      - "spec/**"
+      - "cli/**"
+      - "plugin/**"
+      - "syntax/**"
+      - "harness/**"
+      - "scripts/**"
+      - "doc/**"
+      - "Makefile"
+      - "stylua.toml"
+      - ".github/workflows/tests.yml"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # These directories are LUA_DIRS in the Makefile, and `make fmt-check` is
+      # the local equivalent. Keep the two in step when adding one
+      - uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: latest
+          args: --check lua/ spec/ cli/ plugin/ harness/ scripts/
+
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every release we support, pinned rather than `stable`, so a green run
+        # names exactly the versions it was green on. The floor is 0.11.0
+        # because `vim.fs.relpath` arrived there; add each new point release
+        # here as it ships
+        version:
+          - v0.11.0
+          - v0.11.1
+          - v0.11.2
+          - v0.11.3
+          - v0.11.4
+          - v0.11.5
+          - v0.11.6
+          - v0.11.7
+          - v0.12.0
+          - v0.12.1
+          - v0.12.2
+          - v0.12.3
+          - v0.12.4
+          - nightly
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Neovim
+        uses: rhysd/action-setup-vim@v1
+        id: neovim
+        with:
+          neovim: true
+          version: ${{ matrix.version }}
+
+      # No retry wrapper: this suite touches only temporary directories and
+      # scratch buffers, so a failure here is a bug rather than a flake
+      - name: Run the suite
+        run: make test
+
+      - name: Audit the mechanical style rules
+        run: make style

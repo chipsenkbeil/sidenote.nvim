@@ -34,8 +34,20 @@ make lint            # luacheck
 make fmt             # stylua, writes
 make fmt-check       # stylua, fails instead of writing
 make style           # the mechanical lua-style audit
-make check           # all of the above, what CI runs
+make check           # all of the above; run this before closing a change
 ```
+
+`test` and `style` need **only Neovim** — the audit runs through `nvim -l`, not
+luajit — so CI runs both against every version in its matrix. `fmt-check` needs
+stylua, a single static binary CI fetches directly, and runs once.
+
+**`lint` is the one target CI does not run.** luacheck's only real distribution
+channel is luarocks, which this project does not use in either direction, so
+luacheck stays a local tool. Run `make check` before closing a change; CI will
+not catch a luacheck warning for you.
+
+All four read their directory list from `LUA_DIRS` in the Makefile; adding a
+directory is one edit.
 
 ## Testing
 

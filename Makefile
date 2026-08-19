@@ -24,6 +24,6 @@ fmt-check: ## Fail if any source is unformatted
 	@stylua --check $(LUA_DIRS)
 
 style: ## Audit the mechanical lua-style rules
-	@luajit scripts/style_audit.lua $$(find $(LUA_DIRS) -name '*.lua')
+	@$(NVIM) -l scripts/style_audit.lua $$(find $(LUA_DIRS) -name '*.lua')
 
 check: test lint fmt-check style ## Everything CI runs
