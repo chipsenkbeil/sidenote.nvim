@@ -1,0 +1,176 @@
+local browser = require("sidenote.browser")
+local capture = require("sidenote.capture")
+local store = require("sidenote.store")
+
+---@return sidenote.Config
+local function opts()
+    return {
+        filetype = "org",
+        strategy = { "project" },
+        project_dir = ".annotations",
+        global_dir = vim.fn.tempname(),
+        indicator = { style = "sign" },
+        preview = { style = "float", max_lines = 20 },
+        editor = { style = "split", position = "right", size = 60 },
+    }
+end
+
+local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
+
+---Build a project with one source file open in a buffer.
+---@return integer
+local function project_buffer()
+    local root = vim.fn.tempname()
+    vim.fn.mkdir(root .. "/.annotations", "p")
+    local path = root .. "/m.lua"
+    local fh = assert(io.open(path, "w"))
+    fh:write(table.concat(SOURCE, "\n") .. "\n")
+    fh:close()
+
+    local bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_name(bufnr, path)
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, SOURCE)
+    return bufnr
+end
+
+---Capture an annotation and write prose the user would have written.
+---@param bufnr integer
+---@param line integer
+---@param prose string[]
+---@return string id
+local function annotate(bufnr, line, prose)
+    local cfg = opts()
+    local result =
+        assert(capture.run(bufnr, { scope = "lines", range = { line, 0, line, 0 }, config = cfg }))
+    local fh = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
+    fh:write(table.concat(prose, "\n") .. "\n")
+    fh:close()
+    return result.id
+end
+
+describe("browser.open", function()
+    it("names the buffer after the resolved absolute source path", function()
+        -- Absolute, so two projects open at once cannot collide on one
+        -- relative path, and the browser can recover its roots from its name
+        local source = project_buffer()
+        local bufnr = assert(browser.open(source, opts()))
+        local path = vim.uv.fs_realpath(vim.api.nvim_buf_get_name(source))
+        assert.eq(vim.api.nvim_buf_get_name(bufnr), "sidenote://" .. path)
+    end)
+
+    it("uses an acwrite buftype so :w is interceptable", function()
+        local bufnr = assert(browser.open(project_buffer(), opts()))
+        assert.eq(vim.bo[bufnr].buftype, "acwrite")
+        assert.eq(vim.bo[bufnr].filetype, "sidenote")
+    end)
+
+    it("sets the conceal and fold options on the window, not the buffer", function()
+        -- Both are window-local; setting them on the buffer would silently do
+        -- nothing and leave every id on screen
+        assert(browser.open(project_buffer(), opts()))
+        local winid = vim.api.nvim_get_current_win()
+        assert.eq(vim.wo[winid].conceallevel, 3)
+        assert.eq(vim.wo[winid].concealcursor, "nvic")
+        assert.eq(vim.wo[winid].foldmethod, "expr")
+        assert.eq(vim.wo[winid].foldtext, "")
+        assert.contains(vim.wo[winid].foldexpr, "^/")
+    end)
+
+    it("reuses the buffer when the same source is browsed again", function()
+        local source = project_buffer()
+        local first = assert(browser.open(source, opts()))
+        assert.eq(browser.open(source, opts()), first)
+    end)
+
+    it("opens with every annotation folded shut, one visible row each", function()
+        -- Entries sort by line, so the note on line 1 renders first and the
+        -- one on line 4 renders second, carrying its body with it
+        local source = project_buffer()
+        annotate(source, 4, { "has a body", "the body line" })
+        annotate(source, 1, { "no body" })
+
+        assert(browser.open(source, opts()))
+        assert.eq(vim.fn.foldclosed(1), 1, "a body-less note is still a closed fold")
+        assert.eq(vim.fn.foldclosedend(1), 1)
+        assert.eq(vim.fn.foldclosed(2), 2)
+        assert.eq(vim.fn.foldclosedend(2), 3, "the body line belongs inside the fold")
+    end)
+
+    it("puts a note's whole body inside its fold, so dd on a closed row takes it all", function()
+        local source = project_buffer()
+        annotate(source, 4, { "summary", "body one", "body two" })
+        local bufnr = assert(browser.open(source, opts()))
+
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        vim.cmd("normal! dd")
+        assert.eq_deep(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), { "" })
+    end)
+
+    it("renders a row for every annotation targeting the source", function()
+        local source = project_buffer()
+        annotate(source, 4, { "the note" })
+        local bufnr = assert(browser.open(source, opts()))
+
+        local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+        assert.eq(#lines, 1)
+        assert.contains(lines[1], "the note")
+        assert.contains(lines[1], "m.lua:4")
+    end)
+
+    it("refuses a buffer that resolves to no store, rather than opening empty", function()
+        local loose = vim.api.nvim_create_buf(false, true)
+        vim.api.nvim_buf_set_name(loose, vim.fn.tempname() .. "/loose.lua")
+        vim.api.nvim_buf_set_lines(loose, 0, -1, false, SOURCE)
+
+        local bufnr, err = browser.open(loose, opts())
+        assert.is_nil(bufnr)
+        assert.not_nil(err)
+    end)
+
+    it("refuses a buffer with no file name", function()
+        local bufnr, err = browser.open(vim.api.nvim_create_buf(false, true), opts())
+        assert.is_nil(bufnr)
+        assert.not_nil(err)
+    end)
+end)
+
+describe("browser.state", function()
+    it("returns the rows as rendered, in buffer order", function()
+        local source = project_buffer()
+        annotate(source, 4, { "later" })
+        annotate(source, 1, { "earlier" })
+        local bufnr = assert(browser.open(source, opts()))
+
+        local state = assert(browser.state(bufnr))
+        assert.eq(#state.rows, 2)
+        assert.eq(state.rows[1].prose[1], "earlier")
+        assert.eq(state.rows[2].prose[1], "later")
+    end)
+
+    it("carries the store root each annotation came from", function()
+        local source = project_buffer()
+        annotate(source, 4, { "the note" })
+        local state = assert(browser.state(assert(browser.open(source, opts()))))
+        assert.contains(state.rows[1].entry.root, ".annotations")
+    end)
+
+    it("keeps the source path so a create knows what it is annotating", function()
+        local source = project_buffer()
+        local bufnr = assert(browser.open(source, opts()))
+        local state = assert(browser.state(bufnr))
+        assert.eq(state.path, vim.uv.fs_realpath(vim.api.nvim_buf_get_name(source)))
+    end)
+
+    it("is nil for a buffer that is not a browser", function()
+        assert.is_nil(browser.state(vim.api.nvim_create_buf(false, true)))
+    end)
+
+    it("normalizes prose the same way the renderer does", function()
+        -- The state is the diff baseline; normalized differently from what was
+        -- rendered, it would report an edit nobody made
+        local source = project_buffer()
+        annotate(source, 4, { "the note", "", "" })
+        local state = assert(browser.state(assert(browser.open(source, opts()))))
+        assert.eq_deep(state.rows[1].prose, { "the note" })
+    end)
+end)
