@@ -1,0 +1,49 @@
+{
+  "note": "Anchoring accuracy measured against real repository history. Regenerate deliberately, never to make a failing comparison pass. A rise in `wrong` or a fall in `correct` is a regression.",
+  "interpretation": "The error profile is conservative by design: `false_stale` (declined to place a line that survived) exceeds `wrong` (placed a line at the incorrect location) at every drift depth. That ordering is the point of the two-threshold ladder, because a wrong placement points an agent at code that was never the subject of the note, while a false stale merely asks a human to look. Recall falls sharply with drift -- at 600 commits on a hot file only 12 of 55 surviving samples were placed -- which is expected, since `git blame` counts a line as surviving even when the block around it has become unrecognizable.",
+  "generated": "2026-08-18",
+  "reports": [
+    {
+      "repo": "org-roam.nvim",
+      "path": "lua/org-roam/core/ui/select.lua",
+      "head": "0240378c92eb0c9d6bc4ccbc8a6046e3c3d02ece",
+      "base": "7798d3c07857d311ebed79b0b3eba921592110e2",
+      "depth": 100,
+      "samples": 60,
+      "height": 8,
+      "correct": 52,
+      "wrong": 0,
+      "false_stale": 6,
+      "correct_stale": 2,
+      "by_tier": { "L2": 45, "L3": 1, "L4": 5, "L6": 9 }
+    },
+    {
+      "repo": "doug-game",
+      "path": "src/game/match.lua",
+      "head": "ea3fc26949abb22c768cc169f50f472c93060b9c",
+      "base": "f6f597d1e97bae1a1b0f3c291d6d98e813cf3dab",
+      "depth": 300,
+      "samples": 80,
+      "height": 8,
+      "correct": 21,
+      "wrong": 4,
+      "false_stale": 17,
+      "correct_stale": 38,
+      "by_tier": { "L2": 17, "L4": 3, "L6": 60 }
+    },
+    {
+      "repo": "doug-game",
+      "path": "src/engine/sync/init.lua",
+      "head": "ea3fc26949abb22c768cc169f50f472c93060b9c",
+      "base": "ae1302bd1d821b3f9223e3add3185fc8475da677",
+      "depth": 600,
+      "samples": 80,
+      "height": 8,
+      "correct": 12,
+      "wrong": 1,
+      "false_stale": 43,
+      "correct_stale": 24,
+      "by_tier": { "L2": 5, "L4": 2, "L6": 73 }
+    }
+  ]
+}

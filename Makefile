@@ -1,6 +1,7 @@
-.PHONY: help test lint fmt
+.PHONY: help test lint fmt fmt-check
 
 NVIM ?= nvim
+LUA_DIRS := lua spec harness
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -14,7 +15,10 @@ else
 endif
 
 lint: ## Static-check the Lua sources
-	@luacheck lua spec --globals vim describe it before_each after_each assert
+	@luacheck $(LUA_DIRS) --globals vim describe it before_each after_each assert
 
 fmt: ## Format the Lua sources
-	@stylua lua spec
+	@stylua $(LUA_DIRS)
+
+fmt-check: ## Fail if any source is unformatted
+	@stylua --check $(LUA_DIRS)
