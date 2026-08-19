@@ -1,7 +1,7 @@
 *sidenote.txt*   Notes on your code, stored outside it
 
 Author:  Chip Senkbeil
-License: see the repository
+License: MIT
 
 ==============================================================================
 CONTENTS                                                    *sidenote-contents*

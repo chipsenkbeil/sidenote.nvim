@@ -294,3 +294,7 @@ real repository history and grades placements against `git blame --reverse`;
 **A note is never deleted by the plugin.** Losing the anchor changes a note's
 status, never its existence, and orphaning only ever *adds* fields. Deletion is
 always something you asked for.
+
+## License
+
+[MIT](LICENSE).
