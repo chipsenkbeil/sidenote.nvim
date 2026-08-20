@@ -240,9 +240,26 @@ already happened once here. Check `jj st` after every absorb.
   `was:` line.
 - **Follow mode is re-pointing one window, not a window system**
   (`follow.lua`). `at_cursor` over entries cached per changedtick; the
-  panel keeps the last note over unannotated code; a modified prose buffer
-  is `:update`d before the panel moves off it, so the on-disk store never
-  lies to the CLI or an agent; closing the panel turns following off.
+  panel keeps the last note over unannotated code; the editor itself
+  `:update`s any prose buffer it re-points away from, so the on-disk store
+  never lies to the CLI or an agent; closing the panel turns following off.
+- **Config is input, `vim.g.sidenote_state` is output** (2026-08-20, user
+  decision after discussing how gitsigns does it). `vim.g.sidenote.pen`
+  seeds the active pen; `:Sidenote pen` and `<Plug>(SidenotePen)` change it
+  for the session via `pen.lua`, which mirrors the result into the state
+  global for statuslines. The plugin never writes the config global — a
+  user re-sourcing their config must not silently reset runtime state —
+  and function-form configs make writing it impossible anyway.
+- **One writer for kind/state/pen rotation** (`cycle.lua`): the browser's
+  `t`/`T`, the source-buffer cycle plugs and the menu all go through it,
+  so the rings and the write-then-repaint path cannot drift apart. Every
+  write also calls `editor.redecorate_note`, keeping an open header true.
+- **A note buffer carries `b:sidenote`** ({id, root, source}), which is
+  what DWIM reads: browse/browse_project from inside a note act on the
+  annotated file. The context header re-draws from live extents on source
+  `TextChanged` and on `BufWinEnter` of the prose buffer; `topfill` is
+  re-asked only when the view sits at the top, so a scrolled note is never
+  yanked back up.
 - **No required `setup()`.** Config is `vim.g.sidenote`, validated in
   `config.lua`, which returns defaults *alongside* any error so a bad config
   degrades rather than disabling the plugin.
