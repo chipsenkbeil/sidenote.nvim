@@ -32,10 +32,10 @@ end
 
 ---@param root string
 ---@param name string
----@param line integer
+---@param capture_opts sidenote.capture.Opts everything but the config
 ---@param prose string[]
 ---@return string id
-local function annotate(root, name, line, prose)
+local function annotate_with(root, name, capture_opts, prose)
     local path = root .. "/" .. name
     local bufnr = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_name(bufnr, path)
@@ -45,14 +45,23 @@ local function annotate(root, name, line, prose)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(body:gsub("\n$", ""), "\n"))
 
     local cfg = opts()
-    local result =
-        assert(capture.run(bufnr, { scope = "lines", range = { line, 0, line, 0 }, config = cfg }))
+    capture_opts.config = cfg
+    local result = assert(capture.run(bufnr, capture_opts))
     vim.api.nvim_buf_delete(bufnr, { force = true })
 
     local note = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
     note:write(table.concat(prose, "\n") .. "\n")
     note:close()
     return result.id
+end
+
+---@param root string
+---@param name string
+---@param line integer
+---@param prose string[]
+---@return string id
+local function annotate(root, name, line, prose)
+    return annotate_with(root, name, { scope = "lines", range = { line, 0, line, 0 } }, prose)
 end
 
 ---Run the CLI the way a shell would, capturing what it printed.
@@ -122,6 +131,19 @@ describe("cli list", function()
         local _, out = run({ "list", root })
         assert.match(out[1], "^alpha%.lua:4%s")
         assert.contains(out[1], "the note")
+    end)
+
+    it("lists a file-wide annotation by its path alone", function()
+        -- A placed file-scope annotation has a status but no lines, so its
+        -- location column is the bare path, not a formatted position
+        local root = project()
+        annotate_with(root, "alpha.lua", { scope = "file" }, { "about the whole file" })
+
+        local code, out = run({ "list", root })
+        assert.eq(code, 0)
+        assert.match(out[1], "^alpha%.lua\t")
+        assert.contains(out[1], "attached")
+        assert.contains(out[1], "about the whole file")
     end)
 
     it("names the status instead of a location when there is none", function()

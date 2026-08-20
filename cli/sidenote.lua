@@ -53,13 +53,13 @@ end
 
 ---One greppable line per annotation, location first so an editor can jump to it.
 ---
----An annotation the gate withheld shows its path and its status where the
----position would be, rather than a line number nothing stands behind.
+---An annotation with no lines — file-wide, or one the gate withheld — shows its
+---path where the position would be, rather than a number nothing stands behind.
 ---@param record sidenote.export.Record
 ---@return string
 local function summarize(record)
     local where = record.path
-    if not record.code_no_longer_exists then
+    if record.line_start then
         where = location.format({
             path = record.path,
             scope = "lines",
