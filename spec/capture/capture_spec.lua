@@ -9,7 +9,7 @@ local store = require("sidenote.store")
 ---@return string root
 local function project_buffer()
     local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.annotations", "p")
+    vim.fn.mkdir(root .. "/.sidenote", "p")
     local path = root .. "/m.lua"
     local fh = assert(io.open(path, "w"))
     fh:write("local M = {}\n\nfunction M.f()\n  return 1\nend\n")
@@ -32,7 +32,7 @@ local function opts()
     return {
         filetype = "org",
         strategy = { "project" },
-        project_dir = ".annotations",
+        project_dir = ".sidenote",
         global_dir = vim.fn.tempname(),
         indicator = { style = "sign" },
         preview = { style = "float", max_lines = 20 },
@@ -46,7 +46,7 @@ describe("capture.run", function()
         local result = assert.not_nil(
             capture.run(bufnr, { scope = "lines", range = { 4, 0, 4, 0 }, config = opts() })
         )
-        assert.eq(result.root, root .. "/.annotations")
+        assert.eq(result.root, root .. "/.sidenote")
         assert.not_nil(vim.uv.fs_stat(result.paths.meta))
         assert.not_nil(vim.uv.fs_stat(result.paths.prose))
     end)

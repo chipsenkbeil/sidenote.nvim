@@ -120,7 +120,7 @@ vim.g.sidenote = {
     -- Stores to use, tried in order; also the read order
     strategy = { "project", "global" },
     global_dir = vim.fn.stdpath("data") .. "/sidenote",
-    project_dir = ".annotations",
+    project_dir = ".sidenote",
 
     -- How a buffer shows that an annotation exists:
     -- sign | virt_text | highlight | underline | none
@@ -150,7 +150,7 @@ that one setting cannot express.
 
 | strategy | resolves to | fails when |
 |---|---|---|
-| `project` | `<root>/.annotations/` | no project root is found |
+| `project` | `<root>/.sidenote/` | no project root is found |
 | `global` | `<global_dir>/<key>/` | never |
 | a function | whatever `fun(path)` returns | it returns `nil` |
 
@@ -161,9 +161,9 @@ notes. Write the fallback you want in the list.
 The list is also the read order. Reads union every store in it, earlier entries
 winning; writes go to the first that resolves.
 
-A project root is `.annotations/` itself, then `.git` / `.jj` / `.hg`, then
+A project root is `.sidenote/` itself, then `.git` / `.jj` / `.hg`, then
 `Cargo.toml` / `package.json` / `go.mod` / `pyproject.toml` / `*.rockspec`. The
-first is what makes `mkdir .annotations` enough, with no repo and no config.
+first is what makes `mkdir .sidenote` enough, with no repo and no config.
 
 In-repo notes are committed by default. The plugin writes files and nothing
 else.

@@ -9,6 +9,10 @@ describe("config.defaults", function()
         assert.eq_deep(config.defaults().strategy, { "project", "global" })
     end)
 
+    it("names the project store after the tool", function()
+        assert.eq(config.defaults().project_dir, ".sidenote")
+    end)
+
     it("puts the global store under a data path, not a cache path", function()
         assert.contains(config.defaults().global_dir, "/share/")
     end)

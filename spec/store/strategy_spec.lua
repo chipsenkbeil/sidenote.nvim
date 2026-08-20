@@ -16,7 +16,7 @@ end
 ---@param over? table<string, any> fields overriding the fixture defaults
 ---@return sidenote.store.strategy.Opts
 local function opts(over)
-    local base = { strategy = "global", global_dir = GLOBAL, project_dir = ".annotations" }
+    local base = { strategy = "global", global_dir = GLOBAL, project_dir = ".sidenote" }
     for key, value in pairs(over or {}) do
         base[key] = value
     end
@@ -41,7 +41,7 @@ describe("strategy project", function()
     it("resolves to the project directory inside the project", function()
         local root = tree({ ".git" })
         local roots = strategy.resolve(root .. "/a.lua", opts({ strategy = "project" }))
-        assert.eq_deep(roots, { root .. "/.annotations" })
+        assert.eq_deep(roots, { root .. "/.sidenote" })
     end)
 
     it("errors rather than silently falling back when there is no project", function()
@@ -52,7 +52,7 @@ describe("strategy project", function()
 
     it("names the markers it looked for, so the error is actionable", function()
         local _, err = strategy.resolve("/nowhere/a.lua", opts({ strategy = "project" }))
-        assert.contains(err, ".annotations")
+        assert.contains(err, ".sidenote")
     end)
 end)
 
@@ -61,7 +61,7 @@ describe("strategy as a list", function()
         local root = tree({ ".git" })
         local roots =
             strategy.resolve(root .. "/a.lua", opts({ strategy = { "project", "global" } }))
-        assert.eq(roots[1], root .. "/.annotations")
+        assert.eq(roots[1], root .. "/.sidenote")
     end)
 
     it("falls through to a later entry when an earlier one fails", function()
@@ -76,7 +76,7 @@ describe("strategy as a list", function()
         local roots =
             strategy.resolve(root .. "/a.lua", opts({ strategy = { "project", "global" } }))
         assert.eq(#roots, 2)
-        assert.eq(roots[1], root .. "/.annotations")
+        assert.eq(roots[1], root .. "/.sidenote")
         assert.eq(roots[2], GLOBAL .. "/" .. project.key(root))
     end)
 

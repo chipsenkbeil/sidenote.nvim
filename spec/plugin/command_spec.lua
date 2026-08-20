@@ -11,7 +11,7 @@ local LINES = { "local a = 1", "local b = 2", "local c = 3", "local d = 4", "loc
 ---@return string root
 local function project()
     local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.annotations", "p")
+    vim.fn.mkdir(root .. "/.sidenote", "p")
     local fh = assert(io.open(root .. "/code.lua", "w"))
     fh:write(table.concat(LINES, "\n") .. "\n")
     fh:close()
@@ -22,9 +22,9 @@ end
 ---@param root string
 ---@return sidenote.Annotation
 local function only_record(root)
-    local ids = store.ids(root .. "/.annotations")
+    local ids = store.ids(root .. "/.sidenote")
     assert.eq(#ids, 1, "expected exactly one annotation")
-    return assert(store.read(root .. "/.annotations", ids[1]))
+    return assert(store.read(root .. "/.sidenote", ids[1]))
 end
 
 describe("the :Sidenote command", function()

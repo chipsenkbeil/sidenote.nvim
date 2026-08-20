@@ -4,11 +4,11 @@ local M = {}
 
 ---Root markers in priority order.
 ---
----`.annotations` leads so that creating that directory is enough to declare a
+---`.sidenote` leads so that creating that directory is enough to declare a
 ---project, with no VCS and no configuration. `*.rockspec` is a glob rather than
 ---a name, since its version is part of the filename.
 M.MARKERS = {
-    ".annotations",
+    ".sidenote",
     ".git",
     ".jj",
     ".hg",

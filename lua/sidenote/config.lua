@@ -39,7 +39,7 @@ function M.defaults()
         -- Stores to use, tried in order; also the read order
         strategy = { "project", "global" },
         global_dir = vim.fn.stdpath("data") .. "/sidenote",
-        project_dir = ".annotations",
+        project_dir = ".sidenote",
 
         -- How a buffer shows that an annotation exists:
         -- sign | virt_text | highlight | underline | none

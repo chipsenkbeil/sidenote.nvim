@@ -1,6 +1,6 @@
 ---
 name: sidenote
-description: Read and act on sidenote.nvim annotations — margin notes and todos stored beside a project's code, outside its files. Use when a project holds a `.annotations/` directory (or `*.metadata.json` sidecar pairs anywhere in a store), when the user mentions sidenotes, annotations, or margin notes on code, or when asked to work through annotated todos. Covers the headless CLI, the export gate, and what an agent may and may not touch.
+description: Read and act on sidenote.nvim annotations — margin notes and todos stored beside a project's code, outside its files. Use when a project holds a `.sidenote/` directory (or `*.metadata.json` sidecar pairs anywhere in a store), when the user mentions sidenotes, annotations, or margin notes on code, or when asked to work through annotated todos. Covers the headless CLI, the export gate, and what an agent may and may not touch.
 ---
 
 # Working with sidenote annotations
@@ -14,7 +14,7 @@ Each one is two files in a store directory:
 <ulid>.metadata.json    record — the plugin's, never yours to write
 ```
 
-The store is `<project>/.annotations/` when the project carries one, else
+The store is `<project>/.sidenote/` when the project carries one, else
 `~/.local/share/sidenote/<project-key>/`.
 
 ## Reading annotations
@@ -63,5 +63,5 @@ prose files is also a supported interface.
 - Agents read; humans write. Never create, edit, or delete a prose file or a
   metadata sidecar, and never touch the store's `index.json`.
 - Never resolve, archive, or otherwise change an annotation's state.
-- An in-repo `.annotations/` directory may be committed. Leave it out of any
+- An in-repo `.sidenote/` directory may be committed. Leave it out of any
   commits you make unless the user asks for it explicitly.

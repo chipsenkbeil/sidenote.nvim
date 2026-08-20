@@ -9,7 +9,7 @@ local function opts()
     return {
         filetype = "org",
         strategy = { "project" },
-        project_dir = ".annotations",
+        project_dir = ".sidenote",
         global_dir = vim.fn.tempname(),
         indicator = { style = "sign" },
         preview = { style = "float", max_lines = 20 },
@@ -23,7 +23,7 @@ local BETA = { "-- beta", "local x = 1", "return x" }
 ---@return string root
 local function project()
     local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.annotations", "p")
+    vim.fn.mkdir(root .. "/.sidenote", "p")
     for name, lines in pairs({ ["alpha.lua"] = ALPHA, ["beta.lua"] = BETA }) do
         local fh = assert(io.open(root .. "/" .. name, "w"))
         fh:write(table.concat(lines, "\n") .. "\n")

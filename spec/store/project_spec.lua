@@ -22,14 +22,14 @@ local function tree(paths)
 end
 
 describe("project.MARKERS", function()
-    it("puts .annotations first so a bare directory can opt in", function()
-        assert.eq(project.MARKERS[1], ".annotations")
+    it("puts .sidenote first so a bare directory can opt in", function()
+        assert.eq(project.MARKERS[1], ".sidenote")
     end)
 end)
 
 describe("project.root", function()
-    it("finds a root marked by .annotations", function()
-        local root = tree({ ".annotations/", "src/a.lua" })
+    it("finds a root marked by .sidenote", function()
+        local root = tree({ ".sidenote/", "src/a.lua" })
         assert.eq(project.root(root .. "/src/a.lua"), root)
     end)
 
@@ -54,7 +54,7 @@ describe("project.root", function()
     end)
 
     it("prefers the nearest root when nested", function()
-        local outer = tree({ ".git/", "inner/.annotations/", "inner/src/a.lua" })
+        local outer = tree({ ".git/", "inner/.sidenote/", "inner/src/a.lua" })
         assert.eq(project.root(outer .. "/inner/src/a.lua"), outer .. "/inner")
     end)
 

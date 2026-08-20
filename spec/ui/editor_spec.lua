@@ -8,7 +8,7 @@ local function opts()
     return {
         filetype = "org",
         strategy = { "project" },
-        project_dir = ".annotations",
+        project_dir = ".sidenote",
         global_dir = vim.fn.tempname(),
         indicator = { style = "sign" },
         preview = { style = "float", max_lines = 20 },
@@ -22,7 +22,7 @@ local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
 ---@return sidenote.session.Entry
 local function annotated()
     local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.annotations", "p")
+    vim.fn.mkdir(root .. "/.sidenote", "p")
     local path = root .. "/m.lua"
     local fh = assert(io.open(path, "w"))
     fh:write(table.concat(SOURCE, "\n") .. "\n")
