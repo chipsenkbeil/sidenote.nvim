@@ -149,6 +149,36 @@ describe("browser widening from a listing", function()
     end)
 end)
 
+describe("verbs aimed at a listing", function()
+    it("refuses to capture an annotation on the listing itself", function()
+        local source = project_buffer()
+        annotate(source, 4)
+        local listing = assert(browser.open(source, { config = opts() }))
+        vim.api.nvim_set_current_buf(listing)
+
+        vim.g.sidenote = { strategy = "project" }
+        local result, err = require("sidenote").add({ scope = "file" })
+        vim.g.sidenote = nil
+
+        assert.is_nil(result)
+        assert.contains(err, "view")
+    end)
+
+    it("keeps the listing's status signs through a stray refresh", function()
+        -- The browser paints its gutter into the shared namespace; a refresh
+        -- aimed at the listing must not wipe what it cannot repaint
+        local source = project_buffer()
+        annotate(source, 4)
+        local listing = assert(browser.open(source, { config = opts() }))
+        vim.api.nvim_set_current_buf(listing)
+
+        require("sidenote.session").refresh(listing, opts())
+        local marks =
+            vim.api.nvim_buf_get_extmarks(listing, require("sidenote.render").NAMESPACE, 0, -1, {})
+        assert.eq(#marks, 1)
+    end)
+end)
+
 describe("browser help", function()
     it("answers ? with a float listing every browser mapping", function()
         local source = project_buffer()

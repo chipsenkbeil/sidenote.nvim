@@ -94,6 +94,16 @@ describe("buffer.target range scope", function()
 end)
 
 describe("buffer.target rejections", function()
+    it("refuses a scheme-named buffer, which is a view and not a file", function()
+        -- Annotating a sidenote:// or oil:// buffer would anchor a note to a
+        -- rendering, and store it against a path no file will ever have
+        for _, name in ipairs({ "sidenote:///tmp/m.lua", "oil:///tmp/" }) do
+            local target, err = buffer.target(scratch(LINES, name), { scope = "file" })
+            assert.is_nil(target)
+            assert.contains(err, "view")
+        end
+    end)
+
     it("refuses a buffer with no file name", function()
         local bufnr = vim.api.nvim_create_buf(false, true)
         local target, err = buffer.target(bufnr, { scope = "file" })

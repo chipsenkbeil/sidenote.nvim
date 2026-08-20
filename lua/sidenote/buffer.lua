@@ -44,6 +44,12 @@ function M.target(bufnr, opts)
     if path == "" then
         return nil, "buffer has no file name, so there is nothing to anchor to"
     end
+    -- A note anchored to a rendering would be stored against a path no file
+    -- will ever have
+    local scheme = path:match("^(%w+)://")
+    if scheme then
+        return nil, ("this buffer is a %s:// view, not a file"):format(scheme)
+    end
     -- Resolve symlinks so this path and the project root stay comparable; on
     -- macOS /var and /tmp are links into /private
     path = vim.uv.fs_realpath(path) or path

@@ -87,6 +87,11 @@ end
 ---@return integer placed
 function M.refresh(bufnr, cfg)
     cfg = cfg or config.get()
+    -- An unannotatable buffer keeps whatever marks its owner painted; the
+    -- browser draws its status gutter into this same namespace
+    if not buffer.target(bufnr, { scope = "file" }) then
+        return 0
+    end
     return render.paint(bufnr, M.entries(bufnr, cfg), cfg.indicator)
 end
 
