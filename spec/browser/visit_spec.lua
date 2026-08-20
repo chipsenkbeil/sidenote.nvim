@@ -470,6 +470,58 @@ describe("browser interactive filters", function()
     end)
 end)
 
+describe("browser cursor", function()
+    ---The first column after the concealed marker on the listing's first line.
+    ---@param listing integer
+    ---@return integer col 0-indexed, as the cursor API counts
+    local function visible_start(listing)
+        local line = vim.api.nvim_buf_get_lines(listing, 0, 1, false)[1]
+        return assert(line:match("^/%w+ ()")) - 1
+    end
+
+    it("keeps motions off the concealed id on a header line", function()
+        local source = project_buffer()
+        annotate(source, 1)
+        local listing = assert(browser.open(source, { config = opts() }))
+        local first = visible_start(listing)
+
+        -- Headless runs never emit CursorMoved, so the motion is simulated:
+        -- this exercises the registration and the clamp, not nvim's firing
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        vim.api.nvim_exec_autocmds("CursorMoved", { buffer = listing })
+        assert.eq(vim.api.nvim_win_get_cursor(0)[2], first, "0 lands on the kind column")
+
+        vim.api.nvim_win_set_cursor(0, { 1, first - 1 })
+        vim.api.nvim_exec_autocmds("CursorMoved", { buffer = listing })
+        assert.eq(vim.api.nvim_win_get_cursor(0)[2], first, "h cannot walk into the marker")
+    end)
+
+    it("cannot break the marker by typing at the line's start", function()
+        local source = project_buffer()
+        annotate(source, 1)
+        local listing = assert(browser.open(source, { config = opts() }))
+        local first = visible_start(listing)
+
+        press("0Ix<Esc>")
+        local line = vim.api.nvim_buf_get_lines(listing, 0, 1, false)[1]
+        assert.match(line, "^/%w+ ", "the id survived an insert at the line start")
+        assert.eq(assert(line:match("^/%w+ ()")) - 1, first)
+    end)
+
+    it("leaves the cursor alone on prose lines", function()
+        local source = project_buffer()
+        annotate(source, 1, { "the summary", "the body" })
+        local listing = assert(browser.open(source, { config = opts() }))
+
+        -- Open the fold so a prose line can hold the cursor at all
+        press("zR")
+        vim.api.nvim_win_set_cursor(0, { 2, 0 })
+        vim.api.nvim_exec_autocmds("CursorMoved", { buffer = listing })
+        assert.eq(vim.api.nvim_win_get_cursor(0)[1], 2)
+        assert.eq(vim.api.nvim_win_get_cursor(0)[2], 0, "prose owns its column 0")
+    end)
+end)
+
 describe("browser help", function()
     it("answers g? with a float listing every browser mapping", function()
         local source = project_buffer()

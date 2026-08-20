@@ -311,6 +311,12 @@ already happened once here. Check `jj st` after every absorb.
 - **`concealcursor` is what hides the id on the line you are on.** Without it
   every other row conceals and the cursor's row does not, which reads as a
   rendering bug rather than as a setting.
+- **Concealed text still owns its cursor columns**, so the browser clamps the
+  cursor past the marker (CursorMoved/CursorMovedI/InsertEnter), oil-style.
+  Two verified caveats: headless `nvim -l` never emits CursorMoved(I) — not
+  even across `vim.wait` — so the spec simulates it with `nvim_exec_autocmds`
+  and only the InsertEnter path tests end to end; and InsertEnter restores
+  the cursor after the autocmd unless `v:char` is set non-empty.
 - **`BufModifiedSet` does not fire for API text edits.** Verified. The
   listing's never-modified promise (closing discards, only `:w` applies) is
   kept by sweeping the flag off on `TextChanged`/`TextChangedI` and once more

@@ -729,6 +729,25 @@ local function show(state)
                 vim.bo[bufnr].modified = false
             end,
         })
+        -- Concealed, not gone: the id's columns are real, so motions into
+        -- them would strand the cursor short of anything visible
+        vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI", "InsertEnter" }, {
+            buffer = bufnr,
+            desc = "Clamp the cursor past the concealed id, the way oil does",
+            callback = function(event)
+                local first = vim.api.nvim_get_current_line():match("^/%w+ ()")
+                local pos = vim.api.nvim_win_get_cursor(0)
+                if first and pos[2] < first - 1 then
+                    vim.api.nvim_win_set_cursor(0, { pos[1], first - 1 })
+
+                    -- InsertEnter restores the cursor after the autocmd
+                    -- unless v:char holds something
+                    if event.event == "InsertEnter" then
+                        vim.api.nvim_set_vvar("char", "x")
+                    end
+                end
+            end,
+        })
         bind(bufnr)
     end
 
