@@ -30,7 +30,13 @@ end
 local function mark_opts(entry, style)
     local group = highlight.GROUPS[entry.status]
     if style == "sign" then
-        return { sign_text = highlight.SIGNS[entry.status], sign_hl_group = group }
+        -- A ranged sign mark repeats its glyph on every covered line, and here
+        -- `end_row` is inclusive, unlike a highlight's
+        return {
+            end_row = entry.line_end - 1,
+            sign_text = highlight.SIGNS[entry.status],
+            sign_hl_group = group,
+        }
     end
     if style == "virt_text" then
         return { virt_text = { { highlight.SIGNS[entry.status], group } }, virt_text_pos = "eol" }
@@ -76,6 +82,7 @@ function M.paint(bufnr, entries, opts)
         if entry.line_start and entry.line_end and entry.line_end <= count then
             local mark = mark_opts(entry, opts.style)
             if mark then
+                mark.priority = highlight.PRIORITIES[entry.status]
                 vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, entry.line_start - 1, 0, mark)
                 placed = placed + 1
             end

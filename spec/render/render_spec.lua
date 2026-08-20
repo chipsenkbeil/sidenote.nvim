@@ -48,6 +48,46 @@ describe("render.paint", function()
         assert.eq(marks(bufnr)[1][4].sign_hl_group, highlight.GROUPS.orphaned)
     end)
 
+    it("shows a sign on every line of a multi-line annotation", function()
+        -- One sign on the first line reads as a one-line note; the gutter
+        -- should carry the whole extent
+        local bufnr = scratch(LINES)
+        render.paint(
+            bufnr,
+            { { id = "a", status = "attached", line_start = 2, line_end = 4 } },
+            { style = "sign" }
+        )
+        for row = 1, 3 do
+            local covering = vim.api.nvim_buf_get_extmarks(
+                bufnr,
+                render.NAMESPACE,
+                { row, 0 },
+                { row, -1 },
+                { details = true, overlap = true, type = "sign" }
+            )
+            assert.eq(#covering, 1, "no sign covers row " .. row)
+        end
+    end)
+
+    it("puts the worst status on top when notes share a line", function()
+        -- The sign column shows one glyph; an orphan hiding behind an
+        -- attached note's mark would go unnoticed exactly when it matters
+        local bufnr = scratch(LINES)
+        render.paint(bufnr, {
+            { id = "a", status = "attached", line_start = 2, line_end = 4 },
+            { id = "b", status = "orphaned", line_start = 3, line_end = 3 },
+        }, { style = "sign" })
+
+        local top, top_priority
+        for _, mark in ipairs(marks(bufnr)) do
+            if not top_priority or mark[4].priority > top_priority then
+                top, top_priority = mark[4].sign_text, mark[4].priority
+            end
+        end
+        -- Sign text is padded to two cells on its way in
+        assert.eq(vim.trim(top), highlight.SIGNS.orphaned)
+    end)
+
     it("skips an entry with no position, since there is nothing to point at", function()
         local bufnr = scratch(LINES)
         local placed = render.paint(

@@ -40,6 +40,19 @@ for status in pairs(M.GROUPS) do
     M.UNDERLINES[status] = "SidenoteUnderline" .. status:sub(1, 1):upper() .. status:sub(2)
 end
 
+---Extmark priority per status, so the worst mark wins a shared line.
+---
+---The sign column shows one glyph; an orphan hiding behind an attached note's
+---mark would go unnoticed exactly when it matters.
+---@type table<sidenote.Status, integer>
+M.PRIORITIES = {
+    attached = 110,
+    drifted = 120,
+    ambiguous = 130,
+    orphaned = 140,
+    filegone = 150,
+}
+
 ---Gutter glyph per status, one distinct mark each.
 ---
 ---Beside visible code the highlight alone would carry the difference, but the
