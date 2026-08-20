@@ -32,7 +32,11 @@ function M.winid()
     return nil
 end
 
+---Autocmd group holding the armed dismissal, cleared alongside the preview.
+local GROUP = "sidenote.preview.dismiss"
+
 function M.hide()
+    pcall(vim.api.nvim_del_augroup_by_name, GROUP)
     window.close(M.winid())
     current = nil
 
@@ -40,6 +44,25 @@ function M.hide()
         vim.api.nvim_buf_clear_namespace(attached, M.NAMESPACE, 0, -1)
     end
     attached = nil
+end
+
+---Hide the preview at the first sign of doing anything else.
+---
+---A glance is transient, the way a hover is. Armed against the position it
+---was shown for: the motion that opened the preview can flush its own
+---CursorMoved after the fact, and that one must not dismiss it.
+local function dismiss_later()
+    local armed = vim.api.nvim_win_get_cursor(0)
+    vim.api.nvim_create_autocmd({ "CursorMoved", "InsertEnter", "BufLeave" }, {
+        group = vim.api.nvim_create_augroup(GROUP, { clear = true }),
+        desc = "Dismiss the sidenote preview once the glance is over",
+        callback = function(event)
+            local here = vim.api.nvim_win_get_cursor(0)
+            if event.event ~= "CursorMoved" or here[1] ~= armed[1] or here[2] ~= armed[2] then
+                M.hide()
+            end
+        end,
+    })
 end
 
 ---@param entry sidenote.session.Entry
@@ -98,6 +121,7 @@ function M.show(entry, opts)
     local lines = prose_lines(entry, opts.filetype, opts.max_lines)
     if opts.style == "virt_lines" then
         attach(entry, lines, opts.bufnr)
+        dismiss_later()
         return
     end
 
@@ -108,6 +132,7 @@ function M.show(entry, opts)
 
     local style = opts.style == "split" and "split" or "float"
     current = window.open(bufnr, { style = style, position = "right", size = 60 })
+    dismiss_later()
 end
 
 return M

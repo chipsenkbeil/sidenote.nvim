@@ -115,6 +115,55 @@ describe("preview.show float", function()
     end)
 end)
 
+describe("preview dismissal", function()
+    it("hides the float on the first real cursor move", function()
+        local case = annotated("transient\n")
+        vim.api.nvim_set_current_buf(case.bufnr)
+        vim.api.nvim_win_set_cursor(0, { 4, 0 })
+        show(case, "float")
+        assert.not_nil(preview.winid())
+
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        vim.cmd("doautocmd CursorMoved")
+        assert.is_nil(preview.winid())
+    end)
+
+    it("survives the move that showed it", function()
+        -- The motion that opens a preview can flush its own CursorMoved after
+        -- the fact; at the armed position it means nothing
+        local case = annotated("still here\n")
+        vim.api.nvim_set_current_buf(case.bufnr)
+        vim.api.nvim_win_set_cursor(0, { 4, 0 })
+        show(case, "float")
+
+        vim.cmd("doautocmd CursorMoved")
+        assert.not_nil(preview.winid())
+        preview.hide()
+    end)
+
+    it("hides when insert mode begins", function()
+        local case = annotated("gone on insert\n")
+        vim.api.nvim_set_current_buf(case.bufnr)
+        vim.api.nvim_win_set_cursor(0, { 4, 0 })
+        show(case, "float")
+
+        vim.cmd("doautocmd InsertEnter")
+        assert.is_nil(preview.winid())
+    end)
+
+    it("clears hanging prose on a move too", function()
+        local case = annotated("hangs beneath\n")
+        vim.api.nvim_set_current_buf(case.bufnr)
+        vim.api.nvim_win_set_cursor(0, { 4, 0 })
+        show(case, "virt_lines")
+        assert.eq(#marks(case.bufnr), 1)
+
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        vim.cmd("doautocmd CursorMoved")
+        assert.eq(#marks(case.bufnr), 0)
+    end)
+end)
+
 describe("preview.show virt_lines", function()
     it("opens no window at all", function()
         -- The whole point of this style is staying in the code
