@@ -30,12 +30,15 @@ local function listing_args(fargs)
     return path, filter
 end
 
----@param scope "file"|"lines"|"range"
+---Capture `first` through `last` as a lines-scope annotation.
+---
+---Always lines, never range: neither the command nor the mapping carries
+---column information, and columns belong to range scope alone.
 ---@param first integer
 ---@param last integer
-local function add(scope, first, last)
+local function add(first, last)
     local sidenote = require("sidenote")
-    local _, err = sidenote.add({ scope = scope, range = { first, 0, last, 0 } })
+    local _, err = sidenote.add({ scope = "lines", range = { first, 0, last, 0 } })
     if err then
         report(err)
         return
@@ -46,7 +49,7 @@ end
 vim.api.nvim_create_user_command("Sidenote", function(cmd)
     local subcommand = cmd.fargs[1]
     if subcommand == "add" then
-        add(cmd.range > 0 and "range" or "lines", cmd.line1, cmd.line2)
+        add(cmd.line1, cmd.line2)
     elseif subcommand == "browse" then
         local path, filter = listing_args(cmd.fargs)
         local _, err = require("sidenote").browse({ filter = filter })
@@ -90,7 +93,7 @@ vim.keymap.set({ "n", "x" }, "<Plug>(SidenoteAdd)", function()
     if first > last then
         first, last = last, first
     end
-    add(first == last and "lines" or "range", first, last)
+    add(first, last)
 end, { desc = "Annotate the current line or selection" })
 
 vim.keymap.set("n", "<Plug>(SidenoteBrowse)", function()
