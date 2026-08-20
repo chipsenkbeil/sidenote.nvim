@@ -42,14 +42,18 @@ field has a default.
 
 ## Getting started
 
-Map what you want:
+Map what you want. A full set that avoids the common collisions — `]s` is
+spell, and `]a`, `]b`, `]q`, `]d` are Neovim defaults:
 
 ```lua
-vim.keymap.set({ "n", "x" }, "<Leader>na", "<Plug>(SidenoteAdd)")
-vim.keymap.set("n", "<Leader>nv", "<Plug>(SidenoteView)")
-vim.keymap.set("n", "<Leader>no", "<Plug>(SidenoteOpen)")
-vim.keymap.set("n", "<Leader>nb", "<Plug>(SidenoteBrowse)")
-vim.keymap.set("n", "<Leader>nB", "<Plug>(SidenoteBrowseProject)")
+vim.keymap.set({ "n", "x" }, "<Leader>sa", "<Plug>(SidenoteAdd)")
+vim.keymap.set("n", "<Leader>sv", "<Plug>(SidenoteView)")
+vim.keymap.set("n", "<Leader>so", "<Plug>(SidenoteOpen)")
+vim.keymap.set("n", "<Leader>sb", "<Plug>(SidenoteBrowse)")
+vim.keymap.set("n", "<Leader>sB", "<Plug>(SidenoteBrowseProject)")
+vim.keymap.set("n", "<Leader>sr", "<Plug>(SidenoteRefresh)")
+vim.keymap.set("n", "]n", "<Plug>(SidenoteViewNext)")
+vim.keymap.set("n", "[n", "<Plug>(SidenoteViewPrev)")
 ```
 
 Annotate a line, write the note, save. A sign appears in the gutter. Edit the
