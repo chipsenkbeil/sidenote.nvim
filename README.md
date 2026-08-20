@@ -85,6 +85,8 @@ Fold verbs need no mapping. The folds are real.
 
 ## Commands
 
+<!-- vimdoc:anchor :Sidenote -->
+
 <!-- gen:commands -->
 ```vim
 :Sidenote add | browse | project | refresh | view | open | next | prev
@@ -103,6 +105,8 @@ Fold verbs need no mapping. The folds are real.
 file.
 
 ## Configuration
+
+<!-- vimdoc:anchor vim.g.sidenote -->
 
 <!-- gen:config -->
 ```lua

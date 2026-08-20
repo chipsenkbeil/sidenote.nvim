@@ -75,6 +75,10 @@ Two things the generator will not do for you:
 - **A tag derived from a heading breaks when the heading is renamed.** Pin the
   ones a reader may have bookmarked with `<!-- vimdoc:tag sidenote-thing -->`
   above the heading. A test lists the pinned ones and fails if any disappears.
+- **A tag for something that is not a section** — `:Sidenote`, `vim.g.sidenote`
+  — comes from `<!-- vimdoc:anchor NAME -->`, which emits the tag verbatim on
+  its own line directly above whatever follows it. Both forms feed the same
+  pinned list.
 - **The README must fit the page.** Code fences are indented four spaces and
   never wrapped, so a sample wider than 74 columns overflows. Prose, tables and
   headings all wrap or shrink on their own.

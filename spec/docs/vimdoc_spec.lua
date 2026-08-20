@@ -196,4 +196,19 @@ describe("vimdoc directives", function()
     it("leaves an unknown comment out of the output entirely", function()
         assert.falsy(text("## S\n\n<!-- just a note -->\n\nprose"):find("just a note", 1, true))
     end)
+
+    it("gives an anchor directive a right-aligned tag of its own", function()
+        -- Verbatim, not slugified: `:Demo` is the tag a reader types, and a
+        -- derived one would be a different promise
+        local line = locate(render("## S\n\n<!-- vimdoc:anchor :Demo -->\n\nprose\n"), "%*:Demo%*")
+        assert.contains(line, "*:Demo*")
+        assert.eq(#line, 78)
+    end)
+
+    it("sits an anchor directly on the item it names", function()
+        -- A blank line between would read as a tag for the whole section
+        local out = render("## S\n\n<!-- vimdoc:anchor vim.g.demo -->\n\nprose here\n")
+        local _, above = locate(out, "^prose here$")
+        assert.contains(above, "*vim.g.demo*")
+    end)
 end)

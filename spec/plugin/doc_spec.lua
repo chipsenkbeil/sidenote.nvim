@@ -58,9 +58,11 @@ describe("the generated help file", function()
     end)
 
     it("keeps the tags a reader may already have bookmarked", function()
-        -- Pinned in README with `vimdoc:tag`, so renaming a heading cannot
-        -- silently break `:help sidenote-export-gate`
+        -- Pinned in README with `vimdoc:tag` or `vimdoc:anchor`, so renaming a
+        -- heading cannot silently break `:help sidenote-export-gate`
         local pinned = {
+            ":Sidenote",
+            "vim.g.sidenote",
             "sidenote-browser",
             "sidenote-export-gate",
             "sidenote-storage",

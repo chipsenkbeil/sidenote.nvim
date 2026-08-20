@@ -4,9 +4,9 @@
 ---@field version string Neovim version the plugin targets
 
 ---@class sidenote.vimdoc.Block
----@field kind "heading"|"paragraph"|"code"|"table" what the block renders as
+---@field kind "heading"|"anchor"|"paragraph"|"code"|"table" what the block renders as
 ---@field level integer|nil heading depth, for a heading
----@field text string|nil heading title or paragraph body
+---@field text string|nil heading title, anchor tag, or paragraph body
 ---@field tag string|nil explicit tag, overriding the derived one
 ---@field lang string|nil language of a code block
 ---@field lines string[]|nil verbatim lines of a code block
@@ -90,6 +90,17 @@ local function wrap(text, width)
     return out
 end
 
+---A tag alone on its line, right-aligned.
+---
+---How a help file tags something that is not a section — a command, a variable
+---— so it can be reached by name without inventing a heading for it.
+---@param tag string
+---@return string
+local function anchor(tag)
+    local marked = ("*%s*"):format(tag)
+    return (" "):rep(math.max(0, M.WIDTH - #marked)) .. marked
+end
+
 ---A heading: title on the left, tag right-aligned to the full width.
 ---
 ---When the two cannot share a line the tag goes above on its own, which is what
@@ -104,7 +115,7 @@ local function heading(left, tag)
         return { left .. (" "):rep(gap) .. marked }
     end
 
-    local out = { (" "):rep(math.max(0, M.WIDTH - #marked)) .. marked }
+    local out = { anchor(tag) }
     vim.list_extend(out, wrap(left, M.WIDTH))
     return out
 end
@@ -130,8 +141,11 @@ local function parse(lines)
         if line:match("^%s*<!%-%-") then
             flush()
             local tag = line:match("vimdoc:tag%s+(%S+)")
+            local named = line:match("vimdoc:anchor%s+(%S+)")
             if tag then
                 pending_tag = tag
+            elseif named then
+                blocks[#blocks + 1] = { kind = "anchor", text = named }
             elseif line:match("vimdoc:ignore%-start") then
                 ignoring = true
             elseif line:match("vimdoc:ignore%-end") then
@@ -302,6 +316,10 @@ function M.render(lines, opts)
             local tag = block.tag or derive_tag(block.text, opts.project)
             vim.list_extend(out, heading(block.text:upper(), tag))
             out[#out + 1] = ""
+        elseif block.kind == "anchor" then
+            -- No blank after it: the tag belongs to whatever follows, and a gap
+            -- would read as a second tag for the section above
+            out[#out + 1] = anchor(block.text)
         elseif block.kind == "paragraph" then
             vim.list_extend(out, wrap(inline(block.text, opts.project), M.WIDTH))
             out[#out + 1] = ""

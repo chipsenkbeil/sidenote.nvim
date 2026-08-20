@@ -105,6 +105,7 @@ Fold verbs need no mapping. The folds are real.
 ==============================================================================
 6. Commands                                                *sidenote-commands*
 
+                                                                   *:Sidenote*
 >vim
     :Sidenote add | browse | project | refresh | view | open | next | prev
 <
@@ -123,6 +124,7 @@ file.
 ==============================================================================
 7. Configuration                                      *sidenote-configuration*
 
+                                                              *vim.g.sidenote*
 >lua
     vim.g.sidenote = {
         -- Extension and filetype of prose files
