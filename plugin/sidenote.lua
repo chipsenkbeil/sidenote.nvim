@@ -377,12 +377,20 @@ vim.keymap.set("n", "<Plug>(SidenoteOpen)", function()
     require("sidenote").open()
 end, { desc = "Open the annotation under the cursor for writing" })
 
-vim.keymap.set("n", "<Plug>(SidenoteViewNext)", function()
+vim.keymap.set("n", "<Plug>(SidenoteNext)", function()
     require("sidenote").next()
+end, { desc = "Jump to the next annotation" })
+
+vim.keymap.set("n", "<Plug>(SidenotePrev)", function()
+    require("sidenote").prev()
+end, { desc = "Jump to the previous annotation" })
+
+vim.keymap.set("n", "<Plug>(SidenoteViewNext)", function()
+    require("sidenote").next({ view = true })
 end, { desc = "Jump to the next annotation and preview it" })
 
 vim.keymap.set("n", "<Plug>(SidenoteViewPrev)", function()
-    require("sidenote").prev()
+    require("sidenote").prev({ view = true })
 end, { desc = "Jump to the previous annotation and preview it" })
 
 local group = vim.api.nvim_create_augroup("sidenote", { clear = true })

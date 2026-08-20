@@ -63,8 +63,8 @@ vim.keymap.set("n", "<Leader>sl", "<Plug>(SidenoteLoclist)")
 vim.keymap.set("n", "<Leader>sL", "<Plug>(SidenoteLoclistProject)")
 vim.keymap.set("n", "<Leader>sq", "<Plug>(SidenoteQflist)")
 vim.keymap.set("n", "<Leader>sQ", "<Plug>(SidenoteQflistProject)")
-vim.keymap.set("n", "]n", "<Plug>(SidenoteViewNext)")
-vim.keymap.set("n", "[n", "<Plug>(SidenoteViewPrev)")
+vim.keymap.set("n", "]n", "<Plug>(SidenoteNext)")
+vim.keymap.set("n", "[n", "<Plug>(SidenotePrev)")
 ```
 
 Annotate a line and the note opens beside it; write, save. A sign appears in
@@ -100,6 +100,8 @@ No default mappings are installed.
 | `<Plug>(SidenoteCyclePenBack)` | Cycle the pen of the note under the cursor, backward |
 | `<Plug>(SidenoteView)` | Preview the annotation under the cursor |
 | `<Plug>(SidenoteOpen)` | Open the annotation under the cursor for writing |
+| `<Plug>(SidenoteNext)` | Jump to the next annotation |
+| `<Plug>(SidenotePrev)` | Jump to the previous annotation |
 | `<Plug>(SidenoteViewNext)` | Jump to the next annotation and preview it |
 | `<Plug>(SidenoteViewPrev)` | Jump to the previous annotation and preview it |
 <!-- /gen:mappings -->
@@ -526,13 +528,13 @@ Glance at the annotation under the cursor without leaving the code.
 
 Open the annotation under the cursor for writing.
 
-`sidenote.next()`
+`sidenote.next({opts})`
 
-Jump to the next annotation and preview it.
+Jump to the next annotation; `view` also glances at it.
 
-`sidenote.prev()`
+`sidenote.prev({opts})`
 
-Jump to the previous annotation and preview it.
+Jump to the previous annotation; `view` also glances at it.
 
 `sidenote.toggle_highlight()`
 

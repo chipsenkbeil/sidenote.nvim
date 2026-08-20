@@ -75,6 +75,8 @@ describe("command and mapping coverage", function()
             "Refresh",
             "View",
             "Open",
+            "Next",
+            "Prev",
             "ViewNext",
             "ViewPrev",
         }) do

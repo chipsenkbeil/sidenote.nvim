@@ -196,13 +196,17 @@ function M.open()
     return true
 end
 
----Jump to an adjacent annotation and preview it in one action.
+---@class sidenote.JumpOpts
+---@field view? boolean also glance at the annotation you land on
+
+---Jump to an adjacent annotation, previewing it only when asked.
 ---
----The fused motion is what makes the preview feel live, which is why no
----cursor-following machinery is needed.
+---The fused motion is what makes a preview-on-landing feel live, which is
+---why `view` needs no cursor-following machinery.
 ---@param direction "next"|"prev"
+---@param opts? sidenote.JumpOpts
 ---@return boolean moved
-local function jump(direction)
+local function jump(direction, opts)
     -- Jumps honor the view: landing on an invisible note reads as a broken
     -- jump, not as a narrowed one
     local session = require("sidenote.session")
@@ -213,20 +217,24 @@ local function jump(direction)
     end
 
     vim.api.nvim_win_set_cursor(0, { target.line_start, 0 })
-    preview(target, config())
+    if opts and opts.view then
+        preview(target, config())
+    end
     return true
 end
 
----Jump to the next annotation and preview it.
+---Jump to the next annotation; `view` also glances at it.
+---@param opts? sidenote.JumpOpts
 ---@return boolean moved
-function M.next()
-    return jump("next")
+function M.next(opts)
+    return jump("next", opts)
 end
 
----Jump to the previous annotation and preview it.
+---Jump to the previous annotation; `view` also glances at it.
+---@param opts? sidenote.JumpOpts
 ---@return boolean moved
-function M.prev()
-    return jump("prev")
+function M.prev(opts)
+    return jump("prev", opts)
 end
 
 ---Toggle this buffer's range highlights, the way spell is toggled.
