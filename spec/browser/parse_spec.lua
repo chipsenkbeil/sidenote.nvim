@@ -72,6 +72,13 @@ describe("browser.parse.header", function()
         assert.contains(err, "pending")
     end)
 
+    it("rejects answered, which nothing produces", function()
+        -- Reserved for an agent verb that was cut; accepting it here would be
+        -- the one door back in
+        local row = parse.header(header(ID, "note  answered  m.lua:4    x"))
+        assert.is_nil(row)
+    end)
+
     it("rejects a malformed location", function()
         local row, err = parse.header(header(ID, "note  open      m.lua:15:4-20    x"))
         assert.is_nil(row)

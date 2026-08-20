@@ -9,7 +9,7 @@ local hash = require("sidenote.core.hash")
 ---@field id string ULID, sorting by creation time
 ---@field schema integer on-disk format version of this record
 ---@field kind "note"|"todo" whether the note is information or a request to act
----@field state "open"|"answered"|"resolved"|"wontfix"|"archived" lifecycle position
+---@field state "open"|"resolved"|"wontfix"|"archived" lifecycle position
 ---@field project_key string identity of the project the path is relative to
 ---@field path string annotated file, relative to the project root
 ---@field scope "file"|"lines"|"range" what the annotation covers
@@ -69,8 +69,6 @@ M.KINDS = { note = true, todo = true }
 ---@type table<string, boolean>
 M.STATES = {
     open = true,
-    -- Reserved for the future agent `answer` verb; nothing produces it yet
-    answered = true,
     resolved = true,
     wontfix = true,
     archived = true,
@@ -184,9 +182,7 @@ function M.validate(rec)
     end
     if not M.STATES[rec.state] then
         return false,
-            ("state: expected open|answered|resolved|wontfix|archived, got %s"):format(
-                tostring(rec.state)
-            )
+            ("state: expected open|resolved|wontfix|archived, got %s"):format(tostring(rec.state))
     end
     if type(rec.line_start) ~= "number" or type(rec.line_end) ~= "number" then
         return false, "line_start/line_end: expected numbers"
