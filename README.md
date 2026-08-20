@@ -125,6 +125,10 @@ vim.g.sidenote = {
     global_dir = vim.fn.stdpath("data") .. "/sidenote",
     project_dir = ".sidenote",
 
+    -- Where scans cache resolutions; never inside a store, which may be
+    -- committed
+    cache_dir = vim.fn.stdpath("cache") .. "/sidenote",
+
     -- How a buffer shows that an annotation exists:
     -- sign | virt_text | highlight | underline | none
     indicator = { style = "sign" },
@@ -403,6 +407,11 @@ truth rates worse with users than an honest orphan.
 The 0.80 and 0.60 thresholds are measured. `harness/` samples real repository
 history and grades placements against `git blame --reverse`, with the results
 checked in.
+
+Project-wide scans — the CLI, the project browser, `export` — cache their
+resolutions under `cache_dir`, keyed by file content and record together, so
+repeating one is cheap. The cache never lives inside a store, and deleting it
+costs a rescan and nothing else.
 
 <!-- vimdoc:tag sidenote-never-deleted -->
 

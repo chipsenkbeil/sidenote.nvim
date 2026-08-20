@@ -23,6 +23,7 @@
 ---@field strategy string|string[]|fun(path: string): string|nil store roots, tried in order
 ---@field global_dir string root of the machine-wide store
 ---@field project_dir string directory name used for an in-project store
+---@field cache_dir string where scans cache resolutions, never inside a store
 ---@field template? fun(ctx: sidenote.template.Context): string[]|nil seeds a new note's buffer
 ---@field indicator sidenote.IndicatorConfig how annotations appear in a source buffer
 ---@field preview sidenote.PreviewConfig how a note is glanced at
@@ -49,6 +50,10 @@ function M.defaults()
         strategy = { "project", "global" },
         global_dir = vim.fn.stdpath("data") .. "/sidenote",
         project_dir = ".sidenote",
+
+        -- Where scans cache resolutions; never inside a store, which may be
+        -- committed
+        cache_dir = vim.fn.stdpath("cache") .. "/sidenote",
 
         -- How a buffer shows that an annotation exists:
         -- sign | virt_text | highlight | underline | none
@@ -79,6 +84,9 @@ local function validate(cfg)
     end
     if type(cfg.project_dir) ~= "string" then
         return fail("project_dir", ("expected a string, got %s"):format(type(cfg.project_dir)))
+    end
+    if type(cfg.cache_dir) ~= "string" then
+        return fail("cache_dir", ("expected a string, got %s"):format(type(cfg.cache_dir)))
     end
 
     local entries = cfg.strategy

@@ -1,5 +1,8 @@
 local buffer = require("sidenote.buffer")
+local hash = require("sidenote.core.hash")
+local index = require("sidenote.core.index")
 local project = require("sidenote.store.project")
+local record = require("sidenote.core.record")
 local resolve = require("sidenote.core.resolve")
 local session = require("sidenote.session")
 local store = require("sidenote.store")
@@ -53,10 +56,29 @@ local function records(roots)
     return found
 end
 
+---Cache file a store's resolutions live in, or nil when caching is off.
+---
+---Under `cache_dir`, never inside the store: the cache is the one replaceable
+---artifact, and writing it into a committed store would turn every scan into
+---a diff. A config with no `cache_dir` scans uncached.
+---@param store_root string
+---@param cfg sidenote.Config
+---@return string|nil
+function M.cache_path(store_root, cfg)
+    if type(cfg.cache_dir) ~= "string" or cfg.cache_dir == "" then
+        return nil
+    end
+    local trimmed = (store_root:gsub("/+$", ""))
+    local owner = vim.fn.fnamemodify(trimmed, ":h:t")
+    return ("%s/%s-%s.json"):format(cfg.cache_dir, owner, hash.sha256(trimmed):sub(1, 12))
+end
+
 ---Resolve every annotation the project holds.
 ---
 ---Sorted by path and then by line, so two runs over unchanged input produce
----the same order and a diff between them means something.
+---the same order and a diff between them means something. Resolutions are
+---cached per store, keyed by the file content and the record together, so a
+---rewrite of either simply misses and re-resolves.
 ---@param opts sidenote.scan.Opts
 ---@return sidenote.session.Entry[]
 function M.project(opts)
@@ -66,18 +88,53 @@ function M.project(opts)
     end
 
     local root = project.root(opts.path)
-    local cache = {}
+
+    ---@type table<string, {idx: sidenote.Index, path: string, dirty: boolean}|false>
+    local caches = {}
+    local function cache_for(store_root)
+        if caches[store_root] == nil then
+            local path = M.cache_path(store_root, opts.config)
+            caches[store_root] = path and { idx = index.load(path), path = path, dirty = false }
+                or false
+        end
+        return caches[store_root] or nil
+    end
+
+    local sources = {}
     local entries = {}
     for _, held in ipairs(records(roots)) do
         local rec = held.record
         -- Each source file is read once however many notes target it
-        if cache[rec.path] == nil then
+        if sources[rec.path] == nil then
             local absolute = root and (root .. "/" .. rec.path) or rec.path
-            cache[rec.path] = { content = content_of(absolute) }
+            sources[rec.path] = { content = content_of(absolute) }
         end
+        local source = sources[rec.path]
 
-        local resolution = resolve.resolve(rec, cache[rec.path].content)
+        -- A missing file resolves trivially, so only real content is cached
+        local cache = source.content ~= nil and cache_for(held.root) or nil
+        local key
+        local resolution
+        if cache then
+            source.sha = source.sha or hash.sha256(source.content)
+            key = source.sha .. ":" .. hash.sha256(record.encode(rec))
+            resolution = index.get(cache.idx, rec.id, key)
+        end
+        if not resolution then
+            resolution = resolve.resolve(rec, source.content)
+            if cache then
+                index.put(cache.idx, rec.id, { against = key, resolution = resolution })
+                cache.dirty = true
+            end
+        end
         entries[#entries + 1] = session.entry(held.root, rec, resolution)
+    end
+
+    for _, cache in pairs(caches) do
+        if cache and cache.dirty then
+            vim.fn.mkdir(vim.fn.fnamemodify(cache.path, ":h"), "p")
+            index.save(cache.path, cache.idx)
+        end
     end
 
     table.sort(entries, function(a, b)

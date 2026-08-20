@@ -290,7 +290,8 @@ A full review on 2026-08-19 fixed twenty-odd findings; the ones that were
 decisions are **recorded in the spec with their reasons**: the agent `answer`
 verb and its `answered` state are cut, the retention window is cut, and the
 L5 treesitter tier is cut along with the never-captured `symbol`/`ts_path`
-fields.
+fields. The last spec'd gaps closed on 2026-08-20: capture opens the note
+seeded by the `template` hook, and disk scans cache resolutions per store
+under `cache_dir` (§4 records the two deviations from the original sketch).
 
-Spec'd but unbuilt, pending a decision: the `template` capture hook (§8), the
-index cache as something the resolve paths actually consult (§4/§6), and MCP.
+Not built, and deliberately: MCP.

@@ -61,7 +61,7 @@ prose files is also a supported interface.
 ## Hard rules
 
 - Agents read; humans write. Never create, edit, or delete a prose file or a
-  metadata sidecar, and never touch the store's `index.json`.
+  metadata sidecar, and never write into the plugin's resolution cache.
 - Never resolve, archive, or otherwise change an annotation's state.
 - An in-repo `.sidenote/` directory may be committed. Leave it out of any
   commits you make unless the user asks for it explicitly.
