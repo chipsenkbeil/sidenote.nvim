@@ -32,6 +32,7 @@ files["spec/"] = {
     -- Declared for `spec/` alone: a `describe` in `lua/` would be a mistake,
     -- and allowing it everywhere is how that mistake goes unnoticed
     read_globals = { "describe", "it", "before_each", "after_each", "assert" },
-    -- The health spec stands in for `vim.health` to read what a check reported
-    globals = { "vim.health" },
+    -- Specs stand in for `vim.health` and `vim.notify` to read what a check
+    -- or a command reported
+    globals = { "vim.health", "vim.notify" },
 }

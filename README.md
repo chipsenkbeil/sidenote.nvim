@@ -96,12 +96,12 @@ Fold verbs need no mapping. The folds are real.
 ```
 <!-- /gen:commands -->
 
-`browse` and `project` take filters, which combine:
+`browse` and `project` take filters, which complete, validate, and combine:
 
 ```vim
-:Sidenote browse  --kind=todo
-:Sidenote project --status=orphaned
-:Sidenote project --kind=todo --state=open
+:Sidenote browse  kind=todo
+:Sidenote project status=orphaned
+:Sidenote project kind=todo state=open
 ```
 
 `project` also takes a path, defaulting to the project holding the current
@@ -246,7 +246,7 @@ carries the filter with it.
 A filtered-out row is absent, not hidden. Saving a filtered listing cannot
 touch an annotation it did not show you.
 
-Cleanup is `:Sidenote project --status=orphaned`, then `VGd` and `:w`.
+Cleanup is `:Sidenote project status=orphaned`, then `VGd` and `:w`.
 
 <!-- vimdoc:tag sidenote-api -->
 

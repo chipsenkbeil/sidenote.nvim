@@ -82,6 +82,59 @@ describe("the :Sidenote command", function()
         assert.eq(rec.text, "local c = 3")
     end)
 
+    it("narrows a listing with a bare key=value filter", function()
+        -- Bare key=value is vim's own convention, the way :set and :Telescope
+        -- take options; a -- prefix belongs to shells
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        vim.cmd("1Sidenote add")
+        vim.cmd("3Sidenote add")
+
+        vim.cmd("Sidenote browse state=open")
+        assert.eq(#vim.api.nvim_buf_get_lines(0, 0, -1, false), 2)
+        vim.cmd("edit " .. root .. "/code.lua")
+        vim.cmd("Sidenote browse state=resolved")
+        assert.eq_deep(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "" })
+    end)
+
+    it("rejects a misspelled filter key instead of silently matching all", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+
+        local messages = {}
+        local original = vim.notify
+        vim.notify = function(msg)
+            messages[#messages + 1] = msg
+        end
+        vim.cmd("Sidenote browse staus=orphaned")
+        vim.notify = original
+        assert.contains(table.concat(messages, "\n"), "staus")
+    end)
+
+    it("rejects a filter value the plugin never produces", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+
+        local messages = {}
+        local original = vim.notify
+        vim.notify = function(msg)
+            messages[#messages + 1] = msg
+        end
+        vim.cmd("Sidenote browse status=banana")
+        vim.notify = original
+        assert.contains(table.concat(messages, "\n"), "banana")
+    end)
+
+    it("completes filter keys and their values", function()
+        project()
+        local keys = vim.fn.getcompletion("Sidenote browse st", "cmdline")
+        assert.contains(table.concat(keys, " "), "status=")
+        assert.contains(table.concat(keys, " "), "state=")
+
+        local values = vim.fn.getcompletion("Sidenote browse status=orph", "cmdline")
+        assert.eq_deep(values, { "status=orphaned" })
+    end)
+
     it("captures a visual selection as lines scope too", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")

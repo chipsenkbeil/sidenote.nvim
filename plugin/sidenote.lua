@@ -10,24 +10,58 @@ local function report(err)
     vim.notify("sidenote: " .. err, vim.log.levels.ERROR)
 end
 
----Split a listing subcommand's arguments into a path and a filter.
+---Values each filter key accepts, required lazily to keep loading lazy.
+---@return table<string, string[]>
+local function filter_values()
+    local record = require("sidenote.core.record")
+    local resolve = require("sidenote.core.resolve")
+    local function sorted(set)
+        local out = {}
+        for name in pairs(set) do
+            out[#out + 1] = name
+        end
+        table.sort(out)
+        return out
+    end
+    return {
+        status = resolve.STATUS_NAMES,
+        kind = sorted(record.KINDS),
+        state = sorted(record.STATES),
+    }
+end
+
+---Split a listing subcommand's arguments into a path and a validated filter.
 ---
----`--status=`, `--kind=` and `--state=` narrow the listing; anything else
----positional is the project path.
+---`status=`, `kind=` and `state=` narrow the listing, the way `:set` and
+---`:Telescope` take options; anything else positional is the project path.
+---A bad key or value is an error, since a filter nothing reads would silently
+---match everything.
 ---@param fargs string[]
 ---@return string|nil path
----@return sidenote.browser.Filter filter
+---@return sidenote.browser.Filter|nil filter nil when a filter was invalid
+---@return string|nil err
 local function listing_args(fargs)
+    local values = filter_values()
     local path, filter = nil, {}
     for i = 2, #fargs do
-        local key, value = fargs[i]:match("^%-%-(%w+)=(.+)$")
-        if key then
-            filter[key] = value
-        else
+        local key, value = fargs[i]:match("^(%w+)=(.+)$")
+        if not key then
             path = fargs[i]
+        elseif not values[key] then
+            return nil, nil, ("unknown filter %q; expected status=, kind= or state="):format(key)
+        elseif not vim.tbl_contains(values[key], value) then
+            return nil,
+                nil,
+                ("unknown %s %q; expected one of %s"):format(
+                    key,
+                    value,
+                    table.concat(values[key], ", ")
+                )
+        else
+            filter[key] = value
         end
     end
-    return path, filter
+    return path, filter, nil
 end
 
 ---Capture `first` through `last` as a lines-scope annotation.
@@ -51,18 +85,26 @@ vim.api.nvim_create_user_command("Sidenote", function(cmd)
     if subcommand == "add" then
         add(cmd.line1, cmd.line2)
     elseif subcommand == "browse" then
-        local path, filter = listing_args(cmd.fargs)
-        local _, err = require("sidenote").browse({ filter = filter })
-        if path then
+        local path, filter, filter_err = listing_args(cmd.fargs)
+        if filter_err then
+            report(filter_err)
+        elseif path then
             report("browse takes no path; use :Sidenote project " .. path)
-        elseif err then
-            report(err)
+        else
+            local _, err = require("sidenote").browse({ filter = filter })
+            if err then
+                report(err)
+            end
         end
     elseif subcommand == "project" then
-        local path, filter = listing_args(cmd.fargs)
-        local _, err = require("sidenote").browse_project({ path = path, filter = filter })
-        if err then
-            report(err)
+        local path, filter, filter_err = listing_args(cmd.fargs)
+        if filter_err then
+            report(filter_err)
+        else
+            local _, err = require("sidenote").browse_project({ path = path, filter = filter })
+            if err then
+                report(err)
+            end
         end
     elseif subcommand == "refresh" then
         require("sidenote").refresh()
@@ -81,10 +123,33 @@ end, {
     nargs = "+",
     range = true,
     desc = "Annotate source code with notes stored outside the file",
-    complete = function(arg_lead)
-        return vim.tbl_filter(function(name)
-            return name:find(arg_lead, 1, true) == 1
-        end, SUBCOMMANDS)
+    complete = function(arg_lead, cmd_line)
+        ---@param candidates string[]
+        local function matching(candidates)
+            return vim.tbl_filter(function(name)
+                return name:find(arg_lead, 1, true) == 1
+            end, candidates)
+        end
+
+        -- Nothing but the lead after the command name: complete the subcommand
+        local after = cmd_line:match("Sidenote%s+(.*)$") or ""
+        if after == arg_lead then
+            return matching(SUBCOMMANDS)
+        end
+        local subcommand = after:match("^(%S+)")
+        if subcommand ~= "browse" and subcommand ~= "project" then
+            return {}
+        end
+
+        -- Filters: values for a known key, else the keys themselves
+        local values = filter_values()
+        local key = arg_lead:match("^(%w+)=")
+        if key and values[key] then
+            return matching(vim.tbl_map(function(value)
+                return key .. "=" .. value
+            end, values[key]))
+        end
+        return matching({ "status=", "kind=", "state=" })
     end,
 })
 
