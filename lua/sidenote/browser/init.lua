@@ -15,6 +15,7 @@ local scan = require("sidenote.scan")
 local session = require("sidenote.session")
 local store = require("sidenote.store")
 local strategy = require("sidenote.store.strategy")
+local window = require("sidenote.window")
 
 ---@class sidenote.browser.Filter
 ---@field status? sidenote.Status keep only annotations the resolver put here
@@ -203,54 +204,156 @@ local function step(bufnr, find)
     end
 end
 
----Mappings that live only inside a browser buffer.
+---What `?` shows below the mappings themselves.
+local HELP_FOOTER = {
+    "",
+    "  Folds are real: za, zR, zM and friends all work",
+    "  Edit any column or prose line, then :w to apply",
+    "  dd on a closed row deletes the whole note",
+}
+
+---Jump to the code a row's annotation is about, in this same window.
 ---
----Fold verbs are deliberately absent: expansion is real folds, so `za`, `zR`
----and the user's own fold mappings already do the right thing.
+---The export gate's rule holds in the UI too: a note with no trusted position
+---gets a message, never a guess at whatever now sits on its old lines.
 ---@param bufnr integer
-local function bind(bufnr)
-    ---@param lhs string
-    ---@param rhs function
-    ---@param desc string
-    local function map(lhs, rhs, desc)
-        vim.keymap.set("n", lhs, rhs, { buffer = bufnr, desc = desc, nowait = true })
+local function visit(bufnr)
+    local row = M.row_at(bufnr, vim.fn.line("."))
+    local state = states[bufnr]
+    if not row or not state then
+        return
     end
 
-    map("<CR>", function()
-        local row = M.row_at(bufnr, vim.fn.line("."))
-        local state = states[bufnr]
-        if not row or not state then
-            return
-        end
-        local where = vim.tbl_extend("force", state.config.editor, { focus = true })
-        editor.open(row.entry, where, state.config.filetype)
-    end, "Open this note's prose for writing")
+    local rec = row.entry.record
+    if not row.entry.line_start and rec.scope ~= "file" then
+        vim.notify(
+            "sidenote: no trusted position; the code no longer exists as written",
+            vim.log.levels.WARN
+        )
+        return
+    end
 
-    map("<Tab>", function()
-        step(bufnr, M.next_column)
-    end, "Jump to the next column")
+    local root = project.root(state.path)
+    local path = rec.path:sub(1, 1) == "/" and rec.path
+        or (root and (root .. "/" .. rec.path) or rec.path)
+    if vim.fn.filereadable(path) ~= 1 then
+        vim.notify(("sidenote: %s does not exist"):format(rec.path), vim.log.levels.WARN)
+        return
+    end
 
-    map("<S-Tab>", function()
-        step(bufnr, M.prev_column)
-    end, "Jump to the previous column")
+    vim.cmd.edit(vim.fn.fnameescape(path))
+    if row.entry.line_start then
+        vim.api.nvim_win_set_cursor(0, { row.entry.line_start, 0 })
+    end
+end
 
-    -- `-` is likely taken by oil in a source buffer, but it is free in here and
-    -- means what it means there: go up
-    map("-", function()
-        local state = states[bufnr]
-        if not state or state.scope == "project" then
-            return
-        end
-        -- The filter travels with you: widening a listing of orphans should
-        -- show the project's orphans, not everything it holds
-        local _, err = M.open_project(state.path, {
-            config = state.config,
-            filter = state.filter,
+---Show the browser's own mappings, the way oil and lazy answer `?`.
+---@param actions {lhs: string, desc: string}[]
+local function help(actions)
+    local lines = {}
+    for _, action in ipairs(actions) do
+        lines[#lines + 1] = ("  %-8s %s"):format(action.lhs, action.desc)
+    end
+    vim.list_extend(lines, HELP_FOOTER)
+    local width = 0
+    for _, line in ipairs(lines) do
+        width = math.max(width, #line)
+    end
+
+    local bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+    vim.bo[bufnr].modifiable = false
+    vim.bo[bufnr].bufhidden = "wipe"
+
+    local winid = window.open(bufnr, { style = "float", size = width + 2, focus = true })
+    for _, lhs in ipairs({ "q", "<Esc>", "?" }) do
+        vim.keymap.set("n", lhs, function()
+            window.close(winid)
+        end, { buffer = bufnr, nowait = true })
+    end
+end
+
+---Mappings that live only inside a browser buffer, kept as data first.
+---
+---One list serves twice — the keymaps are built from it and `?` renders it —
+---so the help can never drift from what the keys do. Fold verbs are
+---deliberately absent: expansion is real folds, so `za`, `zR` and the user's
+---own fold mappings already do the right thing.
+---@param bufnr integer
+local function bind(bufnr)
+    ---@type {lhs: string, desc: string, fn: fun()}[]
+    local actions = {
+        {
+            lhs = "<CR>",
+            desc = "Open this note's prose for writing",
+            fn = function()
+                local row = M.row_at(bufnr, vim.fn.line("."))
+                local state = states[bufnr]
+                if not row or not state then
+                    return
+                end
+                local where = vim.tbl_extend("force", state.config.editor, { focus = true })
+                editor.open(row.entry, where, state.config.filetype)
+            end,
+        },
+        {
+            lhs = "gf",
+            desc = "Jump to the code this note is about",
+            fn = function()
+                visit(bufnr)
+            end,
+        },
+        {
+            lhs = "<Tab>",
+            desc = "Jump to the next column",
+            fn = function()
+                step(bufnr, M.next_column)
+            end,
+        },
+        {
+            lhs = "<S-Tab>",
+            desc = "Jump to the previous column",
+            fn = function()
+                step(bufnr, M.prev_column)
+            end,
+        },
+        {
+            -- Likely taken by oil in a source buffer, but free in here, and it
+            -- means what it means there: go up
+            lhs = "-",
+            desc = "Widen to every annotation in the project",
+            fn = function()
+                local state = states[bufnr]
+                if not state or state.scope == "project" then
+                    return
+                end
+                -- The filter travels with you: widening a listing of orphans
+                -- should show the project's orphans, not everything it holds
+                local _, err = M.open_project(state.path, {
+                    config = state.config,
+                    filter = state.filter,
+                })
+                if err then
+                    vim.notify("sidenote: " .. err, vim.log.levels.ERROR)
+                end
+            end,
+        },
+    }
+    actions[#actions + 1] = {
+        lhs = "?",
+        desc = "Show this help",
+        fn = function()
+            help(actions)
+        end,
+    }
+
+    for _, action in ipairs(actions) do
+        vim.keymap.set("n", action.lhs, action.fn, {
+            buffer = bufnr,
+            desc = action.desc,
+            nowait = true,
         })
-        if err then
-            vim.notify("sidenote: " .. err, vim.log.levels.ERROR)
-        end
-    end, "Widen to every annotation in the project")
+    end
 end
 
 ---Name a listing after what it covers.

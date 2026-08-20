@@ -82,8 +82,10 @@ Inside a browser buffer only:
 | mapping | does |
 |---|---|
 | `<CR>` | open this note's prose for writing |
+| `gf` | jump to the code the note is about |
 | `<Tab>` `<S-Tab>` | move between columns |
 | `-` | widen to every annotation in the project |
+| `?` | this table, as a float |
 
 Fold verbs need no mapping. The folds are real.
 
