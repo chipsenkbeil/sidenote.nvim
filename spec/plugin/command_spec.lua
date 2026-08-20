@@ -403,6 +403,62 @@ describe("the :Sidenote command", function()
         vim.cmd.cclose()
     end)
 
+    it("answers g? with a float listing the list's own verbs", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,2")
+
+        vim.cmd("Sidenote qflist")
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        vim.api.nvim_feedkeys("g?", "x", false)
+
+        -- The guard schedules its verb, so the float arrives a tick later
+        local floating
+        vim.wait(200, function()
+            for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+                if vim.api.nvim_win_get_config(winid).relative ~= "" then
+                    floating = winid
+                    return true
+                end
+            end
+            return false
+        end)
+
+        local lines = vim.api.nvim_buf_get_lines(
+            vim.api.nvim_win_get_buf(assert.not_nil(floating)),
+            0,
+            -1,
+            false
+        )
+        for _, key in ipairs({ "t", "o", "d", "s", "fk", "fc", "g?" }) do
+            local listed = false
+            for _, line in ipairs(lines) do
+                listed = listed or line:match("^  " .. vim.pesc(key) .. "%s") ~= nil
+            end
+            assert.eq(listed, true, "the help never mentions " .. key)
+        end
+        vim.api.nvim_feedkeys("q", "x", false)
+        vim.cmd.cclose()
+    end)
+
+    it("keeps g? out of a foreign quickfix list", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,2")
+
+        vim.fn.setqflist({}, " ", {
+            title = "foreign",
+            items = { { bufnr = vim.api.nvim_get_current_buf(), lnum = 1, text = "x" } },
+        })
+        vim.cmd.copen()
+        vim.api.nvim_feedkeys("g?", "x", false)
+        vim.wait(50)
+        for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            assert.eq(vim.api.nvim_win_get_config(winid).relative, "", "a float opened anyway")
+        end
+        vim.cmd.cclose()
+    end)
+
     it("leaves a foreign quickfix list alone", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")

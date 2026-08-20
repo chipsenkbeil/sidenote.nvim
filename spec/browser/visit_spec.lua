@@ -471,22 +471,30 @@ describe("browser interactive filters", function()
 end)
 
 describe("browser help", function()
-    it("answers ? with a float listing every browser mapping", function()
+    it("answers g? with a float listing every browser mapping", function()
         local source = project_buffer()
         annotate(source, 4)
         assert(browser.open(source, { config = opts() }))
 
-        press("?")
+        press("g?")
         local winid = assert.not_nil(floating())
         local body = table.concat(
             vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(winid), 0, -1, false),
             "\n"
         )
-        for _, key in ipairs({ "<CR>", "gf", "<Tab>", "-", "?" }) do
+        for _, key in ipairs({ "<CR>", "gf", "<Tab>", "-", "g?" }) do
             assert.contains(body, key)
         end
         assert.contains(body, "za")
         press("q")
+    end)
+
+    it("leaves ? meaning search, as everywhere else", function()
+        local source = project_buffer()
+        annotate(source, 4)
+        assert(browser.open(source, { config = opts() }))
+
+        assert.eq(vim.fn.maparg("?", "n"), "")
     end)
 
     it("closes the help again on q", function()
@@ -494,7 +502,7 @@ describe("browser help", function()
         annotate(source, 4)
         assert(browser.open(source, { config = opts() }))
 
-        press("?")
+        press("g?")
         assert.not_nil(floating())
         press("q")
         assert.is_nil(floating())

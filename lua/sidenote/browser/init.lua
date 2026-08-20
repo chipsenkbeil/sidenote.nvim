@@ -18,7 +18,6 @@ local scan = require("sidenote.scan")
 local session = require("sidenote.session")
 local store = require("sidenote.store")
 local strategy = require("sidenote.store.strategy")
-local window = require("sidenote.window")
 
 ---@alias sidenote.browser.Filter sidenote.Filter
 
@@ -340,7 +339,7 @@ local function toggle_all(state)
     vim.cmd("normal! zR")
 end
 
----What `?` shows below the mappings themselves.
+---What `g?` shows below the mappings themselves.
 local HELP_FOOTER = {
     "",
     "  Folds are real: za, zR, zM and friends all work",
@@ -380,32 +379,6 @@ local function visit(bufnr)
     vim.cmd.edit(vim.fn.fnameescape(path))
     if row.entry.line_start then
         vim.api.nvim_win_set_cursor(0, { row.entry.line_start, 0 })
-    end
-end
-
----Show the browser's own mappings, the way oil and lazy answer `?`.
----@param actions {lhs: string, desc: string}[]
-local function help(actions)
-    local lines = {}
-    for _, action in ipairs(actions) do
-        lines[#lines + 1] = ("  %-8s %s"):format(action.lhs, action.desc)
-    end
-    vim.list_extend(lines, HELP_FOOTER)
-    local width = 0
-    for _, line in ipairs(lines) do
-        width = math.max(width, #line)
-    end
-
-    local bufnr = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-    vim.bo[bufnr].modifiable = false
-    vim.bo[bufnr].bufhidden = "wipe"
-
-    local winid = window.open(bufnr, { style = "float", size = width + 2, focus = true })
-    for _, lhs in ipairs({ "q", "<Esc>", "?" }) do
-        vim.keymap.set("n", lhs, function()
-            window.close(winid)
-        end, { buffer = bufnr, nowait = true })
     end
 end
 
@@ -689,10 +662,10 @@ local function bind(bufnr)
         },
     }
     actions[#actions + 1] = {
-        lhs = "?",
+        lhs = "g?",
         desc = "Show this help",
         fn = function()
-            help(actions)
+            require("sidenote.help").show(actions, { footer = HELP_FOOTER })
         end,
     }
 

@@ -120,7 +120,7 @@ Inside a browser buffer only:
 | `<Tab>` | toggle this note's fold, org-style |
 | `<S-Tab>` | toggle every fold: the index, or all the prose |
 | `-` | widen to every annotation in the project |
-| `?` | this table, as a float |
+| `g?` | this table, as a float |
 
 Fold verbs need no mapping. The folds are real.
 
@@ -164,7 +164,8 @@ decides which field turns, and anywhere else on the line means state. `o`
 opens the prose, `d` deletes after the quoting confirmation, and `<CR>`
 jumps as ever. The browser's filter keys work here too — `fk`, `fs`, `fa`,
 `ff` and `fc` — and `s` flips the list between this buffer's notes and the
-whole project's without leaving it. Each change redraws the list in place,
+whole project's without leaving it. `g?` answers with the table of verbs,
+in the list as in the browser. Each change redraws the list in place,
 cursor held — so cycling a pen is pressing `t` on its word until the color
 is right. Items carry their identity in `user_data`, the idiom any other
 list-driven tool can borrow.

@@ -341,50 +341,107 @@ local function flip_scope()
     vim.notify("sidenote: " .. opts.scope .. " scope")
 end
 
+---What `g?` shows below the mappings themselves.
+local HELP_FOOTER = {
+    "",
+    "  Only a sidenote-titled list answers these keys",
+    "  The rest is stock quickfix: <CR> jumps, :cnext walks",
+}
+
 ---Bind the verbs into a quickfix buffer, guarded per keypress.
 ---
 ---One qf buffer serves every list a session ever shows, so the keys decide
 ---at press time: in a sidenote-titled list they act, anywhere else they
----fall through to whatever the key normally does.
+---fall through to whatever the key normally does. The actions table serves
+---twice — the keymaps are built from it and `g?` renders it — so the help
+---can never drift from what the keys do.
 ---@param bufnr integer quickfix buffer
 function M.bind(bufnr)
-    ---@param lhs string
-    ---@param verb fun()
-    local function on(lhs, verb)
-        vim.keymap.set("n", lhs, function()
+    ---@type {lhs: string, desc: string, fn: fun()}[]
+    local actions = {
+        {
+            lhs = "t",
+            desc = "Cycle state forward; kind or pen on their words",
+            fn = function()
+                turn(1)
+            end,
+        },
+        {
+            lhs = "T",
+            desc = "Cycle state backward; kind or pen on their words",
+            fn = function()
+                turn(-1)
+            end,
+        },
+        {
+            lhs = "o",
+            desc = "Open this note's prose for writing",
+            fn = open_note,
+        },
+        {
+            lhs = "d",
+            desc = "Delete this note, after confirming",
+            fn = delete_note,
+        },
+        {
+            lhs = "s",
+            desc = "Flip between file and project scope",
+            fn = flip_scope,
+        },
+        {
+            lhs = "fk",
+            desc = "Filter by kind",
+            fn = function()
+                refilter("kind")
+            end,
+        },
+        {
+            lhs = "fs",
+            desc = "Filter by state",
+            fn = function()
+                refilter("state")
+            end,
+        },
+        {
+            lhs = "fa",
+            desc = "Filter by anchor status",
+            fn = function()
+                refilter("status")
+            end,
+        },
+        {
+            lhs = "ff",
+            desc = "Filter by path substring",
+            fn = function()
+                refilter("path")
+            end,
+        },
+        {
+            lhs = "fc",
+            desc = "Clear every filter",
+            fn = function()
+                refilter(nil)
+            end,
+        },
+    }
+    actions[#actions + 1] = {
+        lhs = "g?",
+        desc = "Show this help",
+        fn = function()
+            require("sidenote.help").show(actions, { footer = HELP_FOOTER })
+        end,
+    }
+
+    for _, action in ipairs(actions) do
+        vim.keymap.set("n", action.lhs, function()
             if not ours() then
-                return lhs
+                return action.lhs
             end
             -- Scheduled: an expression mapping may not edit anything itself
-            vim.schedule(verb)
+            vim.schedule(action.fn)
             return ""
-        end, { buffer = bufnr, expr = true, nowait = true })
+        end, { buffer = bufnr, desc = action.desc, expr = true, nowait = true })
     end
-
-    on("t", function()
-        turn(1)
-    end)
-    on("T", function()
-        turn(-1)
-    end)
-    on("o", open_note)
-    on("d", delete_note)
-    on("s", flip_scope)
-    on("fk", function()
-        refilter("kind")
-    end)
-    on("fs", function()
-        refilter("state")
-    end)
-    on("fa", function()
-        refilter("status")
-    end)
-    on("ff", function()
-        refilter("path")
-    end)
-    on("fc", function()
-        refilter(nil)
-    end)
 end
 
 return M
