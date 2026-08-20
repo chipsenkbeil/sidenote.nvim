@@ -228,6 +228,37 @@ describe("the :Sidenote command", function()
         assert.eq(range_marks(), 0)
     end)
 
+    it("re-resolves once an edit settles, instead of letting marks stretch", function()
+        -- Inserting a line inside a span grows the extmark over lines nobody
+        -- annotated, until something re-derives it from the resolver
+        vim.g.sidenote = { strategy = "project", indicator = { highlight = "always" } }
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("1,3")
+
+        vim.api.nvim_buf_set_lines(0, 2, 2, false, { "-- a wedge" })
+        vim.cmd("doautocmd TextChanged")
+
+        local render = require("sidenote.render")
+        local function widest()
+            local most = 0
+            local marks =
+                vim.api.nvim_buf_get_extmarks(0, render.NAMESPACE, 0, -1, { details = true })
+            for _, mark in ipairs(marks) do
+                if mark[4].end_row then
+                    most = math.max(most, mark[4].end_row - mark[2] + 1)
+                end
+            end
+            return most
+        end
+
+        assert.eq(widest(), 4, "the stretched mark is the situation under test")
+        vim.wait(1500, function()
+            return widest() < 4
+        end)
+        assert.lte(widest(), 3)
+    end)
+
     it("captures a visual selection as lines scope too", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")
