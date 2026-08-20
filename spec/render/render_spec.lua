@@ -33,7 +33,7 @@ describe("render.paint", function()
         local bufnr = scratch(LINES)
         local placed = render.paint(bufnr, {
             { id = "a", status = "attached", line_start = 2, line_end = 2 },
-            { id = "b", status = "orphaned", line_start = 4, line_end = 5 },
+            { id = "b", status = "orphaned", line_start = 4, line_end = 4 },
         }, { style = "sign" })
         assert.eq(placed, 2)
         assert.eq(#marks(bufnr), 2)
@@ -218,6 +218,43 @@ describe("render.paint", function()
             found = found or mark[4].hl_group == "SidenotePenBlue"
         end
         assert.eq(found, true)
+    end)
+
+    it("checks a multi-line todo's box once, a tail carrying the rest", function()
+        -- A checkbox on every covered line reads as that many todos; bars
+        -- extend, badges mark once
+        local bufnr = scratch(LINES)
+        render.paint(bufnr, {
+            {
+                id = "a",
+                status = "attached",
+                kind = "todo",
+                state = "open",
+                summary = "do it",
+                line_start = 2,
+                line_end = 4,
+            },
+        }, { style = "sign" })
+
+        local placed = marks(bufnr)
+        assert.eq(#placed, 2)
+        assert.eq(vim.trim(placed[1][4].sign_text), highlight.TODO.open)
+        assert.is_nil(placed[1][4].end_row, "the box marks the first line alone")
+        assert.eq(placed[2][2], 2, "the tail starts on the second covered line")
+        assert.eq(placed[2][4].end_row, 3)
+        assert.eq(vim.trim(placed[2][4].sign_text), highlight.TAIL)
+    end)
+
+    it("gives a hurt badge the same one-badge treatment over a span", function()
+        local bufnr = scratch(LINES)
+        render.paint(bufnr, {
+            { id = "a", status = "orphaned", line_start = 2, line_end = 3, summary = "s" },
+        }, { style = "sign" })
+        local placed = marks(bufnr)
+        assert.eq(#placed, 2)
+        assert.eq(vim.trim(placed[1][4].sign_text), highlight.SIGNS.orphaned)
+        assert.is_nil(placed[1][4].end_row)
+        assert.eq(vim.trim(placed[2][4].sign_text), highlight.TAIL)
     end)
 
     it("signs a healthy open todo as an unchecked box", function()

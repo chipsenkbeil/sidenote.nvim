@@ -116,6 +116,23 @@ M.SIGNS = {
 ---@type {open: string, done: string}
 M.TODO = { open = "☐", done = "☑" }
 
+---Glyphs that mark one spot rather than extending down a span.
+---
+---A bar repeated down a span reads as continuation; a badge repeated
+---reads as that many separate notes, so a span shows a badge once with
+---`TAIL` on the lines below it.
+---@type table<string, boolean>
+M.BADGES = {
+    [M.SIGNS.ambiguous] = true,
+    [M.SIGNS.orphaned] = true,
+    [M.SIGNS.filegone] = true,
+    [M.TODO.open] = true,
+    [M.TODO.done] = true,
+}
+
+---What a badge's continuation lines show in the gutter.
+M.TAIL = "│"
+
 function M.setup()
     for status, group in pairs(M.GROUPS) do
         local link = "DiagnosticSign" .. SEVERITY[status]

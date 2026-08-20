@@ -144,12 +144,17 @@ local function span_end(bufnr, entry)
     return entry.line_end - 1, #(last or "")
 end
 
+---@class sidenote.render.Tail
+---@field row integer 0-based row the continuation starts on
+---@field opts table extmark options for the continuation mark
+
 ---@param bufnr integer
 ---@param entry sidenote.render.Entry
 ---@param style string
 ---@param pens table<string, string>|nil pen name -> highlight group
 ---@return integer|nil col 0-based start column, nil when nothing is drawn
 ---@return table|nil opts extmark options
+---@return sidenote.render.Tail|nil tail second mark for a badge's span
 local function mark_opts(bufnr, entry, style, pens)
     local group = highlight.GROUPS[entry.status]
     if style == "sign" then
@@ -164,6 +169,21 @@ local function mark_opts(bufnr, entry, style, pens)
         local glyph = highlight.SIGNS[entry.status]
         if entry.status == "attached" and entry.kind == "todo" then
             glyph = entry.state == "open" and highlight.TODO.open or highlight.TODO.done
+        end
+
+        -- Bars extend; badges mark once. A checkbox on every covered line
+        -- reads as that many todos, so a span checks one box and trails off
+        if highlight.BADGES[glyph] and entry.line_end > entry.line_start then
+            return 0,
+                { sign_text = glyph, sign_hl_group = ink },
+                {
+                    row = entry.line_start,
+                    opts = {
+                        end_row = entry.line_end - 1,
+                        sign_text = highlight.TAIL,
+                        sign_hl_group = ink,
+                    },
+                }
         end
         return 0,
             {
@@ -307,7 +327,7 @@ function M.paint(bufnr, entries, opts)
             -- not cost a note its save-time truth
             track(bufnr, entry)
             if opts.style ~= "none" and not entry.hidden then
-                local col, mark = mark_opts(bufnr, entry, opts.style, opts.pens)
+                local col, mark, tail = mark_opts(bufnr, entry, opts.style, opts.pens)
                 if mark then
                     mark.priority = highlight.PRIORITIES[entry.status]
                     vim.api.nvim_buf_set_extmark(
@@ -318,6 +338,10 @@ function M.paint(bufnr, entries, opts)
                         mark
                     )
                     placed = placed + 1
+                end
+                if tail then
+                    tail.opts.priority = highlight.PRIORITIES[entry.status]
+                    vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, tail.row, 0, tail.opts)
                 end
                 if overlay then
                     local ink, range = mark_opts(bufnr, entry, "highlight", opts.pens)

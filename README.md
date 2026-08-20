@@ -222,7 +222,10 @@ note is for.
 Signs span every line of a multi-line note, and when notes overlap the worst
 anchor status wins the gutter. A healthy todo signs as `☐`, checked off to
 `☑` once it is no longer open; notes keep the `▍` stripe, and every hurt
-status keeps its own glyph — hurt is louder than kind. A healthy note with
+status keeps its own glyph — hurt is louder than kind. Bars extend and
+badges mark once: a stripe repeats down its span, while a checkbox or a
+`?`/`!`/`✗` shows on the first line alone with a `│` tail carrying the
+rest, so a three-line todo never reads as three todos. A healthy note with
 no prose yet shows a dimmed sign — a bare anchor is a deletion candidate,
 and looks like one.
 The `summary` style goes further and puts prose line one at the end of the
