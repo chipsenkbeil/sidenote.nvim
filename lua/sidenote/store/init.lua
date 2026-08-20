@@ -93,7 +93,7 @@ end
 ---@return boolean ok
 ---@return string|nil err
 function M.write_prose(opts)
-    local path = M.prose_path(opts.root, opts.id, opts.filetype)
+    local path = M.prose_target(opts.root, opts.id, opts.filetype)
     return write_file(path, table.concat(opts.lines, "\n") .. "\n")
 end
 
@@ -124,10 +124,11 @@ end
 
 ---Path of the prose file that actually exists for an annotation.
 ---
----Reads fall back to whatever extension is on disk rather than trusting the
----configured one. A store written while `filetype` was `org` has to stay
----readable after that setting changes, and a headless run has no user config
----to consult at all. Writes still use the configured extension.
+---Reads and edits fall back to whatever extension is on disk rather than
+---trusting the configured one. A store written while `filetype` was `org` has
+---to stay usable after that setting changes, and a headless run has no user
+---config to consult at all. Only creating a new note uses the configured
+---extension unconditionally.
 ---@param root string
 ---@param id string
 ---@param filetype string extension to prefer
@@ -151,6 +152,19 @@ function M.prose_file(root, id, filetype)
             return root .. "/" .. name
         end
     end
+end
+
+---Path a note's prose is edited at: the file that exists, or the configured
+---one when none does.
+---
+---Every surface that opens or rewrites prose resolves through this, so a
+---changed `filetype` can never fork one note across two files.
+---@param root string
+---@param id string
+---@param filetype string extension to prefer
+---@return string
+function M.prose_target(root, id, filetype)
+    return M.prose_file(root, id, filetype) or M.prose_path(root, id, filetype)
 end
 
 ---@param root string

@@ -114,7 +114,7 @@ CHECKS.write = function(action, state)
     if not row then
         return ("no annotation %s in this browser"):format(tostring(action.id))
     end
-    local path = store.prose_path(row.entry.root, action.id, state.config.filetype)
+    local path = store.prose_target(row.entry.root, action.id, state.config.filetype)
     if open_and_modified(path) then
         return ("%s is open with unsaved changes; save or discard it first"):format(path)
     end

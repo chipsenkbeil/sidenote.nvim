@@ -193,6 +193,16 @@ describe("store.prose_file", function()
         assert.eq(store.prose(dir, annotation.id, "txt"), "hello\n")
     end)
 
+    it("writes prose into the file on disk, never a fork under a new extension", function()
+        -- Reading falls back to the extension that exists; writing to the
+        -- configured one instead would split the note across two files
+        local dir, annotation = root(), rec()
+        store.create(dir, annotation, "org")
+        store.write_prose({ root = dir, id = annotation.id, filetype = "txt", lines = { "kept" } })
+        assert.eq(store.prose(dir, annotation.id, "org"), "kept\n")
+        assert.is_nil(vim.uv.fs_stat(store.prose_path(dir, annotation.id, "txt")))
+    end)
+
     it("deletes the prose file whatever extension it carries", function()
         local dir, annotation = root(), rec()
         store.create(dir, annotation, "org")

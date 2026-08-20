@@ -25,10 +25,12 @@ end
 ---@param filetype string
 ---@return integer winid
 function M.open(entry, opts, filetype)
-    local path = store.prose_path(entry.root, entry.id, filetype)
+    local path = store.prose_target(entry.root, entry.id, filetype)
     local bufnr = vim.fn.bufadd(path)
     vim.fn.bufload(bufnr)
-    vim.bo[bufnr].filetype = filetype
+    -- From the file, not the parameter: a note written under an earlier
+    -- `filetype` setting keeps the highlighting its extension names
+    vim.bo[bufnr].filetype = vim.fn.fnamemodify(path, ":e")
 
     local existing = M.winid()
     if existing then

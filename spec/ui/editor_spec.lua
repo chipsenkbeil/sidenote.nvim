@@ -48,6 +48,20 @@ describe("editor.open", function()
         require("sidenote.window").close(winid)
     end)
 
+    it("opens the file on disk when the configured extension has changed", function()
+        -- The note was written as org; asking for txt must not create an
+        -- empty second prose file beside it
+        local entry = annotated()
+        local winid = editor.open(entry, opts().editor, "txt")
+        local bufnr = vim.api.nvim_win_get_buf(winid)
+        assert.eq(
+            vim.api.nvim_buf_get_name(bufnr),
+            vim.uv.fs_realpath(store.prose_path(entry.root, entry.id, "org"))
+        )
+        assert.eq(vim.bo[bufnr].filetype, "org")
+        require("sidenote.window").close(winid)
+    end)
+
     it("sets the configured filetype so the user's plugins apply", function()
         local winid = editor.open(annotated(), opts().editor, "org")
         assert.eq(vim.bo[vim.api.nvim_win_get_buf(winid)].filetype, "org")
