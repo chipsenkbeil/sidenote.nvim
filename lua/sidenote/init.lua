@@ -120,7 +120,11 @@ function M.browse_project(opts)
     opts = opts or {}
     local from = opts.path
     if not from or from == "" then
-        from = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
+        -- From inside a listing, widen what it lists: the listing's own
+        -- buffer name is sidenote://…, which is no path at all
+        local bufnr = vim.api.nvim_get_current_buf()
+        local state = require("sidenote.browser").state(bufnr)
+        from = state and state.path or vim.api.nvim_buf_get_name(bufnr)
     end
     if from == "" then
         from = vim.fn.getcwd()

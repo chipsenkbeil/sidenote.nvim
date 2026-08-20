@@ -114,6 +114,41 @@ describe("browser toggling back", function()
     end)
 end)
 
+describe("browser widening from a listing", function()
+    it("widens a file listing to its project", function()
+        -- The listing's own buffer name is sidenote://…, which is no path;
+        -- what it lists is
+        local source = project_buffer()
+        annotate(source, 4)
+        vim.api.nvim_set_current_buf(assert(browser.open(source, { config = opts() })))
+
+        local sidenote = require("sidenote")
+        vim.g.sidenote = { strategy = "project" }
+        local listing, err = sidenote.browse_project({})
+        vim.g.sidenote = nil
+
+        assert.is_nil(err)
+        local name = vim.api.nvim_buf_get_name(assert.not_nil(listing))
+        assert.match(name, "^sidenote://.*/$")
+    end)
+
+    it("re-shows a project listing rather than erroring", function()
+        local source = project_buffer()
+        annotate(source, 4)
+        local name = vim.api.nvim_buf_get_name(source)
+        local listing = assert(browser.open_project(name, { config = opts() }))
+        vim.api.nvim_set_current_buf(listing)
+
+        local sidenote = require("sidenote")
+        vim.g.sidenote = { strategy = "project" }
+        local again, err = sidenote.browse_project({})
+        vim.g.sidenote = nil
+
+        assert.is_nil(err)
+        assert.eq(again, listing)
+    end)
+end)
+
 describe("browser help", function()
     it("answers ? with a float listing every browser mapping", function()
         local source = project_buffer()
