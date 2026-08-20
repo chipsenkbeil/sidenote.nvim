@@ -262,6 +262,74 @@ describe("the :Sidenote command", function()
         assert.eq(items[1].lnum, 2)
     end)
 
+    it("gives the sidenote quickfix list its verbs", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,2")
+
+        vim.cmd("Sidenote qflist")
+        assert.eq(vim.bo.filetype, "qf", "the quickfix window has focus")
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+        local function press(key)
+            vim.api.nvim_feedkeys(key, "x", false)
+        end
+
+        -- Anywhere outside the bracket words means state, as in the browser
+        press("t")
+        vim.wait(200, function()
+            return only_record(root).state == "resolved"
+        end)
+        assert.eq(only_record(root).state, "resolved")
+        assert.contains(vim.fn.getqflist()[1].text, "resolved")
+
+        -- On the kind word, the same key flips the kind
+        local line = vim.api.nvim_get_current_line()
+        vim.api.nvim_win_set_cursor(0, { 1, assert(line:find("note", 1, true)) - 1 })
+        press("t")
+        vim.wait(200, function()
+            return only_record(root).kind == "todo"
+        end)
+        assert.eq(only_record(root).kind, "todo")
+
+        -- On the pen placeholder, it picks the first pen up
+        line = vim.api.nvim_get_current_line()
+        vim.api.nvim_win_set_cursor(0, { 1, (assert(line:find(" %-%]"))) })
+        press("t")
+        vim.wait(200, function()
+            return only_record(root).pen ~= nil
+        end)
+        assert.not_nil(only_record(root).pen)
+
+        local original = vim.fn.confirm
+        vim.fn.confirm = function()
+            return 1
+        end
+        press("d")
+        vim.wait(200, function()
+            return #vim.fn.getqflist() == 0
+        end)
+        vim.fn.confirm = original
+        assert.eq(#vim.fn.getqflist(), 0, "the deleted note left the list")
+        vim.cmd.cclose()
+    end)
+
+    it("leaves a foreign quickfix list alone", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,2")
+
+        vim.fn.setqflist({}, " ", {
+            title = "foreign",
+            items = { { bufnr = vim.api.nvim_get_current_buf(), lnum = 1, text = "x" } },
+        })
+        vim.cmd.copen()
+        vim.api.nvim_feedkeys("t", "x", false)
+        vim.wait(50)
+        assert.eq(only_record(root).state, "open", "the verb stayed out of it")
+        vim.cmd.cclose()
+    end)
+
     it("captures a todo when asked, combinable with the file scope", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")

@@ -380,6 +380,14 @@ vim.api.nvim_create_autocmd("BufWritePost", {
         end)
     end,
 })
+vim.api.nvim_create_autocmd("FileType", {
+    group = group,
+    pattern = "qf",
+    desc = "Give sidenote-titled quickfix and location lists their verbs",
+    callback = function(event)
+        require("sidenote.list").bind(event.buf)
+    end,
+})
 vim.api.nvim_create_autocmd("ColorScheme", {
     group = group,
     desc = "Redefine highlight groups after a colorscheme replaces them",
