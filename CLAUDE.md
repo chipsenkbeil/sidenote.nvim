@@ -254,6 +254,11 @@ already happened once here. Check `jj st` after every absorb.
   `t`/`T`, the source-buffer cycle plugs and the menu all go through it,
   so the rings and the write-then-repaint path cannot drift apart. Every
   write also calls `editor.redecorate_note`, keeping an open header true.
+- **Agents resolve what they finish** (2026-08-20, reversing the 08-19
+  read-only stance; spec §7/§9 record it): append a dated response beneath
+  the human's prose, flip `state` to resolved/wontfix, touch nothing else.
+  Invariant 3 is untouched — it binds the plugin's write paths, and an
+  agent editing store files is a store consumer, not the plugin.
 - **Kind shows in the gutter only while the anchor is exact** (2026-08-20):
   a healthy todo signs `☐`, checked to `☑` once no longer open; notes keep
   `▍`; every hurt status keeps its own glyph — hurt is louder than kind.

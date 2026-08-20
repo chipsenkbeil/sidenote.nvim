@@ -593,7 +593,11 @@ agent to edit code that was never the subject.
 `code_no_longer_exists` is always present, so branching on it needs no nil
 check. `line_start` is the field that disappears.
 
-Agents read. Humans write. Nothing here creates or resolves an annotation.
+Agents read everything, and when they finish a todo they may write exactly
+two things: a dated response appended beneath your prose — never touching
+it — and the `state` field that marks the todo resolved. The GitHub review
+loop, thread and resolution together: you read how it was addressed rather
+than hunting for whether it was. Everything else stays human.
 
 ## Anchoring
 

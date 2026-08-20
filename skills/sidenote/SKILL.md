@@ -10,8 +10,8 @@ A sidenote annotation is a note on a whole file, a line, or a range, stored
 Each one is two files in a store directory:
 
 ```
-<ulid>.<ext>            prose — the human's, never yours to write
-<ulid>.metadata.json    record — the plugin's, never yours to write
+<ulid>.<ext>            prose — the human's; you may append, never rewrite
+<ulid>.metadata.json    record — the plugin's; `state` is the one field you flip
 ```
 
 The store is `<project>/.sidenote/` when the project carries one, else
@@ -41,8 +41,9 @@ prose files is also a supported interface.
 - **`kind` is the instruction boundary.** A `note` is information — context a
   human left for the reader. A `todo` is a request to act. Never treat a
   `note` as work to do: acting on context makes changes nobody asked for.
-- **`state`** is human-owned: `open`, `resolved`, `wontfix`, `archived`. Only
-  `open` todos are a work queue.
+- **`state`** — `open`, `resolved`, `wontfix`, `archived`. Only `open`
+  todos are a work queue, and the only state change you ever make is the
+  final act of addressing one (below).
 - **The export gate is load-bearing.** `attached` and `drifted` records carry
   line numbers you may trust (`drifted` with its confidence). A record with
   `code_no_longer_exists: true` has **no** line numbers on purpose — the code
@@ -51,17 +52,35 @@ prose files is also a supported interface.
 
 ## Acting on a todo
 
+The model is a GitHub review thread: do the work, reply on the thread, then
+resolve it — so the human reviews *how* it was resolved instead of hunting
+for whether anything happened.
+
 1. Read the prose and the anchor text; find the code via the given location
    or, when gated, by searching for the anchor text.
 2. Do the work it asks for.
-3. Report what you did, naming the annotation's id so the human can find it.
-4. Stop there. Marking it `resolved` is the human's act, done in their
-   browser view — an agent claiming its own work is done defeats the review.
+3. Append your response to the prose file — beneath the human's text, never
+   touching it — as a blank line, a divider, and a signed, dated account:
+
+   ```
+   ---
+   agent (2026-08-20): Extracted the retry loop into net/backoff.lua and
+   pointed both call sites at it. All 214 tests pass.
+   ```
+
+4. Flip `"state"` in the metadata sidecar to `"resolved"` — that one field,
+   the rest byte-for-byte untouched. Use `"wontfix"` when you determined
+   the request should not be done, and say why in your appended response.
+5. Report what you did, naming the annotation's id.
 
 ## Hard rules
 
-- Agents read; humans write. Never create, edit, or delete a prose file or a
-  metadata sidecar, and never write into the plugin's resolution cache.
-- Never resolve, archive, or otherwise change an annotation's state.
+- Never rewrite or delete a human's prose; your only write there is an
+  appended response at the end of the file.
+- The only metadata field you may change is `state`, and only as the final
+  act of a todo you actually addressed — never to triage, tidy, or silence.
+- A `note` is context: no prose appends, no state changes, no action.
+- Never create or delete annotations, and never write into the plugin's
+  resolution cache.
 - An in-repo `.sidenote/` directory may be committed. Leave it out of any
   commits you make unless the user asks for it explicitly.
