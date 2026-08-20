@@ -158,9 +158,28 @@ describe("browser window options", function()
         assert.eq(vim.wo[winid].conceallevel, 1)
     end)
 
-    it("saves the user's options, not its own, when re-listing in one window", function()
-        -- Widening with `-` reuses the window; saving again there would make
-        -- the browser's values the ones restored on leaving
+    it("restores the window even when the listing is wiped out from under it", function()
+        -- The hard case for any save-and-restore scheme: the replacement
+        -- buffer inherits the window's values as the switch completes
+        local winid = vim.api.nvim_get_current_win()
+        vim.cmd.enew()
+        vim.wo[winid].foldmethod = "indent"
+
+        -- Visit the listing, step out to a real file, and come back, the way
+        -- a browse session actually goes, so several buffers are in play
+        local source = project_buffer()
+        assert(browser.open(source, { config = opts() }))
+        vim.cmd.edit(vim.api.nvim_buf_get_name(source))
+        assert(browser.open(source, { config = opts() }))
+        assert.eq(vim.wo[winid].foldmethod, "expr")
+
+        vim.cmd("silent! %bwipeout!")
+        assert.eq(vim.wo[winid].foldmethod, "indent")
+    end)
+
+    it("keeps the user's options through a re-listing in one window", function()
+        -- Widening with `-` reuses the window; the user's values must be what
+        -- comes back however many listings were shown there in a row
         local winid = vim.api.nvim_get_current_win()
         -- Step out of any listing an earlier test left in this window
         vim.cmd.enew()

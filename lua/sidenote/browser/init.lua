@@ -97,53 +97,17 @@ local function rows_for(state)
     return out
 end
 
----Window options `configure` overrides, saved beforehand so that leaving the
----listing can give the window its own values back.
-local WINDOW_OPTIONS = {
-    "conceallevel",
-    "concealcursor",
-    "foldmethod",
-    "foldexpr",
-    "foldtext",
-    "foldenable",
-    "foldminlines",
-    "fillchars",
-    "wrap",
-    "foldlevel",
-}
-
----Restore the options a window held before it showed a listing.
----@param winid integer
-local function unconfigure(winid)
-    local saved = vim.w[winid].sidenote_restore
-    if not saved then
-        return
-    end
-    for _, option in ipairs(WINDOW_OPTIONS) do
-        vim.wo[winid][option] = saved[option]
-    end
-    vim.w[winid].sidenote_restore = nil
-end
-
----Restore every configured window once it shows something else.
+---Set a window option for the listing alone, never for the window itself.
 ---
----The options are window-local, not buffer-local: without this, the file a
----window shows after a listing inherits the folds and collapses into one.
-local installed = false
-local function install_restore()
-    if installed then
-        return
-    end
-    installed = true
-    vim.api.nvim_create_autocmd("BufWinEnter", {
-        group = vim.api.nvim_create_augroup("sidenote.browser", { clear = true }),
-        desc = "Give a window its own options back once it leaves the browser",
-        callback = function(event)
-            if vim.api.nvim_buf_get_name(event.buf):sub(1, #M.SCHEME) ~= M.SCHEME then
-                unconfigure(vim.api.nvim_get_current_win())
-            end
-        end,
-    })
+---`scope = "local"` is what makes leaving free: vim reverts a local-scoped
+---window option on its own the moment the window shows another buffer, under
+---`:edit`, `nvim_win_set_buf` and `:bwipeout` alike. Nothing is saved, so
+---nothing can fail to be given back.
+---@param winid integer
+---@param option string
+---@param value boolean|integer|string
+local function set_local(winid, option, value)
+    vim.api.nvim_set_option_value(option, value, { win = winid, scope = "local" })
 end
 
 ---Conceal and fold settings, all of which are window-local.
@@ -152,32 +116,25 @@ end
 ---id on screen.
 ---@param winid integer
 local function configure(winid)
-    -- Saved once per stay: re-listing in the same window must not replace the
-    -- user's values with the browser's own
-    if not vim.w[winid].sidenote_restore then
-        local saved = {}
-        for _, option in ipairs(WINDOW_OPTIONS) do
-            saved[option] = vim.wo[winid][option]
-        end
-        vim.w[winid].sidenote_restore = saved
-    end
-
-    local wo = vim.wo[winid]
-    wo.conceallevel = 3
-    wo.concealcursor = "nvic"
-    wo.foldmethod = "expr"
-    wo.foldexpr = M.FOLDEXPR
+    set_local(winid, "conceallevel", 3)
+    set_local(winid, "concealcursor", "nvic")
+    set_local(winid, "foldmethod", "expr")
+    set_local(winid, "foldexpr", M.FOLDEXPR)
     -- An empty foldtext renders a closed fold as its own header line, conceal
     -- included, so a folded row reads exactly like an unfolded one
-    wo.foldtext = ""
-    wo.foldenable = true
+    set_local(winid, "foldtext", "")
+    set_local(winid, "foldenable", true)
     -- A note with no body is a one-line fold, which vim leaves open at the
     -- default of 1. Zero keeps "every annotation is a closed fold" true
-    wo.foldminlines = 0
-    wo.fillchars = vim.o.fillchars == "" and "fold: " or (vim.o.fillchars .. ",fold: ")
+    set_local(winid, "foldminlines", 0)
+    set_local(
+        winid,
+        "fillchars",
+        vim.o.fillchars == "" and "fold: " or (vim.o.fillchars .. ",fold: ")
+    )
     -- A closed fold never wraps, so leaving wrap on would change a row's shape
     -- the moment it is expanded. Summaries are untruncated and can be long
-    wo.wrap = false
+    set_local(winid, "wrap", false)
 end
 
 ---Collapse every annotation, so the browser reads as an index.
@@ -189,7 +146,7 @@ end
 local function close_all(bufnr)
     for _, winid in ipairs(vim.api.nvim_list_wins()) do
         if vim.api.nvim_win_get_buf(winid) == bufnr then
-            vim.wo[winid].foldlevel = 0
+            set_local(winid, "foldlevel", 0)
         end
     end
 end
@@ -341,7 +298,6 @@ local function show(state)
         bind(bufnr)
     end
 
-    install_restore()
     local winid = vim.api.nvim_get_current_win()
     vim.api.nvim_win_set_buf(winid, bufnr)
     vim.bo[bufnr].filetype = "sidenote"
