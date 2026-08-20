@@ -211,9 +211,12 @@ local function decorate(bufnr, winid, entry)
     local lines = M.header(entry, entry.source)
     vim.api.nvim_buf_clear_namespace(bufnr, M.NAMESPACE, 0, -1)
     if #lines > 0 then
+        -- No gravity: typing from the very top of an empty note must not
+        -- drag the header down with the text, leaving prose above it
         vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, 0, 0, {
             virt_lines = lines,
             virt_lines_above = true,
+            right_gravity = false,
         })
     end
 

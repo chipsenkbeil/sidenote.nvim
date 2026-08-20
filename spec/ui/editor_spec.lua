@@ -360,6 +360,20 @@ describe("editor.open context", function()
         require("sidenote.window").close(winid)
     end)
 
+    it("keeps the header above everything the user types", function()
+        -- Typing from the top of an empty note must not push the mark down
+        -- and leave the prose sitting above its own header
+        local entry, source = annotated()
+        entry.source = source
+        local winid = editor.open(entry, opts().editor, "org")
+        local bufnr = vim.api.nvim_win_get_buf(winid)
+
+        vim.api.nvim_buf_set_lines(bufnr, 0, 0, false, { "first thought", "second thought" })
+        local placed = vim.api.nvim_buf_get_extmarks(bufnr, editor.NAMESPACE, 0, -1, {})
+        assert.eq(placed[1][2], 0, "the header holds row zero")
+        require("sidenote.window").close(winid)
+    end)
+
     it("pins the location into the winbar", function()
         local entry, source = annotated()
         entry.source = source
