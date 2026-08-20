@@ -159,6 +159,38 @@ describe("the :Sidenote command", function()
         assert.eq_deep(values, { "status=orphaned" })
     end)
 
+    it("captures the whole file with add scope=file", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+
+        local before = vim.api.nvim_get_current_win()
+        vim.cmd("Sidenote add scope=file")
+        put_away()
+        vim.api.nvim_set_current_win(before)
+
+        local rec = only_record(root)
+        assert.eq(rec.scope, "file")
+        assert.eq(rec.line_start, 0)
+    end)
+
+    it("completes scope=file after add", function()
+        project()
+        assert.eq_deep(vim.fn.getcompletion("Sidenote add sc", "cmdline"), { "scope=file" })
+    end)
+
+    it("captures the whole file from its own mapping", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+
+        local before = vim.api.nvim_get_current_win()
+        local plug = vim.api.nvim_replace_termcodes("<Plug>(SidenoteAddFile)", true, false, true)
+        vim.api.nvim_feedkeys(plug, "x", false)
+        put_away()
+        vim.api.nvim_set_current_win(before)
+
+        assert.eq(only_record(root).scope, "file")
+    end)
+
     it("captures a visual selection as lines scope too", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")

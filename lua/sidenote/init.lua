@@ -72,16 +72,24 @@ function M.entries(bufnr)
     return require("sidenote.session").entries(bufnr or vim.api.nvim_get_current_buf())
 end
 
----Annotation whose range holds the cursor line, or nil when none does.
+---Annotation the cursor is in: the narrowest holding it, else a file-wide one.
 ---@return sidenote.session.Entry|nil
 function M.at_cursor()
     local line = vim.fn.line(".")
+    local best, whole
     for _, entry in ipairs(M.entries()) do
         if entry.line_start and line >= entry.line_start and line <= entry.line_end then
-            return entry
+            -- Overlaps are legal; the most specific note is the one the
+            -- cursor position is talking about
+            local width = entry.line_end - entry.line_start
+            if not best or width < best.line_end - best.line_start then
+                best = entry
+            end
+        elseif not entry.line_start and entry.record.scope == "file" then
+            whole = whole or entry
         end
     end
-    return nil
+    return best or whole
 end
 
 ---@class sidenote.BrowseOpts

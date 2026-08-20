@@ -83,10 +83,28 @@ local function add(first, last)
     sidenote.refresh(bufnr)
 end
 
+---Capture the whole current file as one annotation.
+local function add_file()
+    local sidenote = require("sidenote")
+    local bufnr = vim.api.nvim_get_current_buf()
+    local _, err = sidenote.add({ scope = "file" })
+    if err then
+        report(err)
+        return
+    end
+    sidenote.refresh(bufnr)
+end
+
 vim.api.nvim_create_user_command("Sidenote", function(cmd)
     local subcommand = cmd.fargs[1]
     if subcommand == "add" then
-        add(cmd.line1, cmd.line2)
+        if cmd.fargs[2] == "scope=file" then
+            add_file()
+        elseif cmd.fargs[2] then
+            report(("add takes only scope=file, not %q"):format(cmd.fargs[2]))
+        else
+            add(cmd.line1, cmd.line2)
+        end
     elseif subcommand == "browse" then
         local path, filter, filter_err = listing_args(cmd.fargs)
         if filter_err then
@@ -140,6 +158,9 @@ end, {
             return matching(SUBCOMMANDS)
         end
         local subcommand = after:match("^(%S+)")
+        if subcommand == "add" then
+            return matching({ "scope=file" })
+        end
         if subcommand ~= "browse" and subcommand ~= "project" then
             return {}
         end
@@ -163,6 +184,10 @@ vim.keymap.set({ "n", "x" }, "<Plug>(SidenoteAdd)", function()
     end
     add(first, last)
 end, { desc = "Annotate the current line or selection" })
+
+vim.keymap.set("n", "<Plug>(SidenoteAddFile)", function()
+    add_file()
+end, { desc = "Annotate the whole file" })
 
 vim.keymap.set("n", "<Plug>(SidenoteBrowse)", function()
     local _, err = require("sidenote").browse()

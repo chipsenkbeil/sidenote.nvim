@@ -133,6 +133,45 @@ describe("sidenote.add composing", function()
     end)
 end)
 
+describe("sidenote.at_cursor", function()
+    before_each(function()
+        vim.g.sidenote = { strategy = "project", filetype = "org" }
+    end)
+
+    after_each(function()
+        vim.g.sidenote = nil
+        put_away()
+        vim.cmd("silent! %bwipeout!")
+    end)
+
+    it("prefers the narrowest note containing the cursor", function()
+        -- Overlaps are legal; the most specific note is the one the cursor
+        -- position is talking about
+        editing()
+        added(opts())
+        put_away()
+        assert(sidenote.add({ scope = "lines", range = { 3, 0, 5, 0 }, config = opts() }))
+        put_away()
+
+        vim.api.nvim_win_set_cursor(0, { 4, 0 })
+        local entry = assert.not_nil(sidenote.at_cursor())
+        assert.eq(entry.record.line_start, 4)
+        assert.eq(entry.record.line_end, 4)
+    end)
+
+    it("falls back to the file-wide note when nothing narrower contains it", function()
+        editing()
+        assert(sidenote.add({ scope = "file", config = opts() }))
+        put_away()
+        assert(sidenote.add({ scope = "lines", range = { 3, 0, 3, 0 }, config = opts() }))
+        put_away()
+
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        local entry = assert.not_nil(sidenote.at_cursor())
+        assert.eq(entry.record.scope, "file")
+    end)
+end)
+
 describe("config.template validation", function()
     it("rejects a template that is not a function", function()
         local _, err = require("sidenote.config").resolve({ template = "* TODO" })
