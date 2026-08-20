@@ -54,6 +54,7 @@ vim.keymap.set("n", "<Leader>sb", "<Plug>(SidenoteBrowse)")
 vim.keymap.set("n", "<Leader>sB", "<Plug>(SidenoteBrowseProject)")
 vim.keymap.set("n", "<Leader>sr", "<Plug>(SidenoteRefresh)")
 vim.keymap.set("n", "<Leader>sh", "<Plug>(SidenoteToggleHighlight)")
+vim.keymap.set("n", "<Leader>sf", "<Plug>(SidenoteFollow)")
 vim.keymap.set("n", "]n", "<Plug>(SidenoteViewNext)")
 vim.keymap.set("n", "[n", "<Plug>(SidenoteViewPrev)")
 ```
@@ -75,6 +76,7 @@ No default mappings are installed.
 | `<Plug>(SidenoteBrowseProject)` | Open the editable listing of every annotation in the project |
 | `<Plug>(SidenoteRefresh)` | Re-resolve and repaint annotations |
 | `<Plug>(SidenoteToggleHighlight)` | Toggle range highlights in this buffer |
+| `<Plug>(SidenoteFollow)` | Toggle the note editor following the cursor |
 | `<Plug>(SidenoteView)` | Preview the annotation under the cursor |
 | `<Plug>(SidenoteOpen)` | Open the annotation under the cursor for writing |
 | `<Plug>(SidenoteViewNext)` | Jump to the next annotation and preview it |
@@ -105,7 +107,7 @@ Fold verbs need no mapping. The folds are real.
 <!-- gen:commands -->
 ```vim
 :Sidenote add | browse | project | refresh | view | open | next
-          | prev | highlight
+          | prev | highlight | follow
 ```
 <!-- /gen:commands -->
 
@@ -222,6 +224,18 @@ winbar once a long note scrolls. An anchor that is short of exact shows its
 status and confidence there in the status color, keeping the originally
 captured line on a `was:` marker — so the one place you write about code
 also tells you honestly where that code stands.
+
+<!-- vimdoc:tag sidenote-follow -->
+
+### Follow
+
+`:Sidenote follow` pins that window and keeps it pointed at the note under
+your cursor. Crossing into another annotation re-points it — never focusing
+it — and prose you edited is saved the moment the panel moves on, so the
+store never lies to a reader outside the editor. Over unannotated code the
+panel holds the last note rather than blanking; the context header is what
+keeps a held-over note legible as such. Closing the panel turns following
+off.
 
 <!-- vimdoc:tag sidenote-storage -->
 
@@ -387,6 +401,10 @@ Jump to the previous annotation and preview it.
 `sidenote.toggle_highlight()`
 
 Toggle this buffer's range highlights, the way spell is toggled.
+
+`sidenote.follow()`
+
+Toggle the note editor following the cursor from note to note.
 
 <!-- /gen:api -->
 

@@ -3,8 +3,18 @@ if vim.g.loaded_sidenote then
 end
 vim.g.loaded_sidenote = true
 
-local SUBCOMMANDS =
-    { "add", "browse", "project", "refresh", "view", "open", "next", "prev", "highlight" }
+local SUBCOMMANDS = {
+    "add",
+    "browse",
+    "project",
+    "refresh",
+    "view",
+    "open",
+    "next",
+    "prev",
+    "highlight",
+    "follow",
+}
 
 ---@param err string
 local function report(err)
@@ -132,6 +142,8 @@ vim.api.nvim_create_user_command("Sidenote", function(cmd)
         if shown ~= nil then
             vim.notify("sidenote: highlights " .. (shown and "on" or "off"))
         end
+    elseif subcommand == "follow" then
+        require("sidenote").follow()
     elseif subcommand == "view" or subcommand == "open" then
         if not require("sidenote")[subcommand]() then
             report("no annotation under the cursor")
@@ -213,6 +225,10 @@ end, { desc = "Re-resolve and repaint annotations" })
 vim.keymap.set("n", "<Plug>(SidenoteToggleHighlight)", function()
     require("sidenote").toggle_highlight()
 end, { desc = "Toggle range highlights in this buffer" })
+
+vim.keymap.set("n", "<Plug>(SidenoteFollow)", function()
+    require("sidenote").follow()
+end, { desc = "Toggle the note editor following the cursor" })
 
 vim.keymap.set("n", "<Plug>(SidenoteView)", function()
     require("sidenote").view()

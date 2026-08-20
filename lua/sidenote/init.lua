@@ -216,4 +216,12 @@ function M.toggle_highlight()
     return shown
 end
 
+---Toggle the note editor following the cursor from note to note.
+---@return boolean active
+function M.follow()
+    local active = require("sidenote.follow").toggle(config())
+    vim.notify("sidenote: follow " .. (active and "on" or "off"))
+    return active
+end
+
 return M
