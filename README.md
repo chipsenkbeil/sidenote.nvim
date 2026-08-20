@@ -107,7 +107,8 @@ Inside a browser buffer only:
 | `fk` `fs` `fa` | filter by kind, state, or anchor status |
 | `ff` | filter by path substring |
 | `fc` | clear every filter |
-| `<Tab>` `<S-Tab>` | move between columns |
+| `<Tab>` | toggle this note's fold, org-style |
+| `<S-Tab>` | toggle every fold: the index, or all the prose |
 | `-` | widen to every annotation in the project |
 | `?` | this table, as a float |
 

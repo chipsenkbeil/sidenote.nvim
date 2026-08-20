@@ -29,6 +29,7 @@ local window = require("sidenote.window")
 ---@field config sidenote.Config configuration the browser was opened with
 ---@field filter sidenote.browser.Filter which annotations survive into the listing
 ---@field rows sidenote.browser.Row[] what was rendered, in buffer order
+---@field headers integer[] buffer line of each row's header, in row order
 ---@field lines string[] exactly what was rendered, the clean baseline
 ---@field tick integer buffer tick at that render, the dirty check's fast path
 
@@ -204,23 +205,53 @@ function M.foldtext()
     return chunks
 end
 
----Collapse every annotation, so the browser reads as an index.
+---Collapse every annotation, then hand back the rows that were open.
 ---
 ---A fold created after 'foldlevel' was last set opens regardless of it, so
 ---this runs once the lines are in place rather than alongside the other
----window options.
+---window options. Re-opening by id is what lets a repaint hold still: a
+---cycle rewrites the listing, but the fold you were working in stays open.
 ---@param bufnr integer
-local function close_all(bufnr)
+---@param state sidenote.browser.State
+---@param keep table<string, boolean>|nil ids whose rows stay open
+local function refold(bufnr, state, keep)
     for _, winid in ipairs(vim.api.nvim_list_wins()) do
         if vim.api.nvim_win_get_buf(winid) == bufnr then
             set_local(winid, "foldlevel", 0)
+            if keep then
+                vim.api.nvim_win_call(winid, function()
+                    for i, row in ipairs(state.rows) do
+                        if keep[row.entry.id] then
+                            pcall(vim.cmd, state.headers[i] .. "foldopen")
+                        end
+                    end
+                end)
+            end
         end
     end
 end
 
+---Which rows are open right now, by id, for a repaint to hand back.
+---
+---Read from the current window, which is where every caller of a
+---preserving repaint already sits.
+---@param state sidenote.browser.State
+---@return table<string, boolean>
+local function unfolded(state)
+    local open = {}
+    for i, row in ipairs(state.rows or {}) do
+        local lnum = state.headers and state.headers[i]
+        if lnum and vim.fn.foldclosed(lnum) == -1 then
+            open[row.entry.id] = true
+        end
+    end
+    return open
+end
+
 ---@param bufnr integer
 ---@param state sidenote.browser.State
-local function paint(bufnr, state)
+---@param keep table<string, boolean>|nil ids whose folds a repaint keeps open
+local function paint(bufnr, state, keep)
     state.rows = rows_for(state)
     local lines, headers = render.rows(state.rows)
 
@@ -228,6 +259,7 @@ local function paint(bufnr, state)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     vim.bo[bufnr].modified = false
     state.lines = lines
+    state.headers = headers
     state.tick = vim.api.nvim_buf_get_changedtick(bufnr)
     states[bufnr] = state
 
@@ -248,7 +280,7 @@ local function paint(bufnr, state)
     -- Never the range overlay: the listing is text about notes, not the
     -- annotated code, so pen and status ink belong to the source alone
     indicator.paint(bufnr, marks, { style = "sign", highlight = "never" })
-    close_all(bufnr)
+    refold(bufnr, state, keep)
 end
 
 ---Repaint the loaded buffer of every file a listing edit touched.
@@ -288,23 +320,24 @@ local function report(applied, problems)
     end
 end
 
----Move the cursor to whichever column `find` picks out.
----@param bufnr integer
----@param find fun(text: string, col: integer): integer|nil
-local function step(bufnr, find)
-    local winid = vim.api.nvim_get_current_win()
-    local lnum, col = unpack(vim.api.nvim_win_get_cursor(winid))
-    -- A closed fold paints its whole line as one unit, so a cursor moving
-    -- along it looks pinned; stepping means editing, which means open
-    if vim.fn.foldclosed(lnum) ~= -1 then
-        vim.cmd("normal! zv")
+---Toggle the fold under the cursor, the way org's TAB cycles a headline.
+local function toggle_fold()
+    pcall(vim.cmd, "normal! za")
+end
+
+---Toggle every fold at once: overview when anything is open, else all open.
+---
+---Org's shift-TAB, translated: one key flips between the index and the
+---full text, and which way it flips is read from the screen, not counted.
+---@param state sidenote.browser.State
+local function toggle_all(state)
+    for _, lnum in ipairs(state.headers or {}) do
+        if vim.fn.foldclosed(lnum) == -1 then
+            vim.cmd("normal! zM")
+            return
+        end
     end
-    local text = vim.api.nvim_buf_get_lines(bufnr, lnum - 1, lnum, false)[1] or ""
-    -- Cursor columns are 0-based bytes; parsed fields are 1-based
-    local target = find(text, col + 1)
-    if target then
-        vim.api.nvim_win_set_cursor(winid, { lnum, target - 1 })
-    end
+    vim.cmd("normal! zR")
 end
 
 ---What `?` shows below the mappings themselves.
@@ -429,8 +462,11 @@ local function cycle(bufnr, offset)
         vim.notify("sidenote: " .. tostring(err), vim.log.levels.ERROR)
         return
     end
+    -- The repaint holds still: open folds stay open and the cursor stays
+    -- put, so cycling reads as changing a word, not redrawing a screen
+    local keep = unfolded(state)
     local cursor = vim.api.nvim_win_get_cursor(0)
-    paint(bufnr, state)
+    paint(bufnr, state, keep)
     pcall(vim.api.nvim_win_set_cursor, 0, cursor)
     repaint_sources(state, { row.entry.record.path })
 end
@@ -617,16 +653,17 @@ local function bind(bufnr)
         },
         {
             lhs = "<Tab>",
-            desc = "Jump to the next column",
-            fn = function()
-                step(bufnr, M.next_column)
-            end,
+            desc = "Toggle this note's fold, org-style",
+            fn = toggle_fold,
         },
         {
             lhs = "<S-Tab>",
-            desc = "Jump to the previous column",
+            desc = "Toggle every fold: the index, or all the prose",
             fn = function()
-                step(bufnr, M.prev_column)
+                local state = states[bufnr]
+                if state then
+                    toggle_all(state)
+                end
             end,
         },
         {
@@ -817,6 +854,9 @@ function M.state(bufnr)
 end
 
 ---Re-render from the store, so the buffer shows what is now on disk.
+---
+---Folds a viewer had open stay open when the listing is on screen, so an
+---applied `:w` reads as the edit landing, not as the view resetting.
 ---@param bufnr integer
 ---@return boolean rendered
 function M.rerender(bufnr)
@@ -824,7 +864,8 @@ function M.rerender(bufnr)
     if not state then
         return false
     end
-    paint(bufnr, state)
+    local keep = vim.api.nvim_get_current_buf() == bufnr and unfolded(state) or nil
+    paint(bufnr, state, keep)
     return true
 end
 
@@ -850,49 +891,6 @@ function M.row_at(bufnr, lnum)
         end
     end
     return nil
-end
-
----Byte column each field of a header line starts at, in written order.
----@param text string
----@return integer[]
-local function column_starts(text)
-    local row = parse.header(text)
-    if not row then
-        return {}
-    end
-    local starts = {}
-    for i, column in ipairs(render.COLUMNS) do
-        starts[i] = row.fields[column.name].first
-    end
-    return starts
-end
-
----Where `<Tab>` should land from byte column `col`, or nil at the last column.
----@param text string
----@param col integer 1-based byte column
----@return integer|nil
-function M.next_column(text, col)
-    for _, start in ipairs(column_starts(text)) do
-        if start > col then
-            return start
-        end
-    end
-    return nil
-end
-
----Where `<S-Tab>` should land from byte column `col`, or nil at the first.
----@param text string
----@param col integer 1-based byte column
----@return integer|nil
-function M.prev_column(text, col)
-    local previous = nil
-    for _, start in ipairs(column_starts(text)) do
-        if start >= col then
-            return previous
-        end
-        previous = start
-    end
-    return previous
 end
 
 ---@class sidenote.browser.WriteOpts

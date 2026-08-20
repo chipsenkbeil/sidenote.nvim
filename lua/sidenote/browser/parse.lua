@@ -14,7 +14,7 @@ local render = require("sidenote.browser.render")
 ---@field pen string|nil pen column, nil when it held the `-` placeholder
 ---@field location string location column exactly as written
 ---@field prose string[] the lines beneath the header, summary first
----@field fields table<string, sidenote.browser.Field> column ranges, for <Tab>
+---@field fields table<string, sidenote.browser.Field> column ranges, telling a cycle which field the cursor is on
 
 ---@class sidenote.browser.ParseError
 ---@field lnum integer buffer line the error belongs to, 1-based

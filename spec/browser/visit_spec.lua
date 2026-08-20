@@ -36,11 +36,19 @@ end
 
 ---@param bufnr integer
 ---@param line integer
+---@param prose? string[] written into the note's file when given
 ---@return sidenote.capture.Result
-local function annotate(bufnr, line)
-    return assert(
+local function annotate(bufnr, line, prose)
+    local result = assert(
         capture.run(bufnr, { scope = "lines", range = { line, 0, line, 0 }, config = opts() })
     )
+    if prose then
+        local store = require("sidenote.store")
+        local fh = assert(io.open(store.prose_path(result.root, result.id, "org"), "w"))
+        fh:write(table.concat(prose, "\n") .. "\n")
+        fh:close()
+    end
+    return result
 end
 
 ---@param keys string
@@ -236,25 +244,50 @@ describe("browser gutter", function()
     end)
 end)
 
-describe("browser column stepping", function()
-    it("opens a closed row before moving along it", function()
-        -- A closed fold paints its whole line as one unit, so the cursor
-        -- looks pinned however far it really moved; stepping means editing
+describe("browser folding keys", function()
+    it("cycles one note's fold on tab, the cursor holding still", function()
+        -- Org muscle memory: TAB on a headline folds and unfolds it, and
+        -- moving the cursor is never part of the deal
         local source = project_buffer()
-        annotate(source, 4)
+        annotate(source, 4, { "summary", "a body line" })
         local listing = assert(browser.open(source, { config = opts() }))
         vim.api.nvim_set_current_buf(listing)
-        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        vim.api.nvim_win_set_cursor(0, { 1, 2 })
         assert.eq(vim.fn.foldclosed(1), 1)
 
         press("<Tab>")
         assert.eq(vim.fn.foldclosed(1), -1)
-        assert.gt(vim.api.nvim_win_get_cursor(0)[2], 0)
+        assert.eq_deep(vim.api.nvim_win_get_cursor(0), { 1, 2 })
+
+        press("<Tab>")
+        assert.eq(vim.fn.foldclosed(1), 1)
+    end)
+
+    it("flips between the index and everything on shift-tab", function()
+        local source = project_buffer()
+        annotate(source, 1, { "first", "body" })
+        annotate(source, 4, { "second", "body" })
+        local listing = assert(browser.open(source, { config = opts() }))
+        vim.api.nvim_set_current_buf(listing)
+
+        press("<S-Tab>")
+        assert.eq(vim.fn.foldclosed(1), -1, "everything opens from the index")
+        press("<S-Tab>")
+        assert.neq(vim.fn.foldclosed(1), -1, "and closes again from anything open")
     end)
 end)
 
 describe("browser cycling", function()
     local store = require("sidenote.store")
+
+    ---Cursor column where a header field starts, 0-based.
+    ---@param name string
+    ---@return integer
+    local function column_of(name)
+        local text = vim.api.nvim_buf_get_lines(0, 0, 1, false)[1]
+        local row = assert(require("sidenote.browser.parse").header(text))
+        return row.fields[name].first - 1
+    end
 
     it("cycles the kind when the cursor sits on its column", function()
         -- One pair of keys serves both fields: the column under the cursor
@@ -262,9 +295,8 @@ describe("browser cycling", function()
         local source = project_buffer()
         local result = annotate(source, 4)
         vim.api.nvim_set_current_buf(assert(browser.open(source, { config = opts() })))
-        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        vim.api.nvim_win_set_cursor(0, { 1, column_of("kind") })
 
-        press("<Tab>")
         press("t")
         assert.eq(store.read(result.root, result.id).kind, "todo")
         assert.contains(vim.api.nvim_buf_get_lines(0, 0, 1, false)[1], "todo")
@@ -278,11 +310,8 @@ describe("browser cycling", function()
         local source = project_buffer()
         local result = annotate(source, 4)
         vim.api.nvim_set_current_buf(assert(browser.open(source, { config = opts() })))
-        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        vim.api.nvim_win_set_cursor(0, { 1, column_of("pen") })
 
-        press("<Tab>")
-        press("<Tab>")
-        press("<Tab>")
         press("t")
         assert.eq(store.read(result.root, result.id).pen, "blue")
         press("t")
@@ -290,6 +319,28 @@ describe("browser cycling", function()
         press("T")
         press("T")
         assert.is_nil(store.read(result.root, result.id).pen)
+    end)
+
+    it("holds still while it cycles: the open fold and cursor survive", function()
+        -- The write rewrites the listing, but the user experiences a word
+        -- changing under the cursor, not a screen redrawing
+        local source = project_buffer()
+        annotate(source, 4, { "summary", "a body line" })
+        vim.api.nvim_set_current_buf(assert(browser.open(source, { config = opts() })))
+        press("<Tab>")
+        assert.eq(vim.fn.foldclosed(1), -1)
+        local at = { 1, column_of("kind") }
+        vim.api.nvim_win_set_cursor(0, at)
+
+        press("t")
+        assert.eq(vim.fn.foldclosed(1), -1, "the fold stays open")
+        assert.eq_deep(vim.api.nvim_win_get_cursor(0), at, "the cursor stays put")
+        press("t")
+        assert.contains(
+            vim.api.nvim_buf_get_lines(0, 0, 1, false)[1],
+            "note",
+            "still on kind, so the second press flips it back"
+        )
     end)
 
     it("cycles the state everywhere else, wrapping at both ends", function()
@@ -316,10 +367,7 @@ describe("browser cycling", function()
         require("sidenote.session").refresh(source, cfg)
 
         vim.api.nvim_set_current_buf(assert(browser.open(source, { config = cfg })))
-        vim.api.nvim_win_set_cursor(0, { 1, 0 })
-        press("<Tab>")
-        press("<Tab>")
-        press("<Tab>")
+        vim.api.nvim_win_set_cursor(0, { 1, column_of("pen") })
         press("t")
 
         local render = require("sidenote.render")
