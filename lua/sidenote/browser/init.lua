@@ -198,6 +198,11 @@ end
 local function step(bufnr, find)
     local winid = vim.api.nvim_get_current_win()
     local lnum, col = unpack(vim.api.nvim_win_get_cursor(winid))
+    -- A closed fold paints its whole line as one unit, so a cursor moving
+    -- along it looks pinned; stepping means editing, which means open
+    if vim.fn.foldclosed(lnum) ~= -1 then
+        vim.cmd("normal! zv")
+    end
     local text = vim.api.nvim_buf_get_lines(bufnr, lnum - 1, lnum, false)[1] or ""
     -- Cursor columns are 0-based bytes; parsed fields are 1-based
     local target = find(text, col + 1)

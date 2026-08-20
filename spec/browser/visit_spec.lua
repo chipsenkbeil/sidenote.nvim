@@ -211,6 +211,23 @@ describe("browser gutter", function()
     end)
 end)
 
+describe("browser column stepping", function()
+    it("opens a closed row before moving along it", function()
+        -- A closed fold paints its whole line as one unit, so the cursor
+        -- looks pinned however far it really moved; stepping means editing
+        local source = project_buffer()
+        annotate(source, 4)
+        local listing = assert(browser.open(source, { config = opts() }))
+        vim.api.nvim_set_current_buf(listing)
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        assert.eq(vim.fn.foldclosed(1), 1)
+
+        press("<Tab>")
+        assert.eq(vim.fn.foldclosed(1), -1)
+        assert.gt(vim.api.nvim_win_get_cursor(0)[2], 0)
+    end)
+end)
+
 describe("browser help", function()
     it("answers ? with a float listing every browser mapping", function()
         local source = project_buffer()
