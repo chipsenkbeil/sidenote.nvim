@@ -78,6 +78,10 @@ spell, and `]a`, `]b`, `]q`, `]d` are Neovim defaults:
     vim.keymap.set("n", "<Leader>sp", "<Plug>(SidenotePen)")
     vim.keymap.set("n", "<Leader>sm", "<Plug>(SidenoteMenu)")
     vim.keymap.set("n", "<Leader>sd", "<Plug>(SidenoteDelete)")
+    vim.keymap.set("n", "<Leader>sl", "<Plug>(SidenoteLoclist)")
+    vim.keymap.set("n", "<Leader>sL", "<Plug>(SidenoteLoclistProject)")
+    vim.keymap.set("n", "<Leader>sq", "<Plug>(SidenoteQflist)")
+    vim.keymap.set("n", "<Leader>sQ", "<Plug>(SidenoteQflistProject)")
     vim.keymap.set("n", "]n", "<Plug>(SidenoteViewNext)")
     vim.keymap.set("n", "[n", "<Plug>(SidenoteViewPrev)")
 <
@@ -107,6 +111,12 @@ mapping                            does
 `<Plug>(SidenoteMenu)`             Open the menu for the note under the cursor
 `<Plug>(SidenoteDelete)`           Delete the note under the cursor, after
                                    confirming
+`<Plug>(SidenoteLoclist)`          This buffer's notes as the window's
+                                   location list
+`<Plug>(SidenoteLoclistProject)`   The project's notes as the window's
+                                   location list
+`<Plug>(SidenoteQflist)`           This buffer's notes as the quickfix list
+`<Plug>(SidenoteQflistProject)`    The project's notes as the quickfix list
 `<Plug>(SidenoteCycleKind)`        Flip the note under the cursor between note
                                    and todo
 `<Plug>(SidenoteCycleState)`       Cycle the state of the note under the
@@ -165,9 +175,11 @@ file. `add scope=file` annotates the whole file rather than a line, and `add
 kind=todo` files a todo instead of a note; the two combine.
 
 `loclist` fills the window's location list with this buffer's notes, and
-`qflist` fills the quickfix list with the whole project's. Both take the same
-filters, so `:Sidenote qflist kind=todo state=open` is a work queue you walk
-with `:cnext`.
+`qflist` fills the quickfix list with the whole project's; `scope=file` and
+`scope=project` flip either default, and the four `<Plug>` mappings pair the
+containers with both scopes — lowercase for the file, capital for the
+project, like `sb` and `sB`. Both verbs take the same filters, so `:Sidenote
+qflist kind=todo state=open` is a work queue you walk with `:cnext`.
 
 Inside a sidenote-titled list the keys grow verbs, guarded per press so every
 other list keeps its own. `t` and `T` cycle exactly as in the browser: the

@@ -38,21 +38,44 @@ end
 
 ---@class sidenote.list.Opts
 ---@field filter? sidenote.Filter which annotations make the list
----@field bufnr? integer buffer a location list covers, defaulting to current
----@field path? string any file inside the project a quickfix list covers
+---@field scope? "file"|"project" how wide a set; each list has its default
+---@field bufnr? integer buffer a file-scoped list covers, defaulting to current
+---@field path? string any file inside the project a project-scoped list covers
 
----Fill the current window's location list with one buffer's annotations.
----@param opts? sidenote.list.Opts
----@return integer listed
-function M.loclist(opts)
-    opts = opts or {}
-    local bufnr = opts.bufnr or vim.api.nvim_get_current_buf()
-    local cfg = config.get()
-
-    opts.bufnr = bufnr
-    held.loclist = opts
-
+---The items a list of `opts`'s scope holds, and the opts made rebuildable.
+---@param opts sidenote.list.Opts
+---@param cfg sidenote.Config
+---@return table[] items
+local function items_for(opts, cfg)
     local items = {}
+    if opts.scope == "project" then
+        local from = opts.path
+        if not from or from == "" then
+            from = vim.api.nvim_buf_get_name(opts.bufnr or vim.api.nvim_get_current_buf())
+        end
+        if from == "" then
+            from = vim.fn.getcwd()
+        end
+        opts.path = from
+        local root = project.root(from)
+        local entries = require("sidenote.scan").project({ path = from, config = cfg })
+        for _, entry in ipairs(filter.narrow(entries, opts.filter)) do
+            local rec = entry.record
+            local path = rec.path:sub(1, 1) == "/" and rec.path
+                or (root and (root .. "/" .. rec.path) or rec.path)
+            items[#items + 1] = {
+                filename = path,
+                lnum = entry.line_start or rec.line_start or 1,
+                col = entry.col_start or 1,
+                text = label(entry),
+                user_data = { sidenote = { id = entry.id, root = entry.root } },
+            }
+        end
+        return items
+    end
+
+    local bufnr = opts.bufnr or vim.api.nvim_get_current_buf()
+    opts.bufnr = bufnr
     local entries = require("sidenote.session").entries(bufnr, cfg)
     for _, entry in ipairs(filter.narrow(entries, opts.filter)) do
         items[#items + 1] = {
@@ -63,6 +86,18 @@ function M.loclist(opts)
             user_data = { sidenote = { id = entry.id, root = entry.root } },
         }
     end
+    return items
+end
+
+---Fill the current window's location list, with this buffer's annotations
+---by default; `scope = "project"` widens it to the whole project's.
+---@param opts? sidenote.list.Opts
+---@return integer listed
+function M.loclist(opts)
+    opts = opts or {}
+    opts.scope = opts.scope or "file"
+    local items = items_for(opts, config.get())
+    held.loclist = opts
 
     vim.fn.setloclist(0, {}, " ", { title = "sidenote", items = items })
     if #items > 0 then
@@ -73,37 +108,15 @@ function M.loclist(opts)
     return #items
 end
 
----Fill the quickfix list with a whole project's annotations.
+---Fill the quickfix list, with the whole project's annotations by default;
+---`scope = "file"` narrows it to this buffer's.
 ---@param opts? sidenote.list.Opts
 ---@return integer listed
 function M.qflist(opts)
     opts = opts or {}
-    local cfg = config.get()
-    local from = opts.path
-    if not from or from == "" then
-        from = vim.api.nvim_buf_get_name(opts.bufnr or vim.api.nvim_get_current_buf())
-    end
-    if from == "" then
-        from = vim.fn.getcwd()
-    end
-    opts.path = from
+    opts.scope = opts.scope or "project"
+    local items = items_for(opts, config.get())
     held.qflist = opts
-    local root = project.root(from)
-
-    local items = {}
-    local entries = require("sidenote.scan").project({ path = from, config = cfg })
-    for _, entry in ipairs(filter.narrow(entries, opts.filter)) do
-        local rec = entry.record
-        local path = rec.path:sub(1, 1) == "/" and rec.path
-            or (root and (root .. "/" .. rec.path) or rec.path)
-        items[#items + 1] = {
-            filename = path,
-            lnum = entry.line_start or rec.line_start or 1,
-            col = entry.col_start or 1,
-            text = label(entry),
-            user_data = { sidenote = { id = entry.id, root = entry.root } },
-        }
-    end
 
     vim.fn.setqflist({}, " ", { title = "sidenote", items = items })
     if #items > 0 then

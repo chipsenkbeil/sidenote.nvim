@@ -180,21 +180,23 @@ vim.api.nvim_create_user_command("Sidenote", function(cmd)
             local showing = vim.g.sidenote_state.show
             vim.notify("sidenote: showing " .. (showing ~= "" and showing or "everything"))
         end
-    elseif subcommand == "loclist" then
-        local path, filter, filter_err = listing_args(cmd.fargs)
-        if filter_err then
-            report(filter_err)
-        elseif path then
-            report("loclist covers this buffer; use :Sidenote qflist " .. path)
-        else
-            require("sidenote").loclist({ filter = filter })
+    elseif subcommand == "loclist" or subcommand == "qflist" then
+        -- The scope token is pulled out first; everything else is filters
+        local scope
+        local rest = { cmd.fargs[1] }
+        for i = 2, #cmd.fargs do
+            local arg = cmd.fargs[i]
+            if arg == "scope=file" or arg == "scope=project" then
+                scope = arg:sub(7)
+            else
+                rest[#rest + 1] = arg
+            end
         end
-    elseif subcommand == "qflist" then
-        local path, filter, filter_err = listing_args(cmd.fargs)
+        local path, filter, filter_err = listing_args(rest)
         if filter_err then
             report(filter_err)
         else
-            require("sidenote").qflist({ path = path, filter = filter })
+            require("sidenote")[subcommand]({ scope = scope, path = path, filter = filter })
         end
     elseif subcommand == "pen" then
         local pen = require("sidenote.pen")
@@ -264,7 +266,12 @@ end, {
                 return key .. "=" .. value
             end, values[key]))
         end
-        return matching({ "kind=", "path=", "state=", "status=" })
+        local keys = { "kind=", "path=", "state=", "status=" }
+        if subcommand == "loclist" or subcommand == "qflist" then
+            keys[#keys + 1] = "scope=file"
+            keys[#keys + 1] = "scope=project"
+        end
+        return matching(keys)
     end,
 })
 
@@ -325,6 +332,22 @@ end, { desc = "Open the menu for the note under the cursor" })
 vim.keymap.set("n", "<Plug>(SidenoteDelete)", function()
     require("sidenote").delete()
 end, { desc = "Delete the note under the cursor, after confirming" })
+
+vim.keymap.set("n", "<Plug>(SidenoteLoclist)", function()
+    require("sidenote").loclist({ scope = "file" })
+end, { desc = "This buffer's notes as the window's location list" })
+
+vim.keymap.set("n", "<Plug>(SidenoteLoclistProject)", function()
+    require("sidenote").loclist({ scope = "project" })
+end, { desc = "The project's notes as the window's location list" })
+
+vim.keymap.set("n", "<Plug>(SidenoteQflist)", function()
+    require("sidenote").qflist({ scope = "file" })
+end, { desc = "This buffer's notes as the quickfix list" })
+
+vim.keymap.set("n", "<Plug>(SidenoteQflistProject)", function()
+    require("sidenote").qflist({ scope = "project" })
+end, { desc = "The project's notes as the quickfix list" })
 
 vim.keymap.set("n", "<Plug>(SidenoteCycleKind)", function()
     require("sidenote.cycle").at_cursor("kind", 1)
