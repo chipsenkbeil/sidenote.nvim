@@ -56,8 +56,9 @@ vim.keymap.set("n", "]n", "<Plug>(SidenoteViewNext)")
 vim.keymap.set("n", "[n", "<Plug>(SidenoteViewPrev)")
 ```
 
-Annotate a line, write the note, save. A sign appears in the gutter. Edit the
-code around it, reformat it, move it down the file: the sign follows.
+Annotate a line and the note opens beside it; write, save. A sign appears in
+the gutter. Edit the code around it, reformat it, move it down the file: the
+sign follows.
 
 ## Mappings
 
@@ -141,6 +142,20 @@ Three display knobs, because they answer three questions: how you know a note
 exists, how you glance at it, and where you write it. A transient float for
 previewing and a persistent right split for editing is a normal combination
 that one setting cannot express.
+
+A `template` function seeds the buffer a new note opens into:
+
+```lua
+vim.g.sidenote = {
+    template = function(ctx)
+        return { "* TODO " .. ctx.path, "" }
+    end,
+}
+```
+
+The seed is an unsaved edit — the prose file stays empty until you write the
+buffer yourself. `ctx` carries `path`, `filetype`, `scope`, `line_start`,
+`line_end` and `text`.
 
 <!-- vimdoc:tag sidenote-storage -->
 
@@ -255,7 +270,7 @@ Cleanup is `:Sidenote project status=orphaned`, then `VGd` and `:w`.
 <!-- gen:api -->
 `sidenote.add({opts})`
 
-Annotate the current buffer.
+Annotate the current buffer and open the new note for writing.
 
 `sidenote.refresh({bufnr})`
 

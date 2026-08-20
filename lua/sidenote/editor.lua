@@ -19,11 +19,15 @@ function M.winid()
     return nil
 end
 
+---@class sidenote.editor.Note
+---@field root string store root the annotation lives in
+---@field id string annotation whose prose to open
+
 ---Open a note, returning the window showing it.
 ---
 ---The `toggle` style behaves as `split`, except that asking for the note
 ---already on show puts it away instead and returns nil.
----@param entry sidenote.session.Entry
+---@param entry sidenote.editor.Note
 ---@param opts sidenote.EditorConfig
 ---@param filetype string
 ---@return integer|nil winid nil when a toggle closed the note

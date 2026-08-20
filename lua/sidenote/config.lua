@@ -10,11 +10,20 @@
 ---@field position "left"|"right"|"top"|"bottom" side the split takes
 ---@field size integer columns for a vertical split, rows for a horizontal one
 
+---@class sidenote.template.Context
+---@field path string annotated file, relative to the project root
+---@field filetype string extension and filetype the note will use
+---@field scope "file"|"lines"|"range" what the annotation covers
+---@field line_start integer first annotated line, or 0 for file scope
+---@field line_end integer last annotated line, inclusive
+---@field text string verbatim anchored bytes, or "" for file scope
+
 ---@class sidenote.Config
 ---@field filetype string extension and filetype for prose files
 ---@field strategy string|string[]|fun(path: string): string|nil store roots, tried in order
 ---@field global_dir string root of the machine-wide store
 ---@field project_dir string directory name used for an in-project store
+---@field template? fun(ctx: sidenote.template.Context): string[]|nil seeds a new note's buffer
 ---@field indicator sidenote.IndicatorConfig how annotations appear in a source buffer
 ---@field preview sidenote.PreviewConfig how a note is glanced at
 ---@field editor sidenote.EditorConfig how a note opens for writing
@@ -86,6 +95,10 @@ local function validate(cfg)
                 ("expected project|global or a function, got %s"):format(tostring(entry))
             )
         end
+    end
+
+    if cfg.template ~= nil and type(cfg.template) ~= "function" then
+        return fail("template", ("expected a function, got %s"):format(type(cfg.template)))
     end
 
     -- Checked before their styles are read: indexing a number would throw, and

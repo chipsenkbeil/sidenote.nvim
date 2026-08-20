@@ -11,12 +11,51 @@ local function config()
     return cfg
 end
 
----Annotate the current buffer.
+---Open a fresh note for writing, seeded by the user's template.
+---
+---The seed goes into the buffer alone, never the file: the prose file stays
+---empty until the user's own `:write`, which is what invariant 3 means.
+---@param result sidenote.capture.Result
+---@param cfg sidenote.Config
+local function compose(result, cfg)
+    local where = vim.tbl_extend("force", cfg.editor, { focus = true })
+    local winid =
+        require("sidenote.editor").open({ root = result.root, id = result.id }, where, cfg.filetype)
+    if not winid or not cfg.template then
+        return
+    end
+
+    local rec = require("sidenote.store").read(result.root, result.id)
+    if not rec then
+        return
+    end
+    local ok, lines = pcall(cfg.template, {
+        path = rec.path,
+        filetype = cfg.filetype,
+        scope = rec.scope,
+        line_start = rec.line_start,
+        line_end = rec.line_end,
+        text = rec.text,
+    })
+    if not ok then
+        vim.notify("sidenote: template failed: " .. tostring(lines), vim.log.levels.WARN)
+        return
+    end
+    if type(lines) == "table" and #lines > 0 then
+        vim.api.nvim_buf_set_lines(vim.api.nvim_win_get_buf(winid), 0, -1, false, lines)
+    end
+end
+
+---Annotate the current buffer and open the new note for writing.
 ---@param opts sidenote.capture.Opts
 ---@return sidenote.capture.Result|nil
 ---@return string|nil err
 function M.add(opts)
-    return require("sidenote.capture").run(vim.api.nvim_get_current_buf(), opts)
+    local result, err = require("sidenote.capture").run(vim.api.nvim_get_current_buf(), opts)
+    if result then
+        compose(result, (opts and opts.config) or config())
+    end
+    return result, err
 end
 
 ---Re-resolve and repaint a buffer's annotations.

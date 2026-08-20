@@ -72,12 +72,15 @@ end
 ---@param last integer
 local function add(first, last)
     local sidenote = require("sidenote")
+    -- Held before the capture: composing focuses the new note's window, so
+    -- "current buffer" no longer names the annotated one afterwards
+    local bufnr = vim.api.nvim_get_current_buf()
     local _, err = sidenote.add({ scope = "lines", range = { first, 0, last, 0 } })
     if err then
         report(err)
         return
     end
-    sidenote.refresh()
+    sidenote.refresh(bufnr)
 end
 
 vim.api.nvim_create_user_command("Sidenote", function(cmd)

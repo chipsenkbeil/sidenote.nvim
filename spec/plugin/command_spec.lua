@@ -27,6 +27,30 @@ local function only_record(root)
     return assert(store.read(root .. "/.sidenote", ids[1]))
 end
 
+---Close the tracked note window, splitting first when it is the last one.
+---
+---Left open, a later spec's `editor.open` would reuse it instead of
+---splitting, and every window assertion there changes meaning.
+local function put_away()
+    local winid = require("sidenote.editor").winid()
+    if not winid then
+        return
+    end
+    if #vim.api.nvim_tabpage_list_wins(0) == 1 then
+        vim.cmd.split()
+    end
+    require("sidenote.window").close(winid)
+end
+
+---Run `:Sidenote add` over `range` and put away the note editor it opens.
+---@param range string Ex range prefix, or "" for the cursor line
+local function add(range)
+    local before = vim.api.nvim_get_current_win()
+    vim.cmd(range .. "Sidenote add")
+    put_away()
+    vim.api.nvim_set_current_win(before)
+end
+
 describe("the :Sidenote command", function()
     before_each(function()
         vim.g.sidenote = { strategy = "project" }
@@ -45,7 +69,7 @@ describe("the :Sidenote command", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")
 
-        vim.cmd("2,4Sidenote add")
+        add("2,4")
 
         local rec = only_record(root)
         assert.eq(rec.scope, "lines")
@@ -59,7 +83,7 @@ describe("the :Sidenote command", function()
         vim.cmd.edit(root .. "/code.lua")
         vim.api.nvim_win_set_cursor(0, { 3, 0 })
 
-        vim.cmd("Sidenote add")
+        add("")
 
         local rec = only_record(root)
         assert.eq(rec.scope, "lines")
@@ -72,7 +96,7 @@ describe("the :Sidenote command", function()
         -- on disk follows the code
         local root = project()
         vim.cmd.edit(root .. "/code.lua")
-        vim.cmd("3Sidenote add")
+        add("3")
 
         vim.api.nvim_buf_set_lines(0, 0, 0, false, { "-- a new first line" })
         vim.cmd.write()
@@ -87,8 +111,8 @@ describe("the :Sidenote command", function()
         -- take options; a -- prefix belongs to shells
         local root = project()
         vim.cmd.edit(root .. "/code.lua")
-        vim.cmd("1Sidenote add")
-        vim.cmd("3Sidenote add")
+        add("1")
+        add("3")
 
         vim.cmd("Sidenote browse state=open")
         assert.eq(#vim.api.nvim_buf_get_lines(0, 0, -1, false), 2)
