@@ -9,6 +9,7 @@ local hash = require("sidenote.core.hash")
 -- `sidenote.render` paints status indicators, which is what it is doing here;
 -- the browser's own renderer already owns the name
 local indicator = require("sidenote.render")
+local location = require("sidenote.location")
 local parse = require("sidenote.browser.parse")
 local project = require("sidenote.store.project")
 local record = require("sidenote.core.record")
@@ -235,6 +236,33 @@ local function paint(bufnr, state)
     close_all(bufnr)
 end
 
+---Repaint the loaded buffer of every file a listing edit touched.
+---
+---The edit changed records out from under any window showing the annotated
+---code, so its marks follow now rather than at that buffer's next save.
+---@param state sidenote.browser.State
+---@param paths string[] project-relative or absolute paths whose buffers repaint
+local function repaint_sources(state, paths)
+    local root = project.root(state.path)
+    local seen = {}
+    for _, given in ipairs(paths) do
+        local path = given:sub(1, 1) == "/" and given
+            or (root and (root .. "/" .. given) or given)
+        local wanted = vim.uv.fs_realpath(path) or path
+        if not seen[wanted] then
+            seen[wanted] = true
+            for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+                if vim.api.nvim_buf_is_loaded(buf) and not states[buf] then
+                    local name = vim.api.nvim_buf_get_name(buf)
+                    if (vim.uv.fs_realpath(name) or name) == wanted then
+                        session.refresh(buf, state.config)
+                    end
+                end
+            end
+        end
+    end
+end
+
 ---@param applied integer
 ---@param problems string[]
 local function report(applied, problems)
@@ -418,6 +446,7 @@ local function cycle(bufnr, offset)
     local cursor = vim.api.nvim_win_get_cursor(0)
     paint(bufnr, state)
     pcall(vim.api.nvim_win_set_cursor, 0, cursor)
+    repaint_sources(state, { row.entry.record.path })
 end
 
 ---Values each interactive filter key offers.
@@ -932,8 +961,28 @@ function M.write(bufnr, opts)
         return 0, {}
     end
 
+    -- Gathered before the repaint replaces the rows: the files of every row
+    -- acted on, plus each move's destination
+    local acted = {}
+    for _, action in ipairs(actions) do
+        acted[action.id] = true
+    end
+    local touched = {}
+    for _, row in ipairs(state.rows) do
+        if acted[row.entry.id] then
+            touched[#touched + 1] = row.entry.record.path
+        end
+    end
+    for _, action in ipairs(actions) do
+        local wanted = action.kind == "move" and location.parse(action.to) or nil
+        if wanted then
+            touched[#touched + 1] = wanted.path
+        end
+    end
+
     local applied, failures = apply.run(actions, state)
     M.rerender(bufnr)
+    repaint_sources(state, touched)
     return applied, failures
 end
 

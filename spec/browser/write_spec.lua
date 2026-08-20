@@ -57,6 +57,30 @@ local function always_no()
 end
 
 describe("browser.write", function()
+    it("repaints the source buffer of a rescoped annotation", function()
+        -- The write moved the record's anchor; the code window's mark moves
+        -- with it now, not at that buffer's next save
+        local source = project_buffer()
+        annotate(source, 4, { "the note" })
+        require("sidenote.session").refresh(source, opts())
+        local bufnr = assert(browser.open(source, { config = opts() }))
+
+        local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+        lines[1] = lines[1]:gsub("m%.lua:4", "m.lua:2")
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+
+        assert.eq(browser.write(bufnr, { confirm = always_yes }), 1)
+        local marks = vim.api.nvim_buf_get_extmarks(
+            source,
+            require("sidenote.render").NAMESPACE,
+            0,
+            -1,
+            {}
+        )
+        assert.eq(#marks, 1)
+        assert.eq(marks[1][2], 1, "the sign sits on the new line")
+    end)
+
     it("applies nothing when the buffer was not edited", function()
         local source = project_buffer()
         annotate(source, 4, { "the note" })

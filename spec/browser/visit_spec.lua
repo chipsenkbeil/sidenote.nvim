@@ -306,6 +306,33 @@ describe("browser cycling", function()
         assert.eq(store.read(result.root, result.id).state, "archived")
     end)
 
+    it("repaints the source buffer the moment a cycle writes", function()
+        -- The listing edited the record out from under the code window; its
+        -- ink follows now, not at the next save
+        local source = project_buffer()
+        local cfg = opts()
+        cfg.indicator = { style = "highlight" }
+        annotate(source, 4)
+        require("sidenote.session").refresh(source, cfg)
+
+        vim.api.nvim_set_current_buf(assert(browser.open(source, { config = cfg })))
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        press("<Tab>")
+        press("<Tab>")
+        press("<Tab>")
+        press("t")
+
+        local render = require("sidenote.render")
+        local marks = vim.api.nvim_buf_get_extmarks(source, render.NAMESPACE, 0, -1, {
+            details = true,
+        })
+        local groups = {}
+        for _, mark in ipairs(marks) do
+            groups[mark[4].hl_group or ""] = true
+        end
+        assert.truthy(groups.SidenotePenBlue, "the pen's ink in the source")
+    end)
+
     it("refuses to cycle over unsaved edits, which a repaint would eat", function()
         local source = project_buffer()
         local result = annotate(source, 4)
