@@ -4,6 +4,7 @@ local highlight = require("sidenote.highlight")
 ---@field id string annotation this mark stands for
 ---@field status sidenote.Status anchor status, deciding the styling
 ---@field pen? string pen name coloring the ink instead of the status
+---@field summary? string first prose line, nil while the note has none
 ---@field confidence? number resolver confidence at placement, kept by the tracker
 ---@field line_start? integer first line, 1-based, absent when unplaced
 ---@field line_end? integer last line, inclusive
@@ -26,7 +27,7 @@ local highlight = require("sidenote.highlight")
 ---@field ranged boolean whether the span carries exact columns
 
 ---@class sidenote.render.PaintOpts
----@field style string sign, virt_text, highlight, underline or none
+---@field style string sign, virt_text, highlight, underline, summary or none
 ---@field highlight? string the range overlay mode: off, on, always or never
 ---@field pens? table<string, string> mapping of pen name -> highlight group its ink uses
 
@@ -98,6 +99,13 @@ function M.highlighted(bufnr, mode)
     return mode == "on"
 end
 
+---Whether a toggle, not the config, is what hides this buffer's highlights.
+---@param bufnr integer
+---@return boolean
+function M.suppressed(bufnr)
+    return overrides[bufnr] == false
+end
+
 ---Flip a buffer's range highlights, the way `:set spell!` flips spelling.
 ---@param bufnr integer
 ---@param mode string|nil the configured default
@@ -144,16 +152,36 @@ local function mark_opts(bufnr, entry, style, pens)
     if style == "sign" then
         -- A ranged sign mark repeats its glyph on every covered line, and here
         -- `end_row` is inclusive, unlike a highlight's
+
+        -- A healthy note with no prose dims into the deletion candidate it
+        -- is; a hurt anchor keeps its status color, prose or none
+        local ink = entry.status == "attached" and not entry.summary and highlight.BARE or group
         return 0,
             {
                 end_row = entry.line_end - 1,
                 sign_text = highlight.SIGNS[entry.status],
-                sign_hl_group = group,
+                sign_hl_group = ink,
             }
     end
     if style == "virt_text" then
         return 0,
             { virt_text = { { highlight.SIGNS[entry.status], group } }, virt_text_pos = "eol" }
+    end
+    if style == "summary" then
+        -- The ambient reading mode: prose line one sits at end of line, in
+        -- the note's own pen when it carries one
+        local pen = entry.pen and pens and pens[entry.pen]
+        local text = entry.summary
+        if text and #text > 60 then
+            text = text:sub(1, 60) .. "…"
+        end
+        return 0,
+            {
+                virt_text = {
+                    text and { text, pen or highlight.PROSE } or { "(no prose)", highlight.BARE },
+                },
+                virt_text_pos = "eol",
+            }
     end
 
     -- Ink over the text and only the text, the way a marker pen reads: exact

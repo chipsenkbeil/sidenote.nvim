@@ -45,6 +45,19 @@ describe("session.entries", function()
         assert.eq(#entries, 1)
         assert.eq(entries[1].status, "attached")
         assert.eq(entries[1].line_start, 4)
+        assert.is_nil(entries[1].summary, "no prose was written yet")
+    end)
+
+    it("carries the note's summary, for ambient display", function()
+        local bufnr = project_buffer()
+        local result =
+            assert(capture.run(bufnr, { scope = "lines", range = { 4, 0, 4, 0 }, config = opts() }))
+        local store = require("sidenote.store")
+        local fh = assert(io.open(store.prose_path(result.root, result.id, "org"), "w"))
+        fh:write("the note\na body line\n")
+        fh:close()
+
+        assert.eq(session.entries(bufnr, opts())[1].summary, "the note")
     end)
 
     it("relocates an annotation after the buffer shifts", function()

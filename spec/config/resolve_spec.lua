@@ -66,6 +66,11 @@ describe("config.resolve", function()
         assert.match(err, "indicator")
     end)
 
+    it("accepts the summary indicator style", function()
+        local _, err = config.resolve({ indicator = { style = "summary" } })
+        assert.is_nil(err)
+    end)
+
     it("rejects a filetype that is not a string", function()
         local _, err = config.resolve({ filetype = 42 })
         assert.match(err, "filetype")

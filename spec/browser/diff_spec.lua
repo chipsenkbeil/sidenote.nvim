@@ -242,6 +242,12 @@ describe("browser.diff delete", function()
         assert.eq(actions[1].id, ID)
     end)
 
+    it("carries the summary on a delete, so a dialog can quote it", function()
+        local state = before({ { prose = { "the summary", "a body" } } })
+        local action = find(diff.compute(state, {}), "delete")
+        assert.eq(assert.not_nil(action).summary, "the summary")
+    end)
+
     it("flags a delete as lossy, because it destroys prose you wrote", function()
         local actions = diff.compute(before({ {} }), after({}))
         assert.truthy(find(actions, "delete").lossy)

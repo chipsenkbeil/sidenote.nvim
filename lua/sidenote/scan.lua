@@ -127,7 +127,9 @@ function M.project(opts)
                 cache.dirty = true
             end
         end
-        entries[#entries + 1] = session.entry(held.root, rec, resolution)
+        local entry = session.entry(held.root, rec, resolution)
+        entry.summary = store.summary(held.root, rec.id, opts.config.filetype)
+        entries[#entries + 1] = entry
     end
 
     for _, cache in pairs(caches) do

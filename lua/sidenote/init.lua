@@ -51,9 +51,19 @@ end
 ---@return sidenote.capture.Result|nil
 ---@return string|nil err
 function M.add(opts)
-    local result, err = require("sidenote.capture").run(vim.api.nvim_get_current_buf(), opts)
+    local bufnr = vim.api.nvim_get_current_buf()
+    local result, err = require("sidenote.capture").run(bufnr, opts)
     if result then
-        compose(result, (opts and opts.config) or config())
+        local cfg = (opts and opts.config) or config()
+        -- A toggle hid the highlights for a moment; a capture is the moment
+        -- ending, since a half-hidden new mark reads as a failed capture
+        local render = require("sidenote.render")
+        if render.suppressed(bufnr) then
+            render.toggle(bufnr, cfg.indicator.highlight)
+            require("sidenote.session").refresh(bufnr, cfg)
+            vim.notify("sidenote: highlights shown")
+        end
+        compose(result, cfg)
     end
     return result, err
 end

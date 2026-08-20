@@ -209,6 +209,64 @@ describe("render.paint", function()
         assert.eq(found, true)
     end)
 
+    it("dims the sign of a healthy note that has no prose yet", function()
+        -- A bare anchor is a deletion candidate, and it should look like one
+        local bufnr = scratch(LINES)
+        render.paint(
+            bufnr,
+            { { id = "a", status = "attached", line_start = 2, line_end = 2 } },
+            { style = "sign" }
+        )
+        assert.eq(marks(bufnr)[1][4].sign_hl_group, highlight.BARE)
+    end)
+
+    it("keeps the status color on a hurt note, prose or none", function()
+        local bufnr = scratch(LINES)
+        render.paint(
+            bufnr,
+            { { id = "a", status = "orphaned", line_start = 2, line_end = 2 } },
+            { style = "sign" }
+        )
+        assert.eq(marks(bufnr)[1][4].sign_hl_group, highlight.GROUPS.orphaned)
+    end)
+
+    it("shows the summary at end of line when the style is summary", function()
+        local bufnr = scratch(LINES)
+        render.paint(bufnr, {
+            { id = "a", status = "attached", line_start = 2, line_end = 2, summary = "the note" },
+        }, { style = "summary" })
+        local virt = marks(bufnr)[1][4].virt_text[1]
+        assert.eq(virt[1], "the note")
+        assert.eq(virt[2], highlight.PROSE)
+    end)
+
+    it("labels a bare anchor in the summary style, dimly", function()
+        local bufnr = scratch(LINES)
+        render.paint(
+            bufnr,
+            { { id = "a", status = "attached", line_start = 2, line_end = 2 } },
+            { style = "summary" }
+        )
+        local virt = marks(bufnr)[1][4].virt_text[1]
+        assert.contains(virt[1], "no prose")
+        assert.eq(virt[2], highlight.BARE)
+    end)
+
+    it("inks the summary with the note's pen", function()
+        local bufnr = scratch(LINES)
+        render.paint(bufnr, {
+            {
+                id = "a",
+                status = "attached",
+                line_start = 2,
+                line_end = 2,
+                summary = "the note",
+                pen = "coral",
+            },
+        }, { style = "summary", pens = { coral = "SidenotePenCoral" } })
+        assert.eq(marks(bufnr)[1][4].virt_text[1][2], "SidenotePenCoral")
+    end)
+
     it("puts the sign at end of line when the style is virt_text", function()
         local bufnr = scratch(LINES)
         render.paint(

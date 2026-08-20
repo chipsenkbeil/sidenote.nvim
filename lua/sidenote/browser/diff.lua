@@ -9,6 +9,7 @@ local location = require("sidenote.location")
 ---@field from string|nil value being replaced, for change, rescope and move
 ---@field to string|nil value replacing it, for change, rescope and move
 ---@field prose string[]|nil the note's new prose, for a write
+---@field summary string|nil first prose line, for a delete's dialog to quote
 
 ---Turns an edited buffer into the actions that would make it true.
 ---
@@ -118,7 +119,8 @@ function M.compute(before, after)
         if not kept[id] then
             -- Lossy: unlike every other action this destroys a document the
             -- user wrote, not a record the store can rebuild
-            actions[#actions + 1] = { kind = "delete", id = id, lossy = true }
+            actions[#actions + 1] =
+                { kind = "delete", id = id, lossy = true, summary = row.prose[1] }
         end
     end
     return actions

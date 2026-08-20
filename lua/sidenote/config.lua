@@ -1,5 +1,5 @@
 ---@class sidenote.IndicatorConfig
----@field style "sign"|"virt_text"|"highlight"|"underline"|"none" how an annotation announces itself
+---@field style "sign"|"virt_text"|"highlight"|"underline"|"summary"|"none" how an annotation announces itself
 ---@field highlight "off"|"on"|"always"|"never" range-highlight overlay: a toggleable default, or pinned
 
 ---@class sidenote.PreviewConfig
@@ -35,8 +35,14 @@
 ---@class sidenote.config
 local M = {}
 
-local INDICATOR_STYLES =
-    { sign = true, virt_text = true, highlight = true, underline = true, none = true }
+local INDICATOR_STYLES = {
+    sign = true,
+    virt_text = true,
+    highlight = true,
+    underline = true,
+    summary = true,
+    none = true,
+}
 local HIGHLIGHT_MODES = { off = true, on = true, always = true, never = true }
 local PREVIEW_STYLES = { float = true, virt_lines = true, split = true, none = true }
 local EDITOR_STYLES = { split = true, float = true, toggle = true, current = true, tab = true }
@@ -67,8 +73,8 @@ function M.defaults()
             green = "SidenotePenGreen",
         },
 
-        -- Style: sign | virt_text | highlight | underline | none. The range
-        -- overlay: off | on (toggleable defaults) | always | never (pinned)
+        -- Style: sign | virt_text | highlight | underline | summary | none.
+        -- The overlay: off | on (toggleable defaults) | always | never
         indicator = { style = "sign", highlight = "on" },
 
         -- Where a note appears when glanced at:

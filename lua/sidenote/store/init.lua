@@ -190,6 +190,28 @@ function M.prose(root, id, filetype)
     return path and read_file(path) or nil
 end
 
+---First non-blank line of a note's prose, trimmed, or nil when it has none.
+---
+---What ambient indicators show without carrying the whole document; a file
+---of nothing but whitespace counts as no prose at all.
+---@param root string
+---@param id string
+---@param filetype string
+---@return string|nil
+function M.summary(root, id, filetype)
+    local text = M.prose(root, id, filetype)
+    if not text then
+        return nil
+    end
+    for line in text:gmatch("[^\n]+") do
+        local trimmed = vim.trim(line)
+        if trimmed ~= "" then
+            return trimmed
+        end
+    end
+    return nil
+end
+
 ---Every annotation id present in a store root, sorted.
 ---@param root string
 ---@return string[]

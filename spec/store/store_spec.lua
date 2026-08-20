@@ -240,3 +240,31 @@ describe("store.prose_file", function()
         assert.is_nil(store.prose_file(dir, annotation.id, "org"))
     end)
 end)
+
+describe("store.summary", function()
+    ---@param prose string|nil
+    ---@return string root
+    local function holding(prose)
+        local dir = vim.fn.tempname()
+        vim.fn.mkdir(dir, "p")
+        if prose then
+            local fh = assert(io.open(store.prose_path(dir, "01X", "org"), "w"))
+            fh:write(prose)
+            fh:close()
+        end
+        return dir
+    end
+
+    it("returns the first non-blank line, trimmed", function()
+        local dir = holding("\n  the summary  \nthe body\n")
+        assert.eq(store.summary(dir, "01X", "org"), "the summary")
+    end)
+
+    it("is nil for a note with no prose file", function()
+        assert.is_nil(store.summary(holding(nil), "01X", "org"))
+    end)
+
+    it("is nil for prose of nothing but whitespace", function()
+        assert.is_nil(store.summary(holding("  \n\t\n"), "01X", "org"))
+    end)
+end)

@@ -14,9 +14,12 @@ M.RULE = "── these lose information ──"
 
 ---Kinds listed one line each, because the specific values are the point.
 ---
----Everything else is counted, since one more deletion reads the same as the
----last one.
-local PER_ACTION = { move = true, rescope = true, change = true }
+---Deletes included: `dd` on a closed fold destroys sight-unseen, so the
+---quoted summary is the moment of seeing. Only writes stay counted.
+local PER_ACTION = { move = true, rescope = true, change = true, delete = true }
+
+---Most characters of a summary a delete's quote shows.
+local QUOTE_MAX = 50
 
 ---Order kinds appear in, so the dialog reads the same way every time.
 local ORDER = { "write", "change", "move", "rescope", "delete" }
@@ -52,6 +55,16 @@ local function detail(action)
         -- A pen change has a nil side when it is picked up or put down; the
         -- placeholder is how the column renders that
         return ("%s   %s -> %s"):format(action.field, action.from or "-", action.to or "-")
+    end
+    if action.kind == "delete" then
+        local summary = action.summary
+        if not summary or summary == "" then
+            return "(no prose)"
+        end
+        if #summary > QUOTE_MAX then
+            summary = summary:sub(1, QUOTE_MAX) .. "…"
+        end
+        return ('"%s"'):format(summary)
     end
     return ("%s -> %s"):format(action.from, action.to)
 end

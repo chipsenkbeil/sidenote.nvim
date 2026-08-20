@@ -151,8 +151,8 @@ vim.g.sidenote = {
         green = "SidenotePenGreen",
     },
 
-    -- Style: sign | virt_text | highlight | underline | none. The range
-    -- overlay: off | on (toggleable defaults) | always | never (pinned)
+    -- Style: sign | virt_text | highlight | underline | summary | none.
+    -- The overlay: off | on (toggleable defaults) | always | never
     indicator = { style = "sign", highlight = "on" },
 
     -- Where a note appears when glanced at:
@@ -172,11 +172,17 @@ previewing and a persistent right split for editing is a normal combination
 that one setting cannot express.
 
 Signs span every line of a multi-line note, and when notes overlap the worst
-anchor status wins the gutter. `:Sidenote highlight` additionally marks the
-annotated text itself — ink over the words, a range by its exact columns —
-per buffer, the way `:set spell!` toggles: `on` flips the default, `always`
-and `never` pin it. By default the ink is the `SidenoteMark*` groups, one per
-anchor status, yours to restyle.
+anchor status wins the gutter. A healthy note with no prose yet shows a
+dimmed sign — a bare anchor is a deletion candidate, and looks like one.
+The `summary` style goes further and puts prose line one at the end of the
+line, in the note's own pen: margin notes you read without asking.
+
+`:Sidenote highlight` additionally marks the annotated text itself — ink
+over the words, a range by its exact columns — per buffer, the way
+`:set spell!` toggles: `on` flips the default, `always` and `never` pin it.
+Capturing while a toggle has them hidden reveals them again, so a fresh
+mark never looks like a failed capture. By default the ink is the
+`SidenoteMark*` groups, one per anchor status, yours to restyle.
 
 <!-- vimdoc:tag sidenote-pens -->
 
@@ -528,6 +534,23 @@ here be found again at the place you pasted it.
 
 Losing the anchor changes a note's status, never its existence. Orphaning only
 adds fields. Deletion is always something you asked for.
+
+<!-- vimdoc:tag sidenote-limitations -->
+
+## Limitations
+
+Stated as contract rather than left to be discovered:
+
+- Annotations live outside undo. `u` restores your code, never a deleted
+  note — but the store is plain files, so commit it and recovery is your
+  VCS's.
+- Saving re-baselines an attached note to the span its mark tracked, so a
+  save also asserts where your notes now live. Typing over a whole span
+  breaks that assertion on purpose, and the resolver decides instead.
+- The browser's concealed ids need `:syntax on`; without it every row
+  shows its raw ULID.
+- On macOS, `/tmp` and `/var` resolve into `/private`. Stored paths use the
+  resolved form, so outside tooling comparing paths should realpath first.
 
 ## Health
 

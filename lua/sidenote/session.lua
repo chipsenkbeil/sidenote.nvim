@@ -12,6 +12,7 @@ local strategy = require("sidenote.store.strategy")
 ---@field root string store root the record came from
 ---@field record sidenote.Annotation the stored record
 ---@field resolution sidenote.Resolution what the resolver concluded
+---@field summary string|nil first prose line, set by whoever built the entry
 
 ---Ties a buffer to the annotations that target it.
 ---@class sidenote.session
@@ -104,7 +105,9 @@ function M.entries(bufnr, cfg)
                     seen[id] = true
                     local resolution = editing and live_resolution(bufnr, rec)
                         or resolve.resolve(rec, target.content)
-                    entries[#entries + 1] = M.entry(root, rec, resolution)
+                    local entry = M.entry(root, rec, resolution)
+                    entry.summary = store.summary(root, rec.id, cfg.filetype)
+                    entries[#entries + 1] = entry
                 end
             end
         end

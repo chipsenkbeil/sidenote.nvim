@@ -50,7 +50,7 @@ local RESCOPE = {
     from = "lua/lobby.lua:42-57",
     to = "lua/lobby.lua",
 }
-local DELETE = { kind = "delete", id = ID, lossy = true }
+local DELETE = { kind = "delete", id = ID, lossy = true, summary = "race in lobby join" }
 
 describe("browser.confirm.summary", function()
     it("names every action kind it was given", function()
@@ -70,9 +70,9 @@ describe("browser.confirm.summary", function()
         assert.eq(#confirm.summary({ WRITE, other }), #confirm.summary({ WRITE }))
     end)
 
-    it("reads naturally for a single annotation", function()
-        assert.contains(text({ DELETE }), "1 annotation")
-        assert.falsy(text({ DELETE }):find("1 annotations", 1, true))
+    it("reads naturally for a single write", function()
+        assert.contains(text({ WRITE }), "1 note's prose")
+        assert.falsy(text({ WRITE }):find("1 notes", 1, true))
     end)
 end)
 
@@ -130,6 +130,20 @@ describe("browser.confirm callouts", function()
     it("warns that a delete removes the prose file", function()
         -- The one action that destroys a document rather than a record
         assert.contains(text({ DELETE }), "REMOVES PROSE FILE")
+    end)
+
+    it("quotes what a delete destroys, one line per note", function()
+        -- `dd` on a closed fold deletes sight-unseen; the quote is the
+        -- moment of seeing
+        local other = { kind = "delete", id = OTHER, lossy = true, summary = "the other note" }
+        local body = text({ DELETE, other })
+        assert.contains(body, '"race in lobby join"')
+        assert.contains(body, '"the other note"')
+    end)
+
+    it("says plainly when a deleted note never had prose", function()
+        local bare = { kind = "delete", id = ID, lossy = true }
+        assert.contains(text({ bare }), "(no prose)")
     end)
 
     it("shows what a change is changing", function()

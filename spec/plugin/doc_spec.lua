@@ -73,6 +73,7 @@ describe("the generated help file", function()
             "sidenote-filtering",
             "sidenote-api",
             "sidenote-agents",
+            "sidenote-limitations",
             "sidenote-never-deleted",
         }
         for _, tag in ipairs(pinned) do

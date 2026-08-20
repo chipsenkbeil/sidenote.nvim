@@ -92,6 +92,28 @@ describe("sidenote.add composing", function()
         assert.eq(on_disk, "", "the template must never touch the file itself")
     end)
 
+    it("reveals highlights a toggle had hidden, so the capture shows", function()
+        -- Half-hiding the new mark instead would read as a failed capture
+        local bufnr = editing()
+        local cfg = opts()
+        cfg.indicator = { style = "sign", highlight = "on" }
+        local render = require("sidenote.render")
+        render.toggle(bufnr, "on")
+        assert.falsy(render.highlighted(bufnr, "on"))
+
+        added(cfg)
+        assert.truthy(render.highlighted(bufnr, "on"))
+    end)
+
+    it("respects a config that keeps highlights off", function()
+        -- Off by configuration is a preference; off by toggle is a moment
+        local bufnr = editing()
+        local cfg = opts()
+        cfg.indicator = { style = "sign", highlight = "off" }
+        added(cfg)
+        assert.falsy(require("sidenote.render").highlighted(bufnr, "off"))
+    end)
+
     it("hands the template the annotation's own shape", function()
         editing()
         local seen
