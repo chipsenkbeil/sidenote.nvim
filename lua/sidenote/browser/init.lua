@@ -33,6 +33,8 @@ local window = require("sidenote.window")
 ---@field config sidenote.Config configuration the browser was opened with
 ---@field filter sidenote.browser.Filter which annotations survive into the listing
 ---@field rows sidenote.browser.Row[] what was rendered, in buffer order
+---@field lines string[] exactly what was rendered, the clean baseline
+---@field tick integer buffer tick at that render, the dirty check's fast path
 
 ---An oil-style editable listing of one file's annotations.
 ---@class sidenote.browser
@@ -50,6 +52,30 @@ M.FOLDEXPR = [[getline(v:lnum) =~ '^/\w\+ ' ? '>1' : '1']]
 
 ---@type table<integer, sidenote.browser.State>
 local states = {}
+
+---Whether a listing holds edits `:w` has not applied.
+---
+---By content, not by the modified flag: the flag is kept permanently off so
+---abandoning a listing never complains, and an undo back to the rendered
+---text counts as clean again.
+---@param bufnr integer
+---@return boolean
+local function dirty(bufnr)
+    local state = states[bufnr]
+    if not state or state.tick == vim.api.nvim_buf_get_changedtick(bufnr) then
+        return false
+    end
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    if #lines ~= #state.lines then
+        return true
+    end
+    for i, line in ipairs(lines) do
+        if line ~= state.lines[i] then
+            return true
+        end
+    end
+    return false
+end
 
 ---@param name string full buffer name of a listing
 ---@return integer|nil bufnr
@@ -214,6 +240,8 @@ local function paint(bufnr, state)
     vim.bo[bufnr].modifiable = true
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     vim.bo[bufnr].modified = false
+    state.lines = lines
+    state.tick = vim.api.nvim_buf_get_changedtick(bufnr)
     states[bufnr] = state
 
     -- Healthy is silent: the row itself says the note exists, so the gutter
@@ -246,8 +274,7 @@ local function repaint_sources(state, paths)
     local root = project.root(state.path)
     local seen = {}
     for _, given in ipairs(paths) do
-        local path = given:sub(1, 1) == "/" and given
-            or (root and (root .. "/" .. given) or given)
+        local path = given:sub(1, 1) == "/" and given or (root and (root .. "/" .. given) or given)
         local wanted = vim.uv.fs_realpath(path) or path
         if not seen[wanted] then
             seen[wanted] = true
@@ -419,7 +446,7 @@ local function cycle(bufnr, offset)
         return
     end
     local field = cycle_target(bufnr)
-    if vim.bo[bufnr].modified then
+    if dirty(bufnr) then
         vim.notify("sidenote: apply or discard your edits first (:w)", vim.log.levels.WARN)
         return
     end
@@ -465,7 +492,7 @@ local function refilter(bufnr, key, value)
     if not state then
         return
     end
-    if vim.bo[bufnr].modified then
+    if dirty(bufnr) then
         vim.notify("sidenote: apply or discard your edits first (:w)", vim.log.levels.WARN)
         return
     end
@@ -503,7 +530,7 @@ local function create_note(bufnr)
     if not state then
         return
     end
-    if vim.bo[bufnr].modified then
+    if dirty(bufnr) then
         vim.notify("sidenote: apply or discard your edits first (:w)", vim.log.levels.WARN)
         return
     end
@@ -717,6 +744,15 @@ local function show(state)
             desc = "Confirm and apply the edits made to this listing",
             callback = function()
                 report(M.write(bufnr))
+            end,
+        })
+        -- The flag cannot be suppressed at the moment vim sets it, so it is
+        -- swept back off after every edit and once more before a quit
+        vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "QuitPre" }, {
+            buffer = bufnr,
+            desc = "A listing is a projection, so no edit of it ever needs saving",
+            callback = function()
+                vim.bo[bufnr].modified = false
             end,
         })
         bind(bufnr)
@@ -947,7 +983,9 @@ function M.write(bufnr, opts)
 
     local actions = diff.compute(state, rows)
     if #actions == 0 then
-        vim.bo[bufnr].modified = false
+        -- The edit meant nothing once normalized; repaint to canonical form
+        -- so the listing reads clean again
+        M.rerender(bufnr)
         return 0, {}
     end
 

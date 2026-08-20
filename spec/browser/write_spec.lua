@@ -70,13 +70,8 @@ describe("browser.write", function()
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
 
         assert.eq(browser.write(bufnr, { confirm = always_yes }), 1)
-        local marks = vim.api.nvim_buf_get_extmarks(
-            source,
-            require("sidenote.render").NAMESPACE,
-            0,
-            -1,
-            {}
-        )
+        local marks =
+            vim.api.nvim_buf_get_extmarks(source, require("sidenote.render").NAMESPACE, 0, -1, {})
         assert.eq(#marks, 1)
         assert.eq(marks[1][2], 1, "the sign sits on the new line")
     end)

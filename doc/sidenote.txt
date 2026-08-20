@@ -296,6 +296,10 @@ deleting a row                         deletes the note
 `dd` on a collapsed row deletes the whole note, prose and all. A vim operator
 applies to an entire closed fold, so that comes free.
 
+Only `:w` applies anything, and closing an edited listing simply discards: the
+listing is a projection of the store, not a document, so vim never asks you to
+save it.
+
 Nothing applies until you confirm, and anything lossy is listed apart:
 
 >

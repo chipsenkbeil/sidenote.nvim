@@ -269,6 +269,12 @@ already happened once here. Check `jj st` after every absorb.
 - **`concealcursor` is what hides the id on the line you are on.** Without it
   every other row conceals and the cursor's row does not, which reads as a
   rendering bug rather than as a setting.
+- **`BufModifiedSet` does not fire for API text edits.** Verified. The
+  listing's never-modified promise (closing discards, only `:w` applies) is
+  kept by sweeping the flag off on `TextChanged`/`TextChangedI` and once more
+  on `QuitPre` — the moments vim actually reads it. Listing dirtiness for
+  `t`/filters is a content compare against the rendered baseline, not the
+  flag.
 
 ## Anchoring, and why the thresholds are what they are
 

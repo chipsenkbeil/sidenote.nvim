@@ -349,7 +349,8 @@ describe("browser cycling", function()
         vim.notify = original
 
         assert.eq(store.read(result.root, result.id).kind, "note")
-        assert.truthy(vim.bo[listing].modified, "the edit must survive")
+        local held = table.concat(vim.api.nvim_buf_get_lines(listing, 0, -1, false), "\n")
+        assert.contains(held, "an unsaved edit", "the edit must survive")
         assert.contains(table.concat(messages, "\n"), "edits")
     end)
 end)

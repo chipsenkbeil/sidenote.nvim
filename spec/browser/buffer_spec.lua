@@ -64,6 +64,23 @@ describe("browser.open", function()
         assert.eq(vim.bo[bufnr].filetype, "sidenote")
     end)
 
+    it("never reads as modified, so abandoning edits cannot complain", function()
+        -- The listing is a projection of the store, not a document: `:w` is
+        -- the one way anything applies, and closing simply discards
+        local source = project_buffer()
+        annotate(source, 4, { "the note" })
+        local bufnr = assert(browser.open(source, { config = opts() }))
+        vim.api.nvim_set_current_buf(bufnr)
+
+        vim.api.nvim_buf_set_lines(bufnr, 0, 0, false, { "half-typed prose" })
+        vim.cmd("doautocmd TextChanged")
+        assert.falsy(vim.bo[bufnr].modified)
+
+        vim.api.nvim_set_current_buf(source)
+        vim.cmd("bdelete " .. bufnr)
+        assert.falsy(vim.api.nvim_buf_is_loaded(bufnr))
+    end)
+
     it("sets the conceal and fold options on the window, not the buffer", function()
         -- Both are window-local; setting them on the buffer would silently do
         -- nothing and leave every id on screen
