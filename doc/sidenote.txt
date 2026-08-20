@@ -238,8 +238,9 @@ An editable listing, in the spirit of oil.nvim:
     ! note  wontfix   lua/lobby.lua          the old retry loop
 <
 
-Every column is yours to edit. The gutter carries anchor status, the one thing
-the machine owns.
+Every column is yours to edit. Anchor status is the one thing the machine
+owns, and it lives in the gutter — silently while a note is healthy, as a
+status glyph the moment one is not.
 
 Each note is a real fold, so `za`, `zR`, `zM` and your own fold mappings work.
 Expanding one reveals its prose, indented, editable in place.

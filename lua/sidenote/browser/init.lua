@@ -163,17 +163,19 @@ local function paint(bufnr, state)
     vim.bo[bufnr].modified = false
     states[bufnr] = state
 
-    -- Anchor status is not a column, so the sign column is the only place it
-    -- appears; the source-buffer gutter already defines the glyphs
+    -- Healthy is silent: the row itself says the note exists, so the gutter
+    -- only earns ink when an anchor needs attention
     ---@type sidenote.render.Entry[]
     local marks = {}
     for i, row in ipairs(state.rows) do
-        marks[i] = {
-            id = row.entry.id,
-            status = row.entry.status,
-            line_start = headers[i],
-            line_end = headers[i],
-        }
+        if row.entry.status ~= "attached" then
+            marks[#marks + 1] = {
+                id = row.entry.id,
+                status = row.entry.status,
+                line_start = headers[i],
+                line_end = headers[i],
+            }
+        end
     end
     indicator.paint(bufnr, marks, { style = "sign" })
     close_all(bufnr)

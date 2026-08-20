@@ -169,6 +169,7 @@ describe("verbs aimed at a listing", function()
         -- aimed at the listing must not wipe what it cannot repaint
         local source = project_buffer()
         annotate(source, 4)
+        vim.api.nvim_buf_set_lines(source, 0, -1, false, { "entirely", "different", "words" })
         local listing = assert(browser.open(source, { config = opts() }))
         vim.api.nvim_set_current_buf(listing)
 
@@ -176,6 +177,37 @@ describe("verbs aimed at a listing", function()
         local marks =
             vim.api.nvim_buf_get_extmarks(listing, require("sidenote.render").NAMESPACE, 0, -1, {})
         assert.eq(#marks, 1)
+    end)
+end)
+
+describe("browser gutter", function()
+    it("stays empty while every note is healthy", function()
+        -- In a listing the row itself says the note exists; the gutter only
+        -- earns ink when an anchor is hurt, so a ! can actually stand out
+        local source = project_buffer()
+        annotate(source, 4)
+        local listing = assert(browser.open(source, { config = opts() }))
+
+        local marks =
+            vim.api.nvim_buf_get_extmarks(listing, require("sidenote.render").NAMESPACE, 0, -1, {})
+        assert.eq(#marks, 0)
+    end)
+
+    it("marks the row of a note whose anchor is hurt", function()
+        local source = project_buffer()
+        annotate(source, 4)
+        vim.api.nvim_buf_set_lines(source, 0, -1, false, { "entirely", "different", "words" })
+        local listing = assert(browser.open(source, { config = opts() }))
+
+        local marks = vim.api.nvim_buf_get_extmarks(
+            listing,
+            require("sidenote.render").NAMESPACE,
+            0,
+            -1,
+            { details = true }
+        )
+        assert.eq(#marks, 1)
+        assert.eq(vim.trim(marks[1][4].sign_text), require("sidenote.highlight").SIGNS.orphaned)
     end)
 end)
 
