@@ -47,6 +47,7 @@ spell, and `]a`, `]b`, `]q`, `]d` are Neovim defaults:
 
 ```lua
 vim.keymap.set({ "n", "x" }, "<Leader>sa", "<Plug>(SidenoteAdd)")
+vim.keymap.set({ "n", "x" }, "<Leader>st", "<Plug>(SidenoteAddTodo)")
 vim.keymap.set("n", "<Leader>sA", "<Plug>(SidenoteAddFile)")
 vim.keymap.set("n", "<Leader>sv", "<Plug>(SidenoteView)")
 vim.keymap.set("n", "<Leader>so", "<Plug>(SidenoteOpen)")
@@ -74,6 +75,7 @@ No default mappings are installed.
 |---|---|
 | `<Plug>(SidenoteAdd)` | Annotate the current line or selection |
 | `<Plug>(SidenoteAddFile)` | Annotate the whole file |
+| `<Plug>(SidenoteAddTodo)` | File a todo on the current line or selection |
 | `<Plug>(SidenoteBrowse)` | Open the editable listing of this file's annotations |
 | `<Plug>(SidenoteBrowseProject)` | Open the editable listing of every annotation in the project |
 | `<Plug>(SidenoteRefresh)` | Re-resolve and repaint annotations |
@@ -130,7 +132,8 @@ Fold verbs need no mapping. The folds are real.
 ```
 
 `project` also takes a path, defaulting to the project holding the current
-file. `add scope=file` annotates the whole file rather than a line.
+file. `add scope=file` annotates the whole file rather than a line, and
+`add kind=todo` files a todo instead of a note; the two combine.
 
 ## Configuration
 

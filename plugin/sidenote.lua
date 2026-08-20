@@ -85,12 +85,13 @@ end
 ---column information, and columns belong to range scope alone.
 ---@param first integer
 ---@param last integer
-local function add(first, last)
+---@param kind? "note"|"todo" defaults to note
+local function add(first, last, kind)
     local sidenote = require("sidenote")
     -- Held before the capture: composing focuses the new note's window, so
     -- "current buffer" no longer names the annotated one afterwards
     local bufnr = vim.api.nvim_get_current_buf()
-    local _, err = sidenote.add({ scope = "lines", range = { first, 0, last, 0 } })
+    local _, err = sidenote.add({ scope = "lines", range = { first, 0, last, 0 }, kind = kind })
     if err then
         report(err)
         return
@@ -99,10 +100,11 @@ local function add(first, last)
 end
 
 ---Capture the whole current file as one annotation.
-local function add_file()
+---@param kind? "note"|"todo" defaults to note
+local function add_file(kind)
     local sidenote = require("sidenote")
     local bufnr = vim.api.nvim_get_current_buf()
-    local _, err = sidenote.add({ scope = "file" })
+    local _, err = sidenote.add({ scope = "file", kind = kind })
     if err then
         report(err)
         return
@@ -113,12 +115,23 @@ end
 vim.api.nvim_create_user_command("Sidenote", function(cmd)
     local subcommand = cmd.fargs[1]
     if subcommand == "add" then
-        if cmd.fargs[2] == "scope=file" then
-            add_file()
-        elseif cmd.fargs[2] then
-            report(("add takes only scope=file, not %q"):format(cmd.fargs[2]))
+        local scope, kind, bad
+        for i = 2, #cmd.fargs do
+            local arg = cmd.fargs[i]
+            if arg == "scope=file" then
+                scope = "file"
+            elseif arg == "kind=todo" or arg == "kind=note" then
+                kind = arg:sub(6)
+            else
+                bad = arg
+            end
+        end
+        if bad then
+            report(("add takes scope=file and kind=todo, not %q"):format(bad))
+        elseif scope == "file" then
+            add_file(kind)
         else
-            add(cmd.line1, cmd.line2)
+            add(cmd.line1, cmd.line2, kind)
         end
     elseif subcommand == "browse" then
         local path, filter, filter_err = listing_args(cmd.fargs)
@@ -200,7 +213,7 @@ end, {
         end
         local subcommand = after:match("^(%S+)")
         if subcommand == "add" then
-            return matching({ "scope=file" })
+            return matching({ "kind=todo", "scope=file" })
         end
         if subcommand == "pen" then
             return matching(require("sidenote.pen").ring())
@@ -232,6 +245,14 @@ end, { desc = "Annotate the current line or selection" })
 vim.keymap.set("n", "<Plug>(SidenoteAddFile)", function()
     add_file()
 end, { desc = "Annotate the whole file" })
+
+vim.keymap.set({ "n", "x" }, "<Plug>(SidenoteAddTodo)", function()
+    local first, last = vim.fn.line("v"), vim.fn.line(".")
+    if first > last then
+        first, last = last, first
+    end
+    add(first, last, "todo")
+end, { desc = "File a todo on the current line or selection" })
 
 vim.keymap.set("n", "<Plug>(SidenoteBrowse)", function()
     local _, err = require("sidenote").browse()

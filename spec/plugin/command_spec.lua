@@ -190,6 +190,36 @@ describe("the :Sidenote command", function()
         assert.eq_deep(vim.fn.getcompletion("Sidenote add sc", "cmdline"), { "scope=file" })
     end)
 
+    it("captures a todo when asked, combinable with the file scope", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+
+        local before = vim.api.nvim_get_current_win()
+        vim.cmd("Sidenote add scope=file kind=todo")
+        put_away()
+        vim.api.nvim_set_current_win(before)
+
+        local rec = only_record(root)
+        assert.eq(rec.scope, "file")
+        assert.eq(rec.kind, "todo")
+    end)
+
+    it("files a todo from its own mapping", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        vim.api.nvim_win_set_cursor(0, { 2, 0 })
+
+        local before = vim.api.nvim_get_current_win()
+        local plug = vim.api.nvim_replace_termcodes("<Plug>(SidenoteAddTodo)", true, false, true)
+        vim.api.nvim_feedkeys(plug, "x", false)
+        put_away()
+        vim.api.nvim_set_current_win(before)
+
+        local rec = only_record(root)
+        assert.eq(rec.kind, "todo")
+        assert.eq(rec.line_start, 2)
+    end)
+
     it("captures the whole file from its own mapping", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")
