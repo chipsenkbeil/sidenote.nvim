@@ -72,6 +72,11 @@ function M.target(bufnr, opts)
         return nil,
             ("line %d is past the end of the buffer, which has %d lines"):format(line_end, #lines)
     end
+    -- An empty anchor would read as file scope to the resolver and attach
+    -- forever, whatever happened to the file
+    if not table.concat(lines, "\n", line_start, line_end):match("%S") then
+        return nil, "the selection is blank, so there is nothing to anchor to"
+    end
 
     return {
         path = path,

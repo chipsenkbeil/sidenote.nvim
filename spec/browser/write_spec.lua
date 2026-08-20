@@ -86,8 +86,10 @@ describe("browser.write", function()
         }
 
         local source = project_buffer()
+        -- Any text-bearing line will do; capture refuses the blank one
+        local lines = { 1, 3, 4, 5 }
         for i, prose in ipairs(shapes) do
-            annotate(source, math.min(i, #SOURCE), prose)
+            annotate(source, lines[math.min(i, #lines)], prose)
         end
 
         local bufnr = assert(browser.open(source, { config = opts() }))

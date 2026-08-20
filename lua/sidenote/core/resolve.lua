@@ -178,8 +178,14 @@ function M.resolve(rec, content)
     end
 
     -- A file-scoped note has no text anchor; the file existing is enough
-    if rec.text == "" then
+    if rec.scope == "file" then
         return result("attached", "L0", { confidence = 1 })
+    end
+
+    -- Capture refuses blank selections; a legacy record with no anchor text
+    -- cannot be searched for, and honesty beats a ghost attach
+    if rec.text == "" then
+        return result("orphaned", "-", {})
     end
 
     local lines = hash.split(content)

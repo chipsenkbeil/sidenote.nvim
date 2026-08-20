@@ -51,6 +51,29 @@ describe("buffer.target line scope", function()
     end)
 end)
 
+describe("buffer.target blank selections", function()
+    it("refuses a blank line, which nothing could ever re-find", function()
+        -- An empty anchor would masquerade as file scope in the resolver and
+        -- report attached forever, whatever happened to the file
+        local target, err =
+            buffer.target(scratch(LINES), { scope = "lines", range = { 2, 0, 2, 0 } })
+        assert.is_nil(target)
+        assert.contains(err, "blank")
+    end)
+
+    it("refuses a selection holding only whitespace", function()
+        local bufnr = scratch({ "x = 1", "   ", "\t", "y = 2" })
+        local target, err = buffer.target(bufnr, { scope = "lines", range = { 2, 0, 3, 0 } })
+        assert.is_nil(target)
+        assert.contains(err, "blank")
+    end)
+
+    it("accepts a selection where any line has text", function()
+        local target = buffer.target(scratch(LINES), { scope = "lines", range = { 2, 0, 3, 0 } })
+        assert.not_nil(target)
+    end)
+end)
+
 describe("buffer.target range scope", function()
     it("captures a multi-line range with its columns", function()
         local target = buffer.target(scratch(LINES), { scope = "range", range = { 3, 1, 5, 3 } })

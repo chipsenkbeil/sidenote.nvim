@@ -98,6 +98,19 @@ describe("resolve L2 literal search", function()
     end)
 end)
 
+describe("resolve anchorless records", function()
+    it("orphans a lines record with no anchor text once the file changes", function()
+        -- Capture refuses blank selections now; a record like this predates
+        -- that and cannot be searched for, so honesty beats a ghost attach
+        local ghost = rec()
+        ghost.scope = "lines"
+        ghost.text = ""
+        local r = resolve.resolve(ghost, ORIGINAL .. "\nchanged = true")
+        assert.eq(r.status, "orphaned")
+        assert.is_nil(r.line_start)
+    end)
+end)
+
 describe("resolve missing file", function()
     it("reports filegone and keeps no position", function()
         local r = resolve.resolve(rec(), nil)
