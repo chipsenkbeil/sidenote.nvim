@@ -88,6 +88,14 @@ local function validate(cfg)
         end
     end
 
+    -- Checked before their styles are read: indexing a number would throw, and
+    -- a validator that throws takes every entry point down with it
+    for _, section in ipairs({ "indicator", "preview", "editor" }) do
+        if type(cfg[section]) ~= "table" then
+            return fail(section, ("expected a table, got %s"):format(type(cfg[section])))
+        end
+    end
+
     if not INDICATOR_STYLES[cfg.indicator.style] then
         return fail("indicator.style", ("unknown style %s"):format(tostring(cfg.indicator.style)))
     end
