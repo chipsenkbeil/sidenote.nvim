@@ -203,7 +203,10 @@ end
 ---@param direction "next"|"prev"
 ---@return boolean moved
 local function jump(direction)
-    local entries = M.entries()
+    -- Jumps honor the view: landing on an invisible note reads as a broken
+    -- jump, not as a narrowed one
+    local session = require("sidenote.session")
+    local entries = require("sidenote.filter").narrow(M.entries(), session.viewing())
     local target = require("sidenote.navigate")[direction](entries, vim.fn.line("."))
     if not target then
         return false

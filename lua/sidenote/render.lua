@@ -6,6 +6,7 @@ local highlight = require("sidenote.highlight")
 ---@field pen? string pen name coloring the ink instead of the status
 ---@field kind? string note or todo, deciding a healthy anchor's glyph
 ---@field state? string lifecycle position, checking a done todo's box
+---@field hidden? boolean tracked but not drawn, for a narrowed view
 ---@field summary? string first prose line, nil while the note has none
 ---@field confidence? number resolver confidence at placement, kept by the tracker
 ---@field line_start? integer first line, 1-based, absent when unplaced
@@ -302,8 +303,10 @@ function M.paint(bufnr, entries, opts)
         -- An unplaced or out-of-range entry is skipped rather than clamped:
         -- clamping is how an annotation ends up pointing at unrelated code
         if entry.line_start and entry.line_end and entry.line_end <= count then
+            -- Tracked even when a narrowed view hides it: invisibility must
+            -- not cost a note its save-time truth
             track(bufnr, entry)
-            if opts.style ~= "none" then
+            if opts.style ~= "none" and not entry.hidden then
                 local col, mark = mark_opts(bufnr, entry, opts.style, opts.pens)
                 if mark then
                     mark.priority = highlight.PRIORITIES[entry.status]

@@ -121,7 +121,49 @@ function M.entries(bufnr, cfg)
     return entries
 end
 
+---What painting and navigation currently show; empty shows everything.
+---@type sidenote.Filter
+local view = {}
+
+---Narrow what buffers paint and navigation visits, everywhere at once.
+---
+---A display choice, not a data one: `entries` stays complete, so the
+---browser's baseline, the exports and the cursor's own lookups never
+---silently lose a note. Every loaded annotatable buffer repaints, and
+---`vim.g.sidenote_state.show` mirrors the narrowing for statuslines.
+---@param filter sidenote.Filter|nil nil or {} widens back to everything
+---@return sidenote.Filter showing
+function M.view(filter)
+    view = filter or {}
+
+    local parts = {}
+    for _, key in ipairs({ "kind", "state", "status", "path" }) do
+        if view[key] then
+            parts[#parts + 1] = key .. "=" .. view[key]
+        end
+    end
+    local state = vim.g.sidenote_state or {}
+    state.show = table.concat(parts, " ")
+    vim.g.sidenote_state = state
+
+    for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_loaded(bufnr) then
+            M.refresh(bufnr)
+        end
+    end
+    return view
+end
+
+---The narrowing in force, for whoever else must honor it.
+---@return sidenote.Filter
+function M.viewing()
+    return view
+end
+
 ---Resolve and repaint a buffer, returning how many marks were placed.
+---
+---Only entries passing the `view` narrowing are painted; the rest exist,
+---unpainted, until the view widens again.
 ---@param bufnr integer
 ---@param cfg? sidenote.Config
 ---@return integer placed
@@ -132,7 +174,14 @@ function M.refresh(bufnr, cfg)
     if not buffer.target(bufnr, { scope = "file" }) then
         return 0
     end
-    return render.paint(bufnr, M.entries(bufnr, cfg), {
+    -- Hidden, not dropped: the tracker still places, so a narrowed view
+    -- never costs a note its live extent
+    local survives = require("sidenote.filter").survives
+    local entries = M.entries(bufnr, cfg)
+    for _, entry in ipairs(entries) do
+        entry.hidden = not survives(entry, view)
+    end
+    return render.paint(bufnr, entries, {
         style = cfg.indicator.style,
         highlight = cfg.indicator.highlight,
         pens = cfg.pens,

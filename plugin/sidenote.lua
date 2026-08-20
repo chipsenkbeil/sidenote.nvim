@@ -17,12 +17,15 @@ local SUBCOMMANDS = {
     "pen",
     "loclist",
     "qflist",
+    "show",
 }
 
 -- The state global statuslines read: plugin-owned output, seeded from the
 -- config without loading a single module
+local seeded = type(vim.g.sidenote) == "table" and vim.g.sidenote.pen or ""
 vim.g.sidenote_state = {
-    pen = (type(vim.g.sidenote) == "table" and vim.g.sidenote.pen) or "",
+    pen = type(seeded) == "string" and seeded or "",
+    show = "",
 }
 
 ---@param err string
@@ -166,6 +169,17 @@ vim.api.nvim_create_user_command("Sidenote", function(cmd)
         end
     elseif subcommand == "follow" then
         require("sidenote").follow()
+    elseif subcommand == "show" then
+        local path, filter, filter_err = listing_args(cmd.fargs)
+        if filter_err then
+            report(filter_err)
+        elseif path then
+            report(("show takes filters, not a path; try path=%s"):format(path))
+        else
+            require("sidenote.session").view(filter)
+            local showing = vim.g.sidenote_state.show
+            vim.notify("sidenote: showing " .. (showing ~= "" and showing or "everything"))
+        end
     elseif subcommand == "loclist" then
         local path, filter, filter_err = listing_args(cmd.fargs)
         if filter_err then
@@ -237,7 +251,7 @@ end, {
             return matching(require("sidenote.pen").ring())
         end
         local filtered =
-            { browse = true, project = true, loclist = true, qflist = true }
+            { browse = true, project = true, loclist = true, qflist = true, show = true }
         if not filtered[subcommand] then
             return {}
         end

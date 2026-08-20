@@ -120,7 +120,8 @@ Fold verbs need no mapping. The folds are real.
 <!-- gen:commands -->
 ```vim
 :Sidenote add | browse | project | refresh | view | open | next
-          | prev | highlight | follow | pen
+          | prev | highlight | follow | pen | loclist | qflist
+          | show
 ```
 <!-- /gen:commands -->
 
@@ -136,6 +137,19 @@ Fold verbs need no mapping. The folds are real.
 `project` also takes a path, defaulting to the project holding the current
 file. `add scope=file` annotates the whole file rather than a line, and
 `add kind=todo` files a todo instead of a note; the two combine.
+
+`loclist` fills the window's location list with this buffer's notes, and
+`qflist` fills the quickfix list with the whole project's. Both take the
+same filters, so `:Sidenote qflist kind=todo state=open` is a work queue
+you walk with `:cnext`.
+
+`show` narrows what every buffer paints, all at once: `:Sidenote show
+kind=todo` leaves only the todos' marks, `state=resolved` flips you to
+reviewing what's done, filters combine, and bare `:Sidenote show` widens
+back. The hidden notes are still there — tracked, saved, listed — merely
+unpainted, and `]n`/`[n` honor the narrowing so a jump never lands on
+something invisible. `vim.g.sidenote_state.show` mirrors the view for your
+statusline.
 
 ## Configuration
 
@@ -496,6 +510,14 @@ Jump to the previous annotation and preview it.
 `sidenote.toggle_highlight()`
 
 Toggle this buffer's range highlights, the way spell is toggled.
+
+`sidenote.loclist({opts})`
+
+This buffer's annotations as the window's location list.
+
+`sidenote.qflist({opts})`
+
+The whole project's annotations as the quickfix list.
 
 `sidenote.delete()`
 

@@ -190,6 +190,44 @@ describe("the :Sidenote command", function()
         assert.eq_deep(vim.fn.getcompletion("Sidenote add sc", "cmdline"), { "scope=file" })
     end)
 
+    it("shows only what was asked, and widens back", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,2")
+        vim.cmd("4,4Sidenote add kind=todo")
+        put_away()
+
+        local render = require("sidenote.render")
+        local function drawn()
+            return #vim.api.nvim_buf_get_extmarks(0, render.NAMESPACE, 0, -1, {})
+        end
+
+        -- Sign plus overlay per note under the on-by-default highlight
+        assert.eq(drawn(), 4)
+        vim.cmd("Sidenote show kind=todo")
+        assert.eq(drawn(), 2)
+        assert.eq(vim.g.sidenote_state.show, "kind=todo")
+
+        vim.cmd("Sidenote show")
+        assert.eq(drawn(), 4)
+        assert.eq(vim.g.sidenote_state.show, "")
+    end)
+
+    it("keeps jumps on the visible notes alone", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,2")
+        vim.cmd("4,4Sidenote add kind=todo")
+        put_away()
+
+        vim.cmd("Sidenote show kind=todo")
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        vim.cmd("Sidenote next")
+        assert.eq(vim.fn.line("."), 4, "the hidden note on line 2 is skipped")
+        require("sidenote.preview").hide()
+        vim.cmd("Sidenote show")
+    end)
+
     it("fills the location list with this buffer's notes, filtered", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")

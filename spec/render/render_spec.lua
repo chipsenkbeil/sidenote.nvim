@@ -18,6 +18,17 @@ local function marks(bufnr)
 end
 
 describe("render.paint", function()
+    it("tracks a hidden entry without drawing it", function()
+        -- A narrowed view must never cost a note its save-time truth
+        local bufnr = scratch(LINES)
+        local placed = render.paint(bufnr, {
+            { id = "a", status = "attached", hidden = true, line_start = 2, line_end = 2 },
+        }, { style = "sign" })
+        assert.eq(placed, 0)
+        assert.eq(#marks(bufnr), 0)
+        assert.not_nil(render.extent(bufnr, "a"), "the tracker still placed")
+    end)
+
     it("places one mark per entry", function()
         local bufnr = scratch(LINES)
         local placed = render.paint(bufnr, {
