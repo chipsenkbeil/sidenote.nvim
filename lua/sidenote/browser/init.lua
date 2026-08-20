@@ -64,11 +64,7 @@ local function prose_of(entry, filetype)
     return render.normalize(text and hash.split(text) or {})
 end
 
----Resolve whatever set the listing covers.
----
----A file listing resolves against its buffer, so unsaved edits count; a project
----listing resolves against the whole store, preferring a loaded buffer where
----there is one.
+---Whether an entry passes the listing's filter.
 ---@param entry sidenote.session.Entry
 ---@param filter sidenote.browser.Filter
 ---@return boolean
@@ -78,6 +74,11 @@ local function survives(entry, filter)
         and (filter.state == nil or entry.record.state == filter.state)
 end
 
+---Resolve whatever set the listing covers.
+---
+---A file listing resolves against its buffer, so unsaved edits count; a project
+---listing resolves the whole store, preferring a loaded buffer where there is
+---one.
 ---@param state sidenote.browser.State
 ---@return sidenote.browser.Row[]
 local function rows_for(state)

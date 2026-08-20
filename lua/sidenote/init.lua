@@ -33,7 +33,7 @@ function M.entries(bufnr)
     return require("sidenote.session").entries(bufnr or vim.api.nvim_get_current_buf())
 end
 
----Annotation under the cursor, preferring the one whose range contains it.
+---Annotation whose range holds the cursor line, or nil when none does.
 ---@return sidenote.session.Entry|nil
 function M.at_cursor()
     local line = vim.fn.line(".")

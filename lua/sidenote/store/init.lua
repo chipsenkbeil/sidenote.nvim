@@ -3,9 +3,9 @@ local record = require("sidenote.core.record")
 ---Sidecar-pair persistence.
 ---
 ---An annotation is two files: prose the user owns, and metadata the plugin
----owns. Only metadata is ever rewritten. The prose file is created empty once
----and never opened for writing again, which makes the ownership boundary
----physical rather than a rule to remember.
+---owns. Metadata is rewritten freely. Prose is created empty and touched again
+---only by `write_prose`, applying an edit the user typed and then confirmed —
+---no other path opens it for writing.
 ---@class sidenote.store
 local M = {}
 

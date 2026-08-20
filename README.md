@@ -221,12 +221,12 @@ Nothing applies until you confirm, and anything lossy is listed apart:
 sidenote: apply 5 changes?
 
   WRITE    2 notes' prose
-  CHANGE   1 annotation   kind   note -> todo
-  MOVE     lua/lobby.lua:88 -> lua/net/lobby.lua:31  (re-anchored)
+  CHANGE   kind   note -> todo
+  MOVE     lua/lobby.lua:88 -> lua/net.lua:31   (re-anchored by content)
 
   ── these lose information ──
-  RESCOPE  lua/lobby.lua:42-57 -> lua/lobby.lua      (DROPS ANCHOR)
-  DELETE   1 annotation                              (REMOVES PROSE)
+  RESCOPE  lua/lobby.lua:42-57 -> lua/lobby.lua   (DROPS ANCHOR)
+  DELETE   1 annotation   (REMOVES PROSE FILE)
 ```
 
 `-` widens to every annotation in the project, sorted by path then line. A new
@@ -264,7 +264,7 @@ Every annotation targeting a buffer, resolved against its current text.
 
 `sidenote.at_cursor()`
 
-Annotation under the cursor, preferring the one whose range contains it.
+Annotation whose range holds the cursor line, or nil when none does.
 
 `sidenote.browse({opts})`
 
