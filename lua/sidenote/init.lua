@@ -83,11 +83,12 @@ function M.entries(bufnr)
 end
 
 ---Annotation the cursor is in: the narrowest holding it, else a file-wide one.
+---@param entries? sidenote.session.Entry[] list to select from, else this buffer's, resolved
 ---@return sidenote.session.Entry|nil
-function M.at_cursor()
+function M.at_cursor(entries)
     local line = vim.fn.line(".")
     local best, whole
-    for _, entry in ipairs(M.entries()) do
+    for _, entry in ipairs(entries or M.entries()) do
         if entry.line_start and line >= entry.line_start and line <= entry.line_end then
             -- Overlaps are legal; the most specific note is the one the
             -- cursor position is talking about

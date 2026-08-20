@@ -181,6 +181,18 @@ describe("sidenote.at_cursor", function()
         assert.eq(entry.record.line_end, 4)
     end)
 
+    it("selects from a caller-held list without resolving again", function()
+        -- What lets follow mode pay for resolution once per buffer state
+        -- rather than once per cursor move
+        editing()
+        added(opts())
+        put_away()
+
+        local entries = sidenote.entries()
+        vim.api.nvim_win_set_cursor(0, { 4, 0 })
+        assert.eq(assert.not_nil(sidenote.at_cursor(entries)).id, entries[1].id)
+    end)
+
     it("falls back to the file-wide note when nothing narrower contains it", function()
         editing()
         assert(sidenote.add({ scope = "file", config = opts() }))

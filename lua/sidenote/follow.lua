@@ -19,6 +19,11 @@ local shown
 ---@type sidenote.Config|nil configuration follow was enabled with
 local held
 
+---Entries for one buffer state, so a cursor move costs a lookup, not a
+---resolution of the whole file.
+---@type {bufnr: integer, tick: integer, entries: sidenote.session.Entry[]}|nil
+local cached
+
 ---@return boolean
 function M.active()
     return group ~= nil
@@ -34,7 +39,14 @@ local function point()
         return
     end
 
-    local entry = require("sidenote").at_cursor()
+    local sidenote = require("sidenote")
+    local bufnr = vim.api.nvim_get_current_buf()
+    local tick = vim.api.nvim_buf_get_changedtick(bufnr)
+    if not cached or cached.bufnr ~= bufnr or cached.tick ~= tick then
+        cached = { bufnr = bufnr, tick = tick, entries = sidenote.entries(bufnr) }
+    end
+
+    local entry = sidenote.at_cursor(cached.entries)
     if not entry or entry.id == shown then
         return
     end
@@ -78,6 +90,7 @@ function M.disable()
     end
     shown = nil
     held = nil
+    cached = nil
 end
 
 ---Flip following, returning the state it landed in.

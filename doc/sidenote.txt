@@ -375,7 +375,7 @@ Re-resolve and repaint a buffer's annotations.
 
 Every annotation targeting a buffer, resolved against its current text.
 
-`sidenote.at_cursor()`
+`sidenote.at_cursor({entries})`
 
 Annotation the cursor is in: the narrowest holding it, else a file-wide one.
 
