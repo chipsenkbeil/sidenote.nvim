@@ -221,11 +221,12 @@ describe("the :Sidenote command", function()
             return found
         end
 
-        assert.eq(range_marks(), 0)
-        vim.cmd("Sidenote highlight")
+        -- On out of the box; the toggle takes it away and brings it back
         assert.eq(range_marks(), 1)
         vim.cmd("Sidenote highlight")
         assert.eq(range_marks(), 0)
+        vim.cmd("Sidenote highlight")
+        assert.eq(range_marks(), 1)
     end)
 
     it("lets the mark track an edit, and :w re-baselines the record to it", function()

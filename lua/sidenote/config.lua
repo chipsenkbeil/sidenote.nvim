@@ -69,7 +69,7 @@ function M.defaults()
 
         -- Style: sign | virt_text | highlight | underline | none. The range
         -- overlay: off | on (toggleable defaults) | always | never (pinned)
-        indicator = { style = "sign", highlight = "off" },
+        indicator = { style = "sign", highlight = "on" },
 
         -- Where a note appears when glanced at:
         -- float | virt_lines | split | none

@@ -22,6 +22,10 @@ describe("config.defaults", function()
         assert.eq(config.defaults().filetype, "txt")
     end)
 
+    it("shows range highlights by default, toggleable off per buffer", function()
+        assert.eq(config.defaults().indicator.highlight, "on")
+    end)
+
     it("seeds org-remark's four pens, each pointing at its own group", function()
         local pens = config.defaults().pens
         for _, name in ipairs({ "yellow", "coral", "blue", "green" }) do
