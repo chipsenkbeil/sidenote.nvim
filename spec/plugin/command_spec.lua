@@ -67,6 +67,21 @@ describe("the :Sidenote command", function()
         assert.eq(rec.line_end, 3)
     end)
 
+    it("writes a moved anchor back on :write", function()
+        -- The full loop: annotate, edit the code above, save, and the record
+        -- on disk follows the code
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        vim.cmd("3Sidenote add")
+
+        vim.api.nvim_buf_set_lines(0, 0, 0, false, { "-- a new first line" })
+        vim.cmd.write()
+
+        local rec = only_record(root)
+        assert.eq(rec.line_start, 4)
+        assert.eq(rec.text, "local c = 3")
+    end)
+
     it("captures a visual selection as lines scope too", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")

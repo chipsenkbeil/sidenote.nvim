@@ -131,11 +131,21 @@ vim.keymap.set("n", "<Plug>(SidenoteViewPrev)", function()
 end, { desc = "Jump to the previous annotation and preview it" })
 
 local group = vim.api.nvim_create_augroup("sidenote", { clear = true })
-vim.api.nvim_create_autocmd({ "BufReadPost", "BufWritePost" }, {
+vim.api.nvim_create_autocmd("BufReadPost", {
     group = group,
     desc = "Re-resolve annotations from disk; a surviving extmark is never trusted",
     callback = function(event)
         pcall(require("sidenote").refresh, event.buf)
+    end,
+})
+vim.api.nvim_create_autocmd("BufWritePost", {
+    group = group,
+    desc = "Write back verified anchors, then repaint from the updated records",
+    callback = function(event)
+        pcall(function()
+            require("sidenote.session").written(event.buf)
+            require("sidenote").refresh(event.buf)
+        end)
     end,
 })
 vim.api.nvim_create_autocmd("ColorScheme", {

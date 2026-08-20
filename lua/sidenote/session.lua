@@ -1,6 +1,8 @@
 local buffer = require("sidenote.buffer")
 local config = require("sidenote.config")
+local hash = require("sidenote.core.hash")
 local project = require("sidenote.store.project")
+local record = require("sidenote.core.record")
 local render = require("sidenote.render")
 local resolve = require("sidenote.core.resolve")
 local store = require("sidenote.store")
@@ -86,6 +88,69 @@ end
 function M.refresh(bufnr, cfg)
     cfg = cfg or config.get()
     return render.paint(bufnr, M.entries(bufnr, cfg), cfg.indicator)
+end
+
+---Write verified anchors back after their buffer was saved.
+---
+---Per attached annotation, one of two things:
+---
+---1. If it sits at its stored position, only `file_sha` and `verified` are
+---   refreshed, keeping the whole-file fast path warm.
+---2. If it attached somewhere else, the code legitimately moved: hints, the
+---   anchor text, its context and every hash are re-captured at the new
+---   position, so drift stops compounding.
+---
+---Anything the resolver could not attach is never written; a good anchor is
+---not overwritten with a guess. Only changed records are persisted.
+---@param bufnr integer
+---@param cfg? sidenote.Config
+---@return integer written how many records were persisted
+function M.written(bufnr, cfg)
+    cfg = cfg or config.get()
+    local entries = M.entries(bufnr, cfg)
+    if #entries == 0 then
+        return 0
+    end
+
+    local target = buffer.target(bufnr, { scope = "file" })
+    if not target then
+        return 0
+    end
+    local file_sha = hash.sha256(target.content)
+    local now = os.date("!%Y-%m-%dT%H:%M:%SZ")
+
+    local written = 0
+    for _, entry in ipairs(entries) do
+        local rec = entry.record
+        local res = entry.resolution
+        -- An unchanged file needs nothing; anything short of attached is a
+        -- guess, and a guess never overwrites a good anchor
+        if res.status == "attached" and rec.file_sha ~= file_sha then
+            local moved = rec.scope ~= "file"
+                and (res.line_start ~= rec.line_start or res.line_end ~= rec.line_end)
+            local fresh
+            if moved then
+                fresh = record.reanchor(rec, {
+                    path = rec.path,
+                    content = target.content,
+                    scope = rec.scope,
+                    line_start = res.line_start,
+                    line_end = res.line_end,
+                    col_start = rec.col_start,
+                    col_end = rec.col_end,
+                    now = now,
+                })
+            else
+                fresh = vim.deepcopy(rec)
+                fresh.file_sha = file_sha
+                fresh.verified = now
+            end
+            if store.update(entry.root, fresh) then
+                written = written + 1
+            end
+        end
+    end
+    return written
 end
 
 return M
