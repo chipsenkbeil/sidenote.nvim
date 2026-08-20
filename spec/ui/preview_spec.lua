@@ -164,6 +164,28 @@ describe("preview dismissal", function()
     end)
 end)
 
+describe("preview.show identity", function()
+    it("names what it shows in the float's winbar", function()
+        local case = annotated("why this returns one\n")
+        show(case, "float")
+        local winbar = vim.wo[assert(preview.winid())].winbar
+        assert.contains(winbar, "m.lua:4")
+        assert.contains(winbar, "note")
+        preview.hide()
+    end)
+
+    it("marks a cut float with how much it held back", function()
+        local case = annotated(string.rep("line\n", 40))
+        show(case, "float", 5)
+        local bufnr = vim.api.nvim_win_get_buf(assert(preview.winid()))
+        local placed =
+            vim.api.nvim_buf_get_extmarks(bufnr, preview.NAMESPACE, 0, -1, { details = true })
+        assert.eq(#placed, 1)
+        assert.contains(placed[1][4].virt_lines[1][1][1], "35 more")
+        preview.hide()
+    end)
+end)
+
 describe("preview.show virt_lines", function()
     it("opens no window at all", function()
         -- The whole point of this style is staying in the code
@@ -173,35 +195,42 @@ describe("preview.show virt_lines", function()
         preview.hide()
     end)
 
-    it("attaches the prose below the annotated line", function()
+    it("leads with the note's identity, prose beneath a divider", function()
         local case = annotated("why this returns one\n")
         show(case, "virt_lines")
 
         local placed = marks(case.bufnr)
         assert.eq(#placed, 1)
         assert.eq(placed[1][2], 3, "line 4, zero-indexed")
-        assert.eq(placed[1][4].virt_lines[1][1][1], "why this returns one")
+        local virt = placed[1][4].virt_lines
+        assert.contains(virt[1][1][1], "m.lua:4")
+        assert.contains(virt[2][1][1], "─")
+        assert.eq(virt[3][1][1], "why this returns one")
         preview.hide()
     end)
 
     it("renders every prose line as its own virtual line", function()
         local case = annotated("first\nsecond\nthird\n")
         show(case, "virt_lines")
-        assert.eq(#marks(case.bufnr)[1][4].virt_lines, 3)
+        local virt = marks(case.bufnr)[1][4].virt_lines
+        assert.eq(#virt, 5, "identity, divider, then the three lines")
+        assert.eq(virt[#virt][1][1], "third")
         preview.hide()
     end)
 
-    it("truncates to max_lines like every other style", function()
+    it("cuts at max_lines and says how much it held back", function()
         local case = annotated(string.rep("line\n", 40))
         show(case, "virt_lines", 5)
-        assert.lte(#marks(case.bufnr)[1][4].virt_lines, 5)
+        local virt = marks(case.bufnr)[1][4].virt_lines
+        assert.eq(#virt, 8, "identity, divider, five lines, the marker")
+        assert.contains(virt[#virt][1][1], "35 more")
         preview.hide()
     end)
 
     it("shows a placeholder when the note is still empty", function()
         local case = annotated("")
         show(case, "virt_lines")
-        assert.match(marks(case.bufnr)[1][4].virt_lines[1][1][1], "empty")
+        assert.match(marks(case.bufnr)[1][4].virt_lines[3][1][1], "empty")
         preview.hide()
     end)
 

@@ -58,40 +58,33 @@ local function clipped(text)
     return text
 end
 
----The winbar line naming the open note: its identity, pinned.
+---A note's identity as chunks: location, kind, state, swatch and status.
 ---
----Location, kind and state on the winbar's own background, then a swatch
----drawn in the note's actual ink — the pen's wash, the status mark for a
----penless note, or a squiggle when the configured style is `underline` —
----and the anchor status with its confidence whenever it is short of exact.
+---A nil group means "the surface's own base color" — the winbar maps it to
+---its background, a preview to the context group — while the swatch keeps
+---the note's actual ink (the pen's wash, the status mark for a penless
+---note, a squiggle when the style is `underline`) and a short-of-exact
+---status keeps its status color, with confidence when it is graded.
 ---@param entry sidenote.editor.Note
----@return string winbar statusline-format text
-function M.headline(entry)
+---@return {[1]: string, [2]: string|nil}[] chunks
+function M.identity(entry)
     local rec = assert(entry.record)
     local cfg = entry.config or config.get()
-    local bar = "%#" .. highlight.WINBAR .. "#"
 
-    local parts = {
-        bar,
-        " ",
-        location.format(rec):gsub("%%", "%%%%"),
-        "  ",
-        rec.kind,
-        " · ",
-        rec.state,
-        " · ",
+    local chunks = {
+        { location.format(rec) },
+        { "  " .. rec.kind .. " · " .. rec.state .. " · " },
     }
     if rec.pen then
-        parts[#parts + 1] = rec.pen .. " "
+        chunks[#chunks + 1] = { rec.pen .. " " }
     end
     local status = entry.status or "attached"
     if cfg.indicator.style == "underline" then
-        parts[#parts + 1] = "%#" .. highlight.UNDERLINES[status] .. "#~~~"
+        chunks[#chunks + 1] = { "~~~", highlight.UNDERLINES[status] }
     else
         local ink = rec.pen and (cfg.pens or {})[rec.pen] or highlight.MARKS[status]
-        parts[#parts + 1] = "%#" .. ink .. "#■"
+        chunks[#chunks + 1] = { "■", ink }
     end
-    parts[#parts + 1] = bar
 
     if status ~= "attached" then
         local label = status
@@ -99,7 +92,25 @@ function M.headline(entry)
         if confidence and confidence > 0 and confidence < 1 then
             label = ("%s %.2f"):format(label, confidence)
         end
-        parts[#parts + 1] = " · %#" .. highlight.GROUPS[status] .. "#" .. label .. bar
+        chunks[#chunks + 1] = { " · " }
+        chunks[#chunks + 1] = { label, highlight.GROUPS[status] }
+    end
+    return chunks
+end
+
+---The winbar line naming the open note: its identity, pinned.
+---@param entry sidenote.editor.Note
+---@return string winbar statusline-format text
+function M.headline(entry)
+    local bar = "%#" .. highlight.WINBAR .. "#"
+    local parts = { bar, " " }
+    for _, chunk in ipairs(M.identity(entry)) do
+        local text = chunk[1]:gsub("%%", "%%%%")
+        if chunk[2] then
+            parts[#parts + 1] = "%#" .. chunk[2] .. "#" .. text .. bar
+        else
+            parts[#parts + 1] = text
+        end
     end
     return table.concat(parts)
 end
@@ -206,6 +217,12 @@ local function decorate(bufnr, winid, entry)
         })
     end
 
+    -- The winbar needs a row of its own the first time it lands on a float
+    -- sized to its content
+    local shape = vim.api.nvim_win_get_config(winid)
+    if shape.relative ~= "" and vim.wo[winid].winbar == "" then
+        vim.api.nvim_win_set_config(winid, { height = shape.height + 1 })
+    end
     vim.api.nvim_set_option_value("winbar", M.headline(entry), { win = winid, scope = "local" })
     -- Reveal the header only while the view sits at the top; a re-draw must
     -- never scroll a note the user has moved down into

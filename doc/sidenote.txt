@@ -211,6 +211,11 @@ exists, how you glance at it, and where you write it. A transient float for
 previewing and a persistent right split for editing is a normal combination
 that one setting cannot express.
 
+A glance names what it shows: the preview float carries the note's identity
+— location, kind, state, ink — in its winbar, and the virtual-lines style
+leads with the same line. A note longer than `max_lines` is cut with a marker
+saying how much was held back; reading it all is what opening the note is for.
+
 Signs span every line of a multi-line note, and when notes overlap the worst
 anchor status wins the gutter. A healthy todo signs as `☐`, checked off to
 `☑` once it is no longer open; notes keep the `▍` stripe, and every hurt

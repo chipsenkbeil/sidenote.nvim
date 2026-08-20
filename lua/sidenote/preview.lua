@@ -1,3 +1,5 @@
+local editor = require("sidenote.editor")
+local highlight = require("sidenote.highlight")
 local store = require("sidenote.store")
 local window = require("sidenote.window")
 
@@ -6,6 +8,7 @@ local window = require("sidenote.window")
 ---@field max_lines integer most prose lines rendered in a preview
 ---@field filetype string extension and filetype of prose files
 ---@field bufnr integer source buffer the annotation belongs to
+---@field config? sidenote.Config for the identity line's pens and ink
 
 ---Glance at a note without leaving the code.
 ---
@@ -68,7 +71,8 @@ end
 ---@param entry sidenote.session.Entry
 ---@param filetype string
 ---@param max_lines integer
----@return string[]
+---@return string[] lines
+---@return integer dropped how many prose lines the glance is not showing
 local function prose_lines(entry, filetype, max_lines)
     local prose = store.prose(entry.root, entry.id, filetype) or ""
     local lines = {}
@@ -79,37 +83,58 @@ local function prose_lines(entry, filetype, max_lines)
         lines[#lines] = nil
     end
     if #lines == 0 then
-        return { PLACEHOLDER }
+        return { PLACEHOLDER }, 0
     end
+    local dropped = math.max(0, #lines - max_lines)
     while #lines > max_lines do
         lines[#lines] = nil
     end
-    return lines
+    return lines, dropped
 end
 
----Hang the prose under the annotated line as virtual text.
----
----Plain text, deliberately: giving it the prose filetype would mean rendering
----one language's markup inside another's buffer, which is out of scope.
+---The identity chunks for a glance, base color filled in.
 ---@param entry sidenote.session.Entry
----@param lines string[]
+---@param cfg sidenote.Config|nil
+---@return {[1]: string, [2]: string}[]
+local function identity(entry, cfg)
+    local chunks = {}
+    for _, chunk in ipairs(editor.identity(vim.tbl_extend("keep", { config = cfg }, entry))) do
+        chunks[#chunks + 1] = { chunk[1], chunk[2] or highlight.CONTEXT }
+    end
+    return chunks
+end
+
+---One virtual line saying how much of the note the glance held back.
+---@param dropped integer
+---@return {[1]: string, [2]: string}[]
+local function held_back(dropped)
+    local text = ("… %d more — open the note to read it all"):format(dropped)
+    return { { text, highlight.CONTEXT } }
+end
+
+---Hang the note under the annotated line as virtual text.
+---
+---Plain chunks, deliberately: giving prose its own filetype would mean
+---rendering one language's markup inside another's buffer.
+---@param entry sidenote.session.Entry
+---@param virt {[1]: string, [2]: string}[][] chunk lines to hang
 ---@param bufnr integer
-local function attach(entry, lines, bufnr)
+local function attach(entry, virt, bufnr)
     -- An unplaced or out-of-range annotation is skipped rather than clamped:
     -- clamping is how a note ends up beside code it was never about
     if not entry.line_end or entry.line_end > vim.api.nvim_buf_line_count(bufnr) then
         return
-    end
-
-    local virt = {}
-    for i, line in ipairs(lines) do
-        virt[i] = { { line, "SidenoteProse" } }
     end
     vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, entry.line_end - 1, 0, { virt_lines = virt })
     attached = bufnr
 end
 
 ---Show a note's prose in the configured preview surface.
+---
+---A glance stays a glance: a note longer than `max_lines` is cut with a
+---marker saying how much is held back, and reading it all means opening
+---the note. The identity — location, kind, state, ink — sits in the
+---float's winbar, or leads the virtual lines.
 ---@param entry sidenote.session.Entry
 ---@param opts sidenote.preview.Opts
 function M.show(entry, opts)
@@ -118,9 +143,20 @@ function M.show(entry, opts)
         return
     end
 
-    local lines = prose_lines(entry, opts.filetype, opts.max_lines)
+    local lines, dropped = prose_lines(entry, opts.filetype, opts.max_lines)
     if opts.style == "virt_lines" then
-        attach(entry, lines, opts.bufnr)
+        local virt = {}
+        if entry.record then
+            virt[#virt + 1] = identity(entry, opts.config)
+            virt[#virt + 1] = { { ("─"):rep(40), highlight.CONTEXT } }
+        end
+        for _, line in ipairs(lines) do
+            virt[#virt + 1] = { { line, "SidenoteProse" } }
+        end
+        if dropped > 0 then
+            virt[#virt + 1] = held_back(dropped)
+        end
+        attach(entry, virt, opts.bufnr)
         dismiss_later()
         return
     end
@@ -129,9 +165,28 @@ function M.show(entry, opts)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     vim.bo[bufnr].filetype = opts.filetype
     vim.bo[bufnr].modifiable = false
+    if dropped > 0 then
+        vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, #lines - 1, 0, {
+            virt_lines = { held_back(dropped) },
+        })
+    end
 
     local style = opts.style == "split" and "split" or "float"
     current = window.open(bufnr, { style = style, position = "right", size = 60 })
+    if entry.record then
+        -- The winbar needs a row of its own, which a float sized to its
+        -- content does not have yet
+        local shape = vim.api.nvim_win_get_config(current)
+        if shape.relative ~= "" then
+            vim.api.nvim_win_set_config(current, { height = shape.height + 1 })
+        end
+        local note = vim.tbl_extend("keep", { config = opts.config }, entry)
+        vim.api.nvim_set_option_value(
+            "winbar",
+            editor.headline(note),
+            { win = current, scope = "local" }
+        )
+    end
     dismiss_later()
 end
 

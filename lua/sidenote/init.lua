@@ -166,6 +166,7 @@ local function preview(entry, cfg)
         max_lines = cfg.preview.max_lines,
         filetype = cfg.filetype,
         bufnr = vim.api.nvim_get_current_buf(),
+        config = cfg,
     })
 end
 
