@@ -25,8 +25,6 @@ local hash = require("sidenote.core.hash")
 ---@field prefix_sha string hash of the normalized lines above the anchor
 ---@field suffix_sha string hash of the normalized lines below the anchor
 ---@field file_sha string hash of the whole file at capture
----@field symbol string enclosing named symbol, when one was known
----@field ts_path string enclosing treesitter node path, when one was known
 ---@field vcs sidenote.Vcs|nil provenance only, never used for resolution
 ---@field captured string ISO-8601 instant the annotation was written
 ---@field verified string ISO-8601 instant the anchor last resolved exactly
@@ -43,8 +41,6 @@ local hash = require("sidenote.core.hash")
 ---@field col_start? integer defaults to 1 in range scope
 ---@field col_end? integer defaults to 1 in range scope
 ---@field kind? "note"|"todo" defaults to note
----@field symbol? string enclosing named symbol
----@field ts_path? string enclosing treesitter node path
 ---@field vcs? sidenote.Vcs provenance captured by the store
 
 ---@class sidenote.core.record
@@ -110,8 +106,6 @@ function M.capture(opts)
         prefix_sha = hash.sha256(hash.normalize(prefix)),
         suffix_sha = hash.sha256(hash.normalize(suffix)),
         file_sha = hash.sha256(opts.content),
-        symbol = opts.symbol or "",
-        ts_path = opts.ts_path or "",
         vcs = opts.vcs,
         captured = opts.now,
         verified = opts.now,
@@ -137,7 +131,6 @@ end
 ---
 ---Identity and everything the user owns survive — `id`, `kind`, `state` and
 ---`captured`. The anchor, its context, every hash and `verified` are refreshed.
----`symbol` and `ts_path` are cleared, since both described the old location.
 ---@param rec sidenote.Annotation
 ---@param opts sidenote.core.record.ReanchorOpts
 ---@return sidenote.Annotation

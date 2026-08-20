@@ -86,9 +86,11 @@ describe("health.check", function()
         assert.truthy(mentions(report.ok, "provenance") or mentions(report.info, "provenance"))
     end)
 
-    it("says something about treesitter either way", function()
+    it("says nothing about treesitter, which no tier reads", function()
+        -- The old line checked the checkhealth buffer's own filetype mapping,
+        -- reporting readiness for a tier that was cut
         local report = captured(health.check)
-        assert.truthy(mentions(report.ok, "treesitter") or mentions(report.info, "treesitter"))
+        assert.falsy(mentions(report.ok, "treesitter") or mentions(report.info, "treesitter"))
     end)
 
     it("never reports a missing optional tool as a warning", function()

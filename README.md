@@ -27,7 +27,6 @@ Optional, each independently useful:
 | optional | buys |
 |---|---|
 | nvim-orgmode | org editing, because the prose file ends in `.org` |
-| treesitter | symbol capture, and a structural resolution tier |
 | git or jj | provenance stamping, never used for resolution |
 
 ## Install
@@ -368,6 +367,9 @@ The statuses, in worsening order:
 attached | drifted | ambiguous | orphaned | filegone
 ```
 <!-- /gen:statuses -->
+
+There is no L5: the number was reserved for a treesitter tier that was cut
+before it was built.
 
 Two thresholds rather than one, because a low-confidence guess presented as
 truth rates worse with users than an honest orphan.

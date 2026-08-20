@@ -51,15 +51,6 @@ local function report_vcs()
     end
 end
 
-local function report_treesitter()
-    local ok, parsers = pcall(vim.treesitter.language.get_lang, vim.bo.filetype)
-    if ok and parsers then
-        vim.health.ok(("treesitter available, parser for %q"):format(vim.bo.filetype))
-    else
-        vim.health.info("no treesitter parser here; symbol capture is unavailable")
-    end
-end
-
 ---@param cfg sidenote.Config
 local function report_prose(cfg)
     -- A prose filetype nothing can highlight still works; the note is text
@@ -81,7 +72,6 @@ function M.check()
 
     report_store(cfg)
     report_vcs()
-    report_treesitter()
     report_prose(cfg)
 end
 

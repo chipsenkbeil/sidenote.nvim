@@ -253,12 +253,6 @@ describe("record.reanchor", function()
         assert.eq(fresh.prefix_sha, hash.sha256(hash.normalize(fresh.prefix)))
     end)
 
-    it("clears the symbol and treesitter path, which described the old place", function()
-        local fresh = reanchor()
-        assert.eq(fresh.symbol, "")
-        assert.eq(fresh.ts_path, "")
-    end)
-
     it("empties the anchor when widening to file scope", function()
         local fresh = reanchor({ scope = "file" })
         assert.eq(fresh.text, "")

@@ -238,8 +238,8 @@ function M.resolve(rec, content)
         return result("ambiguous", "L4", { candidates = norm })
     end
 
-    -- L6: scored fuzzy match. Two thresholds, because a low-confidence guess
-    -- shown as truth is worse than an honest orphan
+    -- L6, never L5, which was reserved for a treesitter tier and cut unbuilt.
+    -- Two thresholds: a guess shown as truth is worse than an honest orphan
     local hit = score.best(lines, rec)
     if hit and hit.score >= M.ACCEPT then
         return result("drifted", "L6", {
