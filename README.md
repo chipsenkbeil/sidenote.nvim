@@ -311,6 +311,11 @@ nvim --headless -l cli/sidenote.lua list /path/to/proj --status orphaned
 `export` prints JSON on stdout. `list` prints one tab-separated line per
 annotation: location, status, kind, state, summary.
 
+There is a ready-made agent skill in
+[skills/sidenote/SKILL.md](skills/sidenote/SKILL.md) covering all of this —
+how to read a store, what the gate means, and what an agent must never touch.
+Copy or symlink it into `~/.claude/skills/` (or your agent's equivalent).
+
 <!-- vimdoc:tag sidenote-export-gate -->
 
 ### The export gate
