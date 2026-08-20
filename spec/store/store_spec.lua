@@ -107,8 +107,8 @@ describe("store.update", function()
     end)
 
     it("cannot touch the prose file, even when it is read-only", function()
-        -- Stronger than comparing mtimes: if update opened the prose file for
-        -- writing it would fail outright, so success here proves it did not
+        -- The unchanged content is the proof: writes rename over a file
+        -- whatever its permissions, so success alone would show nothing
         local dir = root()
         local original = rec()
         store.create(dir, original, "org")
@@ -125,6 +125,36 @@ describe("store.update", function()
         assert.eq(store.prose(dir, original.id, "org"), "words the user wrote\n")
 
         vim.uv.fs_chmod(prose_path, 420) -- 0644, so the temp dir can be cleaned
+    end)
+
+    it("keeps the old record when a write cannot complete", function()
+        -- In-place truncation destroys the old bytes before failing; writing a
+        -- sibling and renaming leaves what was there
+        local dir = root()
+        local original = rec()
+        store.create(dir, original, "org")
+        assert.truthy(vim.uv.fs_chmod(dir, 365)) -- 0555, so no new file can land
+
+        original.state = "resolved"
+        local ok = store.update(dir, original)
+        vim.uv.fs_chmod(dir, 493) -- 0755, so the temp dir can be cleaned
+        assert.falsy(ok)
+        assert.eq(store.read(dir, original.id).state, "open")
+    end)
+
+    it("leaves nothing behind that could scan as a record or prose", function()
+        local dir = root()
+        local original = rec()
+        store.create(dir, original, "org")
+        store.write_prose({ root = dir, id = original.id, filetype = "org", lines = { "x" } })
+        store.update(dir, original)
+
+        local names = {}
+        for name in vim.fs.dir(dir) do
+            names[#names + 1] = name
+        end
+        table.sort(names)
+        assert.eq_deep(names, { original.id .. ".metadata.json", original.id .. ".org" })
     end)
 
     it("refuses an invalid record", function()

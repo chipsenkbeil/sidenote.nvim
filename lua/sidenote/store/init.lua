@@ -32,18 +32,32 @@ function M.paths(root, id, filetype)
     return { meta = M.meta_path(root, id), prose = M.prose_path(root, id, filetype) }
 end
 
+---Write `content` through a hidden sibling and a rename.
+---
+---In-place truncation destroys the old bytes before the new ones land, so an
+---interrupted write costs the whole file. A rename replaces it or leaves it.
 ---@param path string
 ---@param content string
 ---@return boolean ok
 ---@return string|nil err
 local function write_file(path, content)
-    vim.fn.mkdir(vim.fn.fnamemodify(path, ":h"), "p")
-    local fh, err = io.open(path, "w")
+    local dir = vim.fn.fnamemodify(path, ":h")
+    vim.fn.mkdir(dir, "p")
+
+    -- Dot-prefixed, so a half-written temp can never scan as a record or prose
+    local temp = ("%s/.%s.tmp"):format(dir, vim.fn.fnamemodify(path, ":t"))
+    local fh, err = io.open(temp, "w")
     if not fh then
         return false, err
     end
     fh:write(content)
     fh:close()
+
+    local ok, rename_err = vim.uv.fs_rename(temp, path)
+    if not ok then
+        os.remove(temp)
+        return false, rename_err
+    end
     return true, nil
 end
 
