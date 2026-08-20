@@ -40,6 +40,27 @@ for status in pairs(M.GROUPS) do
     M.UNDERLINES[status] = "SidenoteUnderline" .. status:sub(1, 1):upper() .. status:sub(2)
 end
 
+---Groups for the `highlight` indicator and the range overlay: marker-pen ink
+---over the annotated text, so they need a background, not a glyph color.
+---@type table<sidenote.Status, string>
+M.MARKS = {}
+for status in pairs(M.GROUPS) do
+    M.MARKS[status] = "SidenoteMark" .. status:sub(1, 1):upper() .. status:sub(2)
+end
+
+---What each marker links to when a colorscheme says nothing.
+---
+---`Search` is the closest thing to a yellow highlighter most schemes carry;
+---the diagnostic virtual-text groups pair a soft background with a severity.
+---@type table<sidenote.Status, string>
+local MARK_DEFAULTS = {
+    attached = "Search",
+    drifted = "DiagnosticVirtualTextHint",
+    ambiguous = "DiagnosticVirtualTextWarn",
+    orphaned = "DiagnosticVirtualTextWarn",
+    filegone = "DiagnosticVirtualTextError",
+}
+
 ---Extmark priority per status, so the worst mark wins a shared line.
 ---
 ---The sign column shows one glyph; an orphan hiding behind an attached note's
@@ -75,6 +96,9 @@ function M.setup()
     for status, group in pairs(M.UNDERLINES) do
         local link = "DiagnosticUnderline" .. SEVERITY[status]
         vim.api.nvim_set_hl(0, group, { link = link, default = true })
+    end
+    for status, group in pairs(M.MARKS) do
+        vim.api.nvim_set_hl(0, group, { link = MARK_DEFAULTS[status], default = true })
     end
     vim.api.nvim_set_hl(0, M.PROSE, { link = "Comment", default = true })
 end

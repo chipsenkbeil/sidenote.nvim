@@ -120,17 +120,48 @@ describe("render.paint", function()
         assert.eq(#marks(bufnr), 0)
     end)
 
-    it("highlights the whole range when the style is highlight", function()
-        -- The extmark end is exclusive, so covering lines 2 through 4 means
-        -- ending at row 4; ending at row 3 leaves the last line unmarked
+    it("highlights the annotated text, ending where its last line does", function()
+        -- The marker-pen look: the text is highlighted, never the whole-width
+        -- line, so it reads as ink over words rather than a painted row
         local bufnr = scratch(LINES)
         render.paint(
             bufnr,
             { { id = "a", status = "attached", line_start = 2, line_end = 4 } },
             { style = "highlight" }
         )
+        local details = marks(bufnr)[1][4]
         assert.eq(marks(bufnr)[1][2], 1)
-        assert.eq(marks(bufnr)[1][4].end_row, 4)
+        assert.eq(details.end_row, 3)
+        assert.eq(details.end_col, #"four")
+        assert.falsy(details.hl_eol)
+    end)
+
+    it("highlights a range's exact columns", function()
+        local bufnr = scratch(LINES)
+        render.paint(bufnr, {
+            {
+                id = "a",
+                status = "attached",
+                line_start = 2,
+                line_end = 2,
+                col_start = 2,
+                col_end = 3,
+            },
+        }, { style = "highlight" })
+        local mark = marks(bufnr)[1]
+        assert.eq(mark[3], 1, "starts at the range's own column")
+        assert.eq(mark[4].end_col, 3)
+    end)
+
+    it("marks with the marker groups, not the sign groups", function()
+        -- A sign group is a colored glyph; ink over text needs a background
+        local bufnr = scratch(LINES)
+        render.paint(
+            bufnr,
+            { { id = "a", status = "attached", line_start = 2, line_end = 2 } },
+            { style = "highlight" }
+        )
+        assert.eq(marks(bufnr)[1][4].hl_group, highlight.MARKS.attached)
     end)
 
     it("puts the sign at end of line when the style is virt_text", function()
@@ -226,8 +257,6 @@ describe("render.paint span styles", function()
         local underlined = marks(bufnr)[1][4]
 
         assert.neq(underlined.hl_group, highlighted.hl_group)
-        assert.falsy(underlined.hl_eol, "an underline belongs under the text, not past it")
-        assert.truthy(highlighted.hl_eol)
     end)
 
     it("underlines through a group linked to the diagnostic underline family", function()

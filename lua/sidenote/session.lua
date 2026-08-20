@@ -31,6 +31,9 @@ function M.entry(root, rec, resolution)
         status = resolution.status,
         line_start = resolution.line_start,
         line_end = resolution.line_end,
+        -- Columns travel only for a range, whose ink covers its exact span
+        col_start = rec.scope == "range" and rec.col_start or nil,
+        col_end = rec.scope == "range" and rec.col_end or nil,
         root = root,
         record = rec,
         resolution = resolution,

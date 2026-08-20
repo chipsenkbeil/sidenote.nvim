@@ -155,9 +155,11 @@ previewing and a persistent right split for editing is a normal combination
 that one setting cannot express.
 
 Signs span every line of a multi-line note, and when notes overlap the worst
-anchor status wins the gutter. `:Sidenote highlight` additionally tints each
-annotated range, per buffer, the way `:set spell!` toggles — `on` flips the
-default, `always` and `never` pin it.
+anchor status wins the gutter. `:Sidenote highlight` additionally marks the
+annotated text itself — ink over the words, a range by its exact columns —
+per buffer, the way `:set spell!` toggles: `on` flips the default, `always`
+and `never` pin it. The pens are the `SidenoteMark*` groups, one per anchor
+status, yours to restyle.
 
 A `template` function seeds the buffer a new note opens into:
 

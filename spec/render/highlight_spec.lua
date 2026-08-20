@@ -50,6 +50,23 @@ describe("highlight.SIGNS", function()
     end)
 end)
 
+describe("highlight.MARKS", function()
+    it("names a marker group for every status, apart from the sign groups", function()
+        for _, status in ipairs(STATUSES) do
+            assert.is_type(highlight.MARKS[status], "string")
+            assert.neq(highlight.MARKS[status], highlight.GROUPS[status])
+        end
+    end)
+
+    it("marks a healthy note like a highlighter pen, with a background", function()
+        -- Ink over words: the sign groups color a glyph, so reusing them here
+        -- tinted the text instead of marking it
+        highlight.setup()
+        local hl = vim.api.nvim_get_hl(0, { name = highlight.MARKS.attached, link = true })
+        assert.not_nil(hl.link)
+    end)
+end)
+
 describe("highlight.setup", function()
     it("defines every group", function()
         highlight.setup()
