@@ -1,5 +1,4 @@
 local buffer = require("sidenote.buffer")
-local capture = require("sidenote.capture")
 local location = require("sidenote.location")
 local project = require("sidenote.store.project")
 local record = require("sidenote.core.record")
@@ -113,20 +112,6 @@ CHECKS.write = function(action, state)
     return nil
 end
 
-CHECKS.create = function(action, state)
-    local wanted, err = location.parse(action.row.location)
-    if not wanted then
-        return err
-    end
-    if wanted.scope ~= "file" then
-        return "a new annotation from the browser covers a whole file; only a source buffer has a selection"
-    end
-    if vim.fn.filereadable(absolute(state, wanted.path)) ~= 1 then
-        return ("%s does not exist"):format(wanted.path)
-    end
-    return nil
-end
-
 ---@type table<string, fun(action: sidenote.browser.Action, state: sidenote.browser.State): boolean, string|nil>
 local APPLIERS = {}
 
@@ -205,45 +190,6 @@ end
 
 APPLIERS.move = reanchor
 APPLIERS.rescope = reanchor
-
-APPLIERS.create = function(action, state)
-    local row = action.row
-    local wanted, parse_err = location.parse(row.location)
-    if not wanted then
-        return false, parse_err
-    end
-
-    -- Captured through a buffer on the file the location names, so a create
-    -- means the same thing in a project listing as in a single file's
-    local bufnr = vim.fn.bufadd(absolute(state, wanted.path))
-    vim.fn.bufload(bufnr)
-
-    local result, err = capture.run(bufnr, {
-        scope = "file",
-        kind = row.kind,
-        config = state.config,
-    })
-    if not result then
-        return false, err
-    end
-
-    if row.state ~= "open" then
-        local rec = store.read(result.root, result.id)
-        if rec then
-            rec.state = row.state
-            store.update(result.root, rec)
-        end
-    end
-    if #row.prose == 0 then
-        return true, nil
-    end
-    return store.write_prose({
-        root = result.root,
-        id = result.id,
-        filetype = state.config.filetype,
-        lines = row.prose,
-    })
-end
 
 ---Everything that would stop an action being possible, gathered before any of
 ---them run.

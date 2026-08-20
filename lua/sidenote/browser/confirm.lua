@@ -19,7 +19,7 @@ M.RULE = "── these lose information ──"
 local PER_ACTION = { move = true, rescope = true, change = true }
 
 ---Order kinds appear in, so the dialog reads the same way every time.
-local ORDER = { "write", "create", "change", "move", "rescope", "delete" }
+local ORDER = { "write", "change", "move", "rescope", "delete" }
 
 ---What an action does or costs, shown at the end of its row.
 ---

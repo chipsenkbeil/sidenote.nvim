@@ -1,15 +1,14 @@
 local location = require("sidenote.location")
 
 ---@class sidenote.browser.Action
----@field kind "write"|"change"|"rescope"|"move"|"create"|"delete" what to do
----@field id string|nil annotation acted on, absent for a create
+---@field kind "write"|"change"|"rescope"|"move"|"delete" what to do
+---@field id string annotation acted on
 ---@field lossy boolean whether applying it discards something unrecoverable
 ---@field lnum integer|nil row the edit was read from, so an error can name it
 ---@field field string|nil column that changed, for a change
 ---@field from string|nil value being replaced, for change, rescope and move
 ---@field to string|nil value replacing it, for change, rescope and move
----@field prose string[]|nil the note's new prose, for write and create
----@field row sidenote.browser.Parsed|nil the typed row, for a create
+---@field prose string[]|nil the note's new prose, for a write
 
 ---Turns an edited buffer into the actions that would make it true.
 ---
@@ -74,16 +73,10 @@ function M.compute(before, after)
 
     local actions, kept = {}, {}
     for _, parsed in ipairs(after) do
-        local row = parsed.id and rendered[parsed.id]
-        if not row then
-            actions[#actions + 1] = {
-                kind = "create",
-                lnum = parsed.lnum,
-                lossy = false,
-                prose = parsed.prose,
-                row = parsed,
-            }
-        else
+        local row = rendered[parsed.id]
+        -- A row naming an id the baseline never rendered is the caller's to
+        -- refuse; diffing it against nothing would invent an edit
+        if row then
             kept[parsed.id] = true
             for _, column in ipairs(COLUMNS) do
                 local was = row.entry.record[column]

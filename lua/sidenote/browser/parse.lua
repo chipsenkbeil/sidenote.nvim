@@ -7,12 +7,12 @@ local render = require("sidenote.browser.render")
 ---@field last integer last byte column, inclusive
 
 ---@class sidenote.browser.Parsed
----@field id string|nil annotation id, absent when the row is a create
+---@field id string annotation id the row stands for
 ---@field lnum integer buffer line the header sat on, 1-based
 ---@field kind string kind column exactly as written
 ---@field state string state column exactly as written
 ---@field location string location column exactly as written
----@field prose string[] the indented lines beneath the header, summary first
+---@field prose string[] the lines beneath the header, summary first
 ---@field fields table<string, sidenote.browser.Field> column ranges, for <Tab>
 
 ---@class sidenote.browser.ParseError
@@ -21,20 +21,15 @@ local render = require("sidenote.browser.render")
 
 ---Reads an edited browser buffer back into intents.
 ---
----Syntactic only: nothing here touches the filesystem, so a whole edit can be
----parsed and reported on without a store. Anything needing a file on disk is
----the applying layer's job.
+---Two kinds of line, told apart by one marker: a line opening with the
+---concealed `/<id> ` prefix is a header, and every other line is prose of the
+---header above it, verbatim. Syntactic only: nothing here touches the
+---filesystem, so a whole edit can be parsed and reported on without a store.
 ---@class sidenote.browser.parse
 local M = {}
 
 ---Columns that carry a value before the location, in order.
 local LEADING = { "kind", "state" }
-
----@param text string
----@return integer leading spaces the renderer would have added
-local function indent_of(text)
-    return math.min(#(text:match("^ *") or ""), render.PROSE_INDENT)
-end
 
 ---@param row sidenote.browser.Parsed
 ---@return string|nil err
@@ -49,21 +44,22 @@ local function check(row)
     return err
 end
 
----Read one column-0 line into an id and its three columns.
+---Read a header line into its id and three columns.
 ---
----A line carrying an id is an existing annotation; one without is a create.
----Columns are separated by a run of two or more spaces; the location comes
----last and runs to the end of the line, so even a path holding such a run
----cannot be misread.
+---Ids are word characters alone, so a prose line mentioning /etc/hosts can
+---never read as a header. Columns are separated by a run of two or more
+---spaces; the location comes last and runs to the end of the line.
 ---@param text string
----@return sidenote.browser.Parsed|nil
----@return string|nil err
+---@return sidenote.browser.Parsed|nil row nil when the line is no header
+---@return string|nil err set only when a header is malformed
 function M.header(text)
-    local id, rest = text:match("^/(%S+) (.*)$")
+    local id, rest = text:match("^/(%w+) (.*)$")
+    if not id then
+        return nil, nil
+    end
     -- The concealed prefix is not part of the columns, but its width still
     -- counts towards the byte offsets a caller will move the cursor to
-    local offset = id and (#text - #rest) or 0
-    rest = rest or text
+    local offset = #text - #rest
 
     local row = { id = id, prose = {}, fields = {} }
     local cursor = 1
@@ -110,23 +106,21 @@ function M.buffer(lines)
             -- Held rather than stored: a blank line is prose only when more
             -- prose follows it, so a spacer before the next row is dropped
             blanks = blanks + 1
-        elseif text:match("^%s") then
-            if not current then
-                fail(lnum, "indented prose with no annotation above it")
-            else
-                for _ = 1, blanks do
-                    current.prose[#current.prose + 1] = ""
-                end
-                current.prose[#current.prose + 1] = text:sub(indent_of(text) + 1)
-            end
-            blanks = 0
         else
-            blanks = 0
             local row, err = M.header(text)
-            if not row then
+            if err then
                 current = nil
                 fail(lnum, err)
-            elseif row.id and seen[row.id] then
+            elseif not row then
+                if not current then
+                    fail(lnum, "prose with no annotation above it")
+                else
+                    for _ = 1, blanks do
+                        current.prose[#current.prose + 1] = ""
+                    end
+                    current.prose[#current.prose + 1] = text
+                end
+            elseif seen[row.id] then
                 current = nil
                 fail(
                     lnum,
@@ -136,12 +130,11 @@ function M.buffer(lines)
                 )
             else
                 row.lnum = lnum
-                if row.id then
-                    seen[row.id] = lnum
-                end
+                seen[row.id] = lnum
                 rows[#rows + 1] = row
                 current = row
             end
+            blanks = 0
         end
     end
 

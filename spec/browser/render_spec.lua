@@ -101,16 +101,23 @@ describe("browser syntax", function()
         return src
     end
 
-    it("conceals the id prefix with a class that covers a whole ULID", function()
-        -- A hex class would conceal only the leading digits of a Crockford
-        -- base32 id, leaving the rest of it on screen
+    it("conceals the id prefix with the grammar's word class", function()
+        -- Ids are word characters, so prose opening with a path such as
+        -- /etc/hosts never conceals as a header; \w still spans a whole ULID
         local src = syntax_source()
-        assert.contains(src, [[syn match sidenoteId /^\/\S\+ / conceal]])
+        assert.contains(src, [[syn match sidenoteId /^\/\w\+ / conceal]])
         for line in src:gmatch("[^\n]+") do
             if line:match("^%s*syn ") then
                 assert.falsy(line:find([[\x]], 1, true), "hex class in: " .. line)
             end
         end
+    end)
+
+    it("styles prose as every line without the marker", function()
+        -- The old rule keyed on indentation, which margin prose no longer has
+        local src = syntax_source()
+        assert.contains(src, [[syn match sidenoteProse /^\(\/\w\+ \)\@!.*$/]])
+        assert.falsy(src:find([[/^\s.*$/]], 1, true))
     end)
 
     it("guards against being sourced twice", function()
@@ -127,13 +134,14 @@ describe("browser syntax", function()
 end)
 
 describe("browser.render prose", function()
-    it("indents every prose line beneath the header, the summary included", function()
+    it("renders every prose line at the margin, verbatim", function()
+        -- The header's concealed marker is what distinguishes it, so prose
+        -- needs no indentation and copies out exactly as stored
         local lines = render.rows({ row({ prose = { "one", "two", "three" } }) })
-        local indent = (" "):rep(render.PROSE_INDENT)
         assert.eq(#lines, 4)
-        assert.eq(lines[2], indent .. "one")
-        assert.eq(lines[3], indent .. "two")
-        assert.eq(lines[4], indent .. "three")
+        assert.eq(lines[2], "one")
+        assert.eq(lines[3], "two")
+        assert.eq(lines[4], "three")
     end)
 
     it("renders the summary untruncated", function()

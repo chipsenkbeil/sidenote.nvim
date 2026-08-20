@@ -106,6 +106,7 @@ Inside a browser buffer only:
 mapping            does
 `<CR>`             open this note's prose for writing
 `gf`               jump to the code the note is about
+`a`                create a note on a file, and open it
 `t` `T`            cycle state forward and back — or kind, on its column
 `fk` `fs` `fa`     filter by kind, state, or anchor status
 `ff`               filter by path substring
@@ -251,8 +252,8 @@ status glyph the moment one is not.
 
 Each note is a real fold, so `za`, `zR`, `zM` and your own fold mappings work.
 A closed row previews the summary beside the note's columns; expanding it
-reveals the prose itself, indented beneath the header with the summary as its
-first line, editable in place.
+reveals the prose itself, verbatim at the margin beneath the header with the
+summary as its first line, editable in place and copyable exactly as stored.
 
 On `:w`:
 
@@ -261,7 +262,6 @@ any prose line, including the summary  rewrites that note
 `kind` or `state`                      updates the record
 the position in the location           re-scopes, re-anchored
 the path in the location               moves it, re-anchored
-a new line with no id                  creates a file-wide note
 deleting a row                         deletes the note
 
 `dd` on a collapsed row deletes the whole note, prose and all. A vim operator
@@ -281,8 +281,10 @@ Nothing applies until you confirm, and anything lossy is listed apart:
       DELETE   1 annotation   (REMOVES PROSE FILE)
 <
 
-`-` widens to every annotation in the project, sorted by path then line. A new
-row there creates a note on whichever file its location names.
+`-` widens to every annotation in the project, sorted by path then line. `a`
+creates a file-wide note — on the listed file, or in a project listing on
+whichever file you name, suggesting the row under the cursor — and opens it
+for writing.
 
 FILTERING                                                 *sidenote-filtering*
 

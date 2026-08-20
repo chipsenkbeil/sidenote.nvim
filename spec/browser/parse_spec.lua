@@ -11,10 +11,11 @@ local function header(id, columns)
     return ("/%s %s"):format(id, columns)
 end
 
+---Prose is any unmarked line, verbatim at the margin.
 ---@param text string
 ---@return string
 local function prose(text)
-    return (" "):rep(render.PROSE_INDENT) .. text
+    return text
 end
 
 describe("browser.parse.header", function()
@@ -28,11 +29,18 @@ describe("browser.parse.header", function()
         assert.eq_deep(row.prose, {})
     end)
 
-    it("reads a line with no id as a create", function()
-        local row = assert(parse.header("todo  open      m.lua"))
-        assert.is_nil(row.id)
-        assert.eq(row.kind, "todo")
-        assert.eq(row.location, "m.lua")
+    it("treats an unmarked line as no header at all", function()
+        -- The concealed id marker is what makes a header; everything else in
+        -- the buffer is prose of the note above it
+        local row, err = parse.header("todo  open      m.lua")
+        assert.is_nil(row)
+        assert.is_nil(err)
+    end)
+
+    it("never mistakes a prose line mentioning a path for a header", function()
+        local row, err = parse.header("/etc/hosts needs a comment")
+        assert.is_nil(row)
+        assert.is_nil(err)
     end)
 
     it("keeps a path holding a double space intact", function()
@@ -52,8 +60,8 @@ describe("browser.parse.header", function()
         assert.eq(row.location, "my file.lua:4")
     end)
 
-    it("rejects a line with too few columns", function()
-        local row, err = parse.header("just some words")
+    it("rejects a marked header with too few columns", function()
+        local row, err = parse.header(header(ID, "note"))
         assert.is_nil(row)
         assert.not_nil(err)
     end)
@@ -93,7 +101,7 @@ describe("browser.parse.header", function()
 end)
 
 describe("browser.parse.buffer", function()
-    it("attaches an indented line as prose of the header above it", function()
+    it("attaches an unmarked line as prose of the header above it", function()
         local rows, errors = parse.buffer({
             header(ID, "note  open      m.lua:4"),
             prose("summary"),
@@ -130,14 +138,14 @@ describe("browser.parse.buffer", function()
         assert.eq_deep(rows[2].prose, { "other" })
     end)
 
-    it("strips no more than the indent the renderer added", function()
-        -- Prose that indents itself further keeps that shape
+    it("keeps a prose line's own indentation verbatim", function()
+        -- Nothing is added on render, so nothing is stripped here
         local rows = parse.buffer({
             header(ID, "note  open      m.lua:4"),
             prose("summary"),
-            prose("    deeper"),
+            prose("    a code block"),
         })
-        assert.eq(rows[1].prose[2], "    deeper")
+        assert.eq(rows[1].prose[2], "    a code block")
     end)
 
     it("records the line each row was read from", function()
@@ -150,7 +158,7 @@ describe("browser.parse.buffer", function()
         assert.eq(rows[2].lnum, 3)
     end)
 
-    it("errors on indented prose with no annotation above it", function()
+    it("errors on prose with no annotation above it", function()
         local _, errors = parse.buffer({ prose("orphaned body") })
         assert.eq(#errors, 1)
         assert.eq(errors[1].lnum, 1)

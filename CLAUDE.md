@@ -207,10 +207,14 @@ already happened once here. Check `jj st` after every absorb.
   that then silently rewrites the note. The summary (prose line one) stays
   trimmed at both ends; body lines keep their own indentation.
 - **A header is `id kind state location`, and the summary lives with its
-  prose**, indented below (2026-08-20 redesign). A closed fold previews the
-  header's columns plus the summary via a chunked `foldtext`, display-only.
-  Location being the last column is what made a path holding two consecutive
-  spaces legal in a listing again — nothing follows it to be confused with.
+  prose**, verbatim at the margin below (2026-08-20 redesign). The concealed
+  `/<id> ` marker is the grammar's only delimiter: ids are word characters, so
+  prose mentioning `/etc/hosts` cannot read as a header, and everything
+  unmarked is prose of the note above. Typed creates went with the old
+  indentation — creation is the browser's `a` mapping. A closed fold previews
+  the header's columns plus the summary via a chunked `foldtext`,
+  display-only. Location being the last column is what made a path holding
+  two consecutive spaces legal in a listing again.
 - **No required `setup()`.** Config is `vim.g.sidenote`, validated in
   `config.lua`, which returns defaults *alongside* any error so a bad config
   degrades rather than disabling the plugin.

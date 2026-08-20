@@ -32,17 +32,15 @@ M.COLUMNS = {
 ---Spaces between one column and the next.
 ---
 ---Two, so that a run of two spaces is unambiguously a boundary while a single
----space inside a summary or a path is not.
+---space inside a path is not.
 M.GAP = 2
-
----Spaces prefixing every prose line below the summary.
-M.PROSE_INDENT = 4
 
 ---The canonical form of a note's prose: what rendering can reproduce exactly.
 ---
----Two rules. Trailing blank lines go, and the summary line loses the
----whitespace at either end of it — it is what a closed fold previews, and the
----preview trims, so keeping the line trimmed is what keeps them one thing.
+---Three rules. Trailing blank lines go; a whitespace-only line inside a block
+---is canonically empty, since a trim-on-save hook would empty it anyway; and
+---the summary line loses the whitespace at either end of it — it is what a
+---closed fold previews, and the preview trims. Every other line is verbatim.
 ---
 ---Exported because the browser keeps the result as its diff baseline. A
 ---baseline normalized differently from what was rendered would report an edit
@@ -52,7 +50,13 @@ M.PROSE_INDENT = 4
 function M.normalize(prose)
     local out = {}
     for i, line in ipairs(prose) do
-        out[i] = i == 1 and line:match("^%s*(.-)%s*$") or line
+        if i == 1 then
+            out[i] = line:match("^%s*(.-)%s*$")
+        elseif not line:match("%S") then
+            out[i] = ""
+        else
+            out[i] = line
+        end
     end
     while #out > 0 and not out[#out]:match("%S") do
         out[#out] = nil
@@ -116,15 +120,14 @@ function M.rows(rows)
     end
 
     local width = widths(all)
-    local indent = (" "):rep(M.PROSE_INDENT)
     local lines, headers = {}, {}
     for i, row in ipairs(rows) do
         lines[#lines + 1] = header(row.entry.id, all[i], width)
         headers[i] = #lines
         for n = 1, #prose[i] do
-            -- A blank line stays empty rather than indented, since a
-            -- trim-trailing-whitespace hook would strip the indent anyway
-            lines[#lines + 1] = prose[i][n]:match("%S") and (indent .. prose[i][n]) or ""
+            -- Verbatim, at the margin: prose needs no marker of its own,
+            -- because a header line is the only marked thing in the buffer
+            lines[#lines + 1] = prose[i][n]
         end
     end
     return lines, headers

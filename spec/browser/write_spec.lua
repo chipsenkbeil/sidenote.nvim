@@ -1,6 +1,5 @@
 local browser = require("sidenote.browser")
 local capture = require("sidenote.capture")
-local render = require("sidenote.browser.render")
 local store = require("sidenote.store")
 
 ---@return sidenote.Config
@@ -123,7 +122,7 @@ describe("browser.write", function()
         local root = assert(browser.state(bufnr)).rows[1].entry.root
 
         local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-        lines[#lines + 1] = (" "):rep(render.PROSE_INDENT) .. "a body line"
+        lines[#lines + 1] = "a body line"
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
 
         assert.eq(browser.write(bufnr, { confirm = always_yes }), 1)

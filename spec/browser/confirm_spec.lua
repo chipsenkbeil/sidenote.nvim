@@ -51,12 +51,11 @@ local RESCOPE = {
     to = "lua/lobby.lua",
 }
 local DELETE = { kind = "delete", id = ID, lossy = true }
-local CREATE = { kind = "create", lossy = false, prose = { "brand new" }, row = {} }
 
 describe("browser.confirm.summary", function()
     it("names every action kind it was given", function()
-        local body = text({ WRITE, CHANGE, MOVE, RESCOPE, DELETE, CREATE })
-        for _, word in ipairs({ "WRITE", "CHANGE", "MOVE", "RESCOPE", "DELETE", "CREATE" }) do
+        local body = text({ WRITE, CHANGE, MOVE, RESCOPE, DELETE })
+        for _, word in ipairs({ "WRITE", "CHANGE", "MOVE", "RESCOPE", "DELETE" }) do
             assert.contains(body, word)
         end
     end)
@@ -88,7 +87,7 @@ describe("browser.confirm lossy grouping", function()
     end)
 
     it("draws no rule when nothing loses information", function()
-        assert.is_nil(rule_at({ WRITE, CHANGE, MOVE, CREATE }))
+        assert.is_nil(rule_at({ WRITE, CHANGE, MOVE }))
     end)
 
     it("keeps a non-lossy rescope above the rule", function()

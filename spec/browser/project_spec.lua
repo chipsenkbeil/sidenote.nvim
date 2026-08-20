@@ -200,29 +200,27 @@ describe("browser project edits", function()
         assert.falsy(vim.uv.fs_stat(store.meta_path(root, doomed)))
     end)
 
-    it("creates an annotation on whichever file the row names", function()
-        -- A project listing spans many files, so the browser's own path cannot
-        -- be what a create means
+    it("creates an annotation on whichever file `a` is told, and opens it", function()
+        -- Typed creates left the grammar with the indentation; the key asks
+        -- for the file instead, suggesting the row under the cursor
         local t = tree()
         local bufnr = assert(browser.open_project(t.root, { config = opts() }))
+        vim.api.nvim_set_current_buf(bufnr)
 
-        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
-            "note  open      beta.lua",
-            "    a brand new note",
-        })
-        assert.eq(
-            browser.write(bufnr, {
-                confirm = function()
-                    return true
-                end,
-            }),
-            1
-        )
+        local original = vim.fn.input
+        vim.fn.input = function()
+            return "beta.lua"
+        end
+        vim.api.nvim_feedkeys("a", "x", false)
+        vim.fn.input = original
+
+        local editor = require("sidenote.editor")
+        local opened = assert.not_nil(editor.winid(), "the new note opens for writing")
+        require("sidenote.window").close(opened)
 
         local state = assert(browser.state(bufnr))
         assert.eq(#state.rows, 1)
         assert.eq(state.rows[1].entry.record.path, "beta.lua")
         assert.eq(state.rows[1].entry.record.scope, "file")
-        assert.eq_deep(state.rows[1].prose, { "a brand new note" })
     end)
 end)

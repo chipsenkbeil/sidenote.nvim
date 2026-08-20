@@ -134,38 +134,6 @@ describe("browser.apply.validate", function()
         assert.eq(apply.validate({ action }, state)[1].lnum, 7)
     end)
 
-    it("rejects creating a line annotation, since only a source buffer has a selection", function()
-        local p = project()
-        local state = state_of(p.source)
-        local row =
-            { kind = "note", state = "open", location = "m.lua:3", prose = { "x" }, lnum = 1 }
-        local action = { kind = "create", lnum = 1, lossy = false, prose = row.prose, row = row }
-
-        local errors = apply.validate({ action }, state)
-        assert.eq(#errors, 1)
-        assert.contains(errors[1].message, "source buffer")
-    end)
-
-    it("allows creating an annotation on any file the location names", function()
-        -- A project listing spans many files, so a create means the file the
-        -- row points at rather than whatever the browser was opened on
-        local p = project()
-        local state = state_of(p.source)
-        local row =
-            { kind = "note", state = "open", location = "other.lua", prose = { "x" }, lnum = 1 }
-        local action = { kind = "create", lnum = 1, lossy = false, prose = row.prose, row = row }
-        assert.eq_deep(apply.validate({ action }, state), {})
-    end)
-
-    it("rejects creating an annotation on a file that does not exist", function()
-        local p = project()
-        local state = state_of(p.source)
-        local row =
-            { kind = "note", state = "open", location = "ghost.lua", prose = { "x" }, lnum = 1 }
-        local action = { kind = "create", lnum = 1, lossy = false, prose = row.prose, row = row }
-        assert.eq(#apply.validate({ action }, state), 1)
-    end)
-
     it("refuses to write prose that is open and modified in another buffer", function()
         -- Rather than racing that buffer and losing whichever write lands last
         local p = project()
@@ -317,26 +285,6 @@ describe("browser.apply.run", function()
         local rec = stored(state, id)
         assert.eq(rec.state, "wontfix", "an earlier change in the same pass is not undone")
         assert.eq(rec.captured, before.captured)
-    end)
-
-    it("creates a file-wide annotation carrying the typed prose", function()
-        local p = project()
-        local state = state_of(p.source)
-        local row = {
-            kind = "todo",
-            state = "open",
-            location = "m.lua",
-            prose = { "brand new", "with a body" },
-            lnum = 1,
-        }
-        local action = { kind = "create", lossy = false, prose = row.prose, row = row }
-        assert.eq(apply.run({ action }, state), 1)
-
-        local fresh = state_of(p.source)
-        assert.eq(#fresh.rows, 1)
-        assert.eq(fresh.rows[1].entry.record.scope, "file")
-        assert.eq(fresh.rows[1].entry.record.kind, "todo")
-        assert.eq_deep(fresh.rows[1].prose, { "brand new", "with a body" })
     end)
 
     it("reports a failing action without abandoning the rest", function()

@@ -1,5 +1,6 @@
 local apply = require("sidenote.browser.apply")
 local buffer = require("sidenote.buffer")
+local capture = require("sidenote.capture")
 local config = require("sidenote.config")
 local confirm = require("sidenote.browser.confirm")
 local diff = require("sidenote.browser.diff")
@@ -42,8 +43,9 @@ M.SCHEME = "sidenote://"
 ---Fold expression making each annotation one fold, opened by its header.
 ---
 ---Structure is read back out of the text, so nothing has to be kept in step
----with the buffer as it is edited.
-M.FOLDEXPR = [[getline(v:lnum) =~ '^/' ? '>1' : '1']]
+---with the buffer as it is edited. The marker is matched fully, so a prose
+---line mentioning /etc/hosts does not start a fold of its own.
+M.FOLDEXPR = [[getline(v:lnum) =~ '^/\w\+ ' ? '>1' : '1']]
 
 ---@type table<integer, sidenote.browser.State>
 local states = {}
@@ -425,6 +427,49 @@ local function ask_filter(bufnr, key)
     end)
 end
 
+---Create a file-wide note and open it for writing.
+---
+---A file listing already names its file; a project listing asks, suggesting
+---the file of the row under the cursor. Typed creates left the grammar when
+---the indentation did: a plain line is prose now, never an instruction.
+---@param bufnr integer
+local function create_note(bufnr)
+    local state = states[bufnr]
+    if not state then
+        return
+    end
+    if vim.bo[bufnr].modified then
+        vim.notify("sidenote: apply or discard your edits first (:w)", vim.log.levels.WARN)
+        return
+    end
+
+    local path = state.path
+    if state.scope == "project" then
+        local row = M.row_at(bufnr, vim.fn.line("."))
+        local answer = vim.fn.input("note on file: ", row and row.entry.record.path or "")
+        if answer == "" then
+            return
+        end
+        local root = project.root(state.path)
+        path = answer:sub(1, 1) == "/" and answer or (root and (root .. "/" .. answer) or answer)
+    end
+    if vim.fn.filereadable(path) ~= 1 then
+        vim.notify(("sidenote: %s does not exist"):format(path), vim.log.levels.WARN)
+        return
+    end
+
+    local target = vim.fn.bufadd(path)
+    vim.fn.bufload(target)
+    local result, err = capture.run(target, { scope = "file", config = state.config })
+    if not result then
+        vim.notify("sidenote: " .. tostring(err), vim.log.levels.ERROR)
+        return
+    end
+    paint(bufnr, state)
+    local where = vim.tbl_extend("force", state.config.editor, { focus = true })
+    editor.open({ root = result.root, id = result.id }, where, state.config.filetype)
+end
+
 ---Mappings that live only inside a browser buffer, kept as data first.
 ---
 ---One list serves twice — the keymaps are built from it and `?` renders it —
@@ -453,6 +498,13 @@ local function bind(bufnr)
             desc = "Jump to the code this note is about",
             fn = function()
                 visit(bufnr)
+            end,
+        },
+        {
+            lhs = "a",
+            desc = "Create a note on a file, and open it",
+            fn = function()
+                create_note(bufnr)
             end,
         },
         {
@@ -809,6 +861,23 @@ function M.write(bufnr, opts)
     local rows, errors = parse.buffer(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
     if #errors > 0 then
         return 0, reported(errors)
+    end
+
+    -- A header pasted in from another listing names an id this baseline never
+    -- rendered; nothing sound can be diffed for it
+    local known = {}
+    for _, row in ipairs(state.rows) do
+        known[row.entry.id] = true
+    end
+    local foreign = {}
+    for _, row in ipairs(rows) do
+        if not known[row.id] then
+            foreign[#foreign + 1] =
+                { lnum = row.lnum, message = ("no annotation %s in this listing"):format(row.id) }
+        end
+    end
+    if #foreign > 0 then
+        return 0, reported(foreign)
     end
 
     local actions = diff.compute(state, rows)
