@@ -1,364 +1,399 @@
-*sidenote.txt*   Notes on your code, stored outside it
-
-Author:  Chip Senkbeil
-License: MIT
+*sidenote.txt*                           Notes on your code, stored outside it
 
 ==============================================================================
-CONTENTS                                                    *sidenote-contents*
+Table of Contents                                          *sidenote-contents*
 
-  1. Introduction ................................. |sidenote-introduction|
-  2. Requirements ................................. |sidenote-requirements|
-  3. Getting started .............................. |sidenote-getting-started|
-  4. Configuration ................................ |sidenote-configuration|
-  5. Storage ...................................... |sidenote-storage|
-  6. Commands ..................................... |sidenote-commands|
-  7. Mappings ..................................... |sidenote-mappings|
-  8. The browser .................................. |sidenote-browser|
-  9. Lua API ...................................... |sidenote-api|
- 10. For agents ................................... |sidenote-agents|
- 11. Anchoring .................................... |sidenote-anchoring|
- 12. Health ...................................... |sidenote-health|
+  1. Why notes live outside the file                            |sidenote-why|
+  2. Requirements                                      |sidenote-requirements|
+  3. Install                                                |sidenote-install|
+  4. Getting started                                |sidenote-getting-started|
+  5. Mappings                                              |sidenote-mappings|
+  6. Commands                                              |sidenote-commands|
+  7. Configuration                                    |sidenote-configuration|
+  8. The browser                                            |sidenote-browser|
+  9. Lua API                                                    |sidenote-api|
+  10. For agents                                             |sidenote-agents|
+  11. Anchoring                                           |sidenote-anchoring|
+  12. Health                                                 |sidenote-health|
+  13. License                                               |sidenote-license|
 
-==============================================================================
-1. INTRODUCTION                                         *sidenote-introduction*
-
-sidenote.nvim annotates source code with notes stored *outside* the annotated
-file. A note attaches to a whole file, a line, or a range, and survives the
-code it points at being edited, moved, reformatted, or deleted.
+Annotate source code with notes stored outside the annotated file. A note
+attaches to a whole file, a line, or a range, and survives the code it points
+at being edited, moved, reformatted, or deleted.
 
 Two uses, both intended: durable personal margin notes, and a work queue an AI
 agent can read and act on.
 
-Because a comment changes the code and a note does not, you can annotate a
-vendored dependency, a file you have no business editing, or a function you are
-still deciding about, and nothing you write ends up in a diff.
+==============================================================================
+1. Why notes live outside the file                              *sidenote-why*
 
-The cost of that is anchoring: a note has to find its code again after the code
-moves. See |sidenote-anchoring|.
+A comment changes the code. A note does not. You can annotate a vendored
+dependency, a file you have no business editing, or a function you are still
+deciding about, and nothing you write lands in a diff.
+
+The cost is anchoring: a note has to find its code again after the code moves.
+See |sidenote-anchoring|.
 
 ==============================================================================
-2. REQUIREMENTS                                         *sidenote-requirements*
+2. Requirements                                        *sidenote-requirements*
 
-Neovim 0.11 or newer — that is where |vim.fs.relpath()| arrived, which the store
-uses to keep every record's path project-relative. No dependencies.
+Neovim 0.11 or newer, for `vim.fs.relpath`. No dependencies.
 
-Optional, and independently useful: >
+Optional, each independently useful:
 
-    nvim-orgmode    org editing of notes, because the prose file ends in .org
-    treesitter      symbol capture, and a structural resolution tier
-    git or jj       provenance stamping, never used for resolution
-<
-==============================================================================
-3. GETTING STARTED                                   *sidenote-getting-started*
-
-There is no setup() to call. Every configuration field has a default.
-
-Map the |<Plug>| mappings you want: >vim
-
-    nmap <Leader>na <Plug>(SidenoteAdd)
-    xmap <Leader>na <Plug>(SidenoteAdd)
-    nmap <Leader>nv <Plug>(SidenoteView)
-    nmap <Leader>no <Plug>(SidenoteOpen)
-    nmap <Leader>nb <Plug>(SidenoteBrowse)
-    nmap <Leader>nB <Plug>(SidenoteBrowseProject)
-<
-Annotate a line, write your note, save. A sign appears in the gutter. Edit the
-code around it, reformat it, move it down the file — the sign follows.
+optional      buys
+nvim-orgmode  org editing, because the prose file ends in `.org`
+treesitter    symbol capture, and a structural resolution tier
+git or jj     provenance stamping, never used for resolution
 
 ==============================================================================
-4. CONFIGURATION                                       *sidenote-configuration*
+3. Install                                                  *sidenote-install*
 
-                                                                *vim.g.sidenote*
-Configuration is `vim.g.sidenote`: a table, or a function returning one. A bad
-value is reported through |vim.notify()| and |:checkhealth|, and the defaults
-are used, so a typo degrades the plugin rather than disabling it.
+With lazy.nvim <https://github.com/folke/lazy.nvim>:
 
-Defaults: >lua
-
-    vim.g.sidenote = {
-        filetype = "txt",
-        strategy = { "project", "global" },
-
-        global_dir = vim.fn.stdpath("data") .. "/sidenote",
-        project_dir = ".annotations",
-
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 60 },
-    }
+>lua
+    { "chipsenkbeil/sidenote.nvim" }
 <
-                                                    *sidenote-config-filetype*
-filetype ~
-    Extension and filetype of prose files. Set it to "org" or "md" to write
-    notes in that format; the extension is the entire format decision.
 
-                                                   *sidenote-config-indicator*
-indicator.style ~
-    How a buffer shows that an annotation exists.
-    One of "sign", "virt_text", "highlight", "underline", "none".
-
-                                                     *sidenote-config-preview*
-preview.style ~
-    Where a note appears when glanced at with |<Plug>(SidenoteView)|.
-    One of "float", "virt_lines", "split", "none".
-
-    "virt_lines" hangs the prose under the annotated line as virtual text, so
-    you never leave the code. It renders as plain text.
-
-preview.max_lines ~
-    Most prose lines rendered in a preview.
-
-                                                      *sidenote-config-editor*
-editor.style ~
-    Where a note opens for writing.
-    One of "split", "float", "toggle", "current", "tab".
-
-editor.position ~
-    "left", "right", "top" or "bottom".
-
-editor.size ~
-    Columns for a vertical split, rows for a horizontal one.
-
-These are three knobs rather than one because they are three questions: how you
-know a note exists, how you glance at it, and where you write it. A cheap
-transient float for previewing and a persistent right split for editing is a
-normal combination that one setting cannot express.
+There is no `setup()` to call. Configuration is `vim.g.sidenote`, and every
+field has a default.
 
 ==============================================================================
-5. STORAGE                                                   *sidenote-storage*
+4. Getting started                                  *sidenote-getting-started*
 
-                                                    *sidenote-config-strategy*
-`strategy` is a string, a function, or a list of them tried in order: >
+Map what you want:
 
-    project     <root>/.annotations/      fails when no project root is found
-    global      <global_dir>/<key>/       never fails
-    function    whatever fun(path) returns  fails when it returns nil
+>lua
+    vim.keymap.set({ "n", "x" }, "<Leader>na", "<Plug>(SidenoteAdd)")
+    vim.keymap.set("n", "<Leader>nv", "<Plug>(SidenoteView)")
+    vim.keymap.set("n", "<Leader>no", "<Plug>(SidenoteOpen)")
+    vim.keymap.set("n", "<Leader>nb", "<Plug>(SidenoteBrowse)")
+    vim.keymap.set("n", "<Leader>nB", "<Plug>(SidenoteBrowseProject)")
 <
-Each entry is strict on its own terms. "project" errors rather than quietly
-falling back, because silent fallback is exactly wrong when you meant to commit
-your notes; write the fallback you want in the list instead.
 
-The list is also the read order. Reads union every store in it, earlier entries
-winning on conflict; writes go to the first that resolves. So
-`{ "project", "global" }` means "write to the project store when there is one,
-and always show me both".
-
-                                                       *sidenote-project-root*
-A project root is found by looking for, in order: `.annotations/` itself, then
-`.git` / `.jj` / `.hg`, then `Cargo.toml` / `package.json` / `go.mod` /
-`pyproject.toml` / `*.rockspec`.
-
-The first of those is what makes `mkdir .annotations` enough to opt a plain
-directory in, with no repo and no configuration.
-
-                                                        *sidenote-sidecar-pair*
-Each annotation is two files: >
-
-    <id>.org             your prose, never machine-written except by your own
-                         confirmed edit in the browser
-    <id>.metadata.json   our record, rewritten freely
-<
-Every record carries its own project key and a project-relative path, so moving
-a store from global to in-repo is a `mv` rather than data loss.
-
-In-repo notes are committed by default. The plugin writes files and does nothing
-else; if you want them ignored, that is your `.gitignore` to edit.
+Annotate a line, write the note, save. A sign appears in the gutter. Edit the
+code around it, reformat it, move it down the file: the sign follows.
 
 ==============================================================================
-6. COMMANDS                                                 *sidenote-commands*
+5. Mappings                                                *sidenote-mappings*
 
-                                                                   *:Sidenote*
-:Sidenote {subcommand} [args]
+No default mappings are installed.
 
-    add        Annotate the current line, or the range given
-    browse     Editable listing of this file's annotations
-    project    Editable listing of every annotation in the project
-    refresh    Re-resolve and repaint the current buffer
-    view       Preview the annotation under the cursor
-    open       Open the annotation under the cursor for writing
-    next       Jump to the next annotation and preview it
-    prev       Jump to the previous annotation and preview it
+mapping                          does
+`<Plug>(SidenoteAdd)`            Annotate the current line or selection
+`<Plug>(SidenoteBrowse)`         Open the editable listing of this file's
+                                 annotations
+`<Plug>(SidenoteBrowseProject)`  Open the editable listing of every annotation
+                                 in the project
+`<Plug>(SidenoteRefresh)`        Re-resolve and repaint annotations
+`<Plug>(SidenoteView)`           Preview the annotation under the cursor
+`<Plug>(SidenoteOpen)`           Open the annotation under the cursor for
+                                 writing
+`<Plug>(SidenoteViewNext)`       Jump to the next annotation and preview it
+`<Plug>(SidenoteViewPrev)`       Jump to the previous annotation and preview
+                                 it
 
-`browse` and `project` accept filters, which combine: >vim
+Inside a browser buffer only:
 
+mapping            does
+`<CR>`             open this note's prose for writing
+`<Tab>` `<S-Tab>`  move between columns
+`-`                widen to every annotation in the project
+
+Fold verbs need no mapping. The folds are real.
+
+==============================================================================
+6. Commands                                                *sidenote-commands*
+
+>vim
+    :Sidenote add | browse | project | refresh | view | open | next | prev
+<
+
+`browse` and `project` take filters, which combine:
+
+>vim
     :Sidenote browse  --kind=todo
     :Sidenote project --status=orphaned
     :Sidenote project --kind=todo --state=open
 <
-`project` also accepts a path; without one it uses the project containing the
-current file.
+
+`project` also takes a path, defaulting to the project holding the current
+file.
 
 ==============================================================================
-7. MAPPINGS                                                 *sidenote-mappings*
+7. Configuration                                      *sidenote-configuration*
 
-No default mappings are installed. Map these yourself.
+>lua
+    vim.g.sidenote = {
+        -- Extension and filetype of prose files
+        filetype = "txt",
 
-                                                        *<Plug>(SidenoteAdd)*
-Annotate the current line, or the visual selection.
+        -- Stores to use, tried in order; also the read order
+        strategy = { "project", "global" },
+        global_dir = vim.fn.stdpath("data") .. "/sidenote",
+        project_dir = ".annotations",
 
-                                                     *<Plug>(SidenoteBrowse)*
-Open the editable listing of this file's annotations.
+        -- How a buffer shows that an annotation exists:
+        -- sign | virt_text | highlight | underline | none
+        indicator = { style = "sign" },
 
-                                              *<Plug>(SidenoteBrowseProject)*
-Open the editable listing of every annotation in the project.
+        -- Where a note appears when glanced at:
+        -- float | virt_lines | split | none
+        preview = { style = "float", max_lines = 20 },
 
-                                                       *<Plug>(SidenoteView)*
-Preview the annotation under the cursor.
+        -- Where a note opens for writing:
+        -- split | float | toggle | current | tab
+        editor = { style = "split", position = "right", size = 60 },
+    }
+<
 
-                                                       *<Plug>(SidenoteOpen)*
-Open the annotation under the cursor for writing.
+Three display knobs, because they answer three questions: how you know a note
+exists, how you glance at it, and where you write it. A transient float for
+previewing and a persistent right split for editing is a normal combination
+that one setting cannot express.
 
-                                                   *<Plug>(SidenoteViewNext)*
-                                                   *<Plug>(SidenoteViewPrev)*
-Jump to the adjacent annotation and preview it in one motion.
+WHERE NOTES ARE STORED                                      *sidenote-storage*
 
-                                                    *<Plug>(SidenoteRefresh)*
-Re-resolve and repaint the current buffer's annotations.
+`strategy` is a string, a function, or a list tried in order:
+
+strategy    resolves to                   fails when
+`project`   `<root>/.annotations/`        no project root is found
+`global`    `<global_dir>/<key>/`         never
+a function  whatever `fun(path)` returns  it returns `nil`
+
+Each entry is strict on its own terms. `project` errors rather than quietly
+falling back, because silent fallback is wrong when you meant to commit your
+notes. Write the fallback you want in the list.
+
+The list is also the read order. Reads union every store in it, earlier
+entries winning; writes go to the first that resolves.
+
+A project root is `.annotations/` itself, then `.git` / `.jj` / `.hg`, then
+`Cargo.toml` / `package.json` / `go.mod` / `pyproject.toml` / `*.rockspec`.
+The first is what makes `mkdir .annotations` enough, with no repo and no
+config.
+
+In-repo notes are committed by default. The plugin writes files and nothing
+else.
+
+WHAT A NOTE IS ON DISK                                      *sidenote-sidecar*
+
+Two files:
+
+>
+    01J9F3K2X7Q4V8M2ZC5T0BQWE.org             your prose
+    01J9F3K2X7Q4V8M2ZC5T0BQWE.metadata.json   our record
+<
+
+The plugin never opens the prose file for writing except when you edit it in
+the browser and confirm. The extension is the entire format decision; metadata
+is always JSON.
+
+Every record carries its own project key and a project-relative path, so
+moving a store from global to in-repo is a `mv`.
 
 ==============================================================================
-8. THE BROWSER                                               *sidenote-browser*
+8. The browser                                              *sidenote-browser*
 
-An editable listing in the spirit of oil.nvim: >
+An editable listing, in the spirit of oil.nvim:
 
+>
     ▍ note  open      lua/lobby.lua:42-57    race in lobby join
     ▍ todo  open      lua/lobby.lua:88       refactor onto the new API
     ! note  wontfix   lua/lobby.lua          the old retry loop
 <
-Every column is yours to edit. The gutter carries anchor status, which is the
-one thing the machine owns.
 
-Each note is a real fold, so `za`, `zR`, `zM` and your own fold mappings all
-work. Expanding one reveals its prose, indented, which you can edit in place.
+Every column is yours to edit. The gutter carries anchor status, the one thing
+the machine owns.
 
-                                                     *sidenote-browser-writing*
-On `:w`: >
+Each note is a real fold, so `za`, `zR`, `zM` and your own fold mappings work.
+Expanding one reveals its prose, indented, editable in place.
 
-    edit any prose line, including the summary   rewrites that note
-    change kind or state                         updates the record
-    change the position in the location          re-scopes, re-anchored
-    change the path in the location              moves it, re-anchored
-    type a new line with no id                   creates a file-wide note
-    delete a row                                 deletes the note
-<
-`dd` on a collapsed row deletes the whole note, prose and all — a vim operator
+On `:w`:
+
+edit                                   result
+any prose line, including the summary  rewrites that note
+`kind` or `state`                      updates the record
+the position in the location           re-scopes, re-anchored
+the path in the location               moves it, re-anchored
+a new line with no id                  creates a file-wide note
+deleting a row                         deletes the note
+
+`dd` on a collapsed row deletes the whole note, prose and all. A vim operator
 applies to an entire closed fold, so that comes free.
 
-Nothing is applied until you confirm, and anything that loses information is
-listed separately.
+Nothing applies until you confirm, and anything lossy is listed apart:
 
-                                                    *sidenote-browser-mappings*
-Inside a browser buffer only: >
+>
+    sidenote: apply 5 changes?
 
-    <CR>       open this note's prose for writing
-    <Tab>      jump to the next column
-    <S-Tab>    jump to the previous column
-    -          widen to every annotation in the project
+      WRITE    2 notes' prose
+      CHANGE   1 annotation   kind   note -> todo
+      MOVE     lua/lobby.lua:88 -> lua/net/lobby.lua:31  (re-anchored)
+
+      ── these lose information ──
+      RESCOPE  lua/lobby.lua:42-57 -> lua/lobby.lua      (DROPS ANCHOR)
+      DELETE   1 annotation                              (REMOVES PROSE)
 <
-Fold verbs need no mapping: the folds are real.
 
-A filtered-out row is absent, not hidden, so saving a filtered listing can never
+`-` widens to every annotation in the project, sorted by path then line. A new
+row there creates a note on whichever file its location names.
+
+FILTERING                                                 *sidenote-filtering*
+
+Either listing narrows by `kind`, `state`, or anchor `status`. Filters
+combine, and re-filtering narrows the listing you have rather than opening
+another. `-` carries the filter with it.
+
+A filtered-out row is absent, not hidden. Saving a filtered listing cannot
 touch an annotation it did not show you.
 
-==============================================================================
-9. LUA API                                                       *sidenote-api*
-
-                                                            *sidenote.add()*
-require("sidenote").add({opts})
-    Annotate the current buffer. `opts.scope` is "file", "lines" or "range";
-    `opts.range` is {line_start, col_start, line_end, col_end}.
-
-                                                        *sidenote.entries()*
-require("sidenote").entries([{bufnr}])
-    Every annotation targeting a buffer, resolved against its current text.
-
-                                                      *sidenote.at_cursor()*
-require("sidenote").at_cursor()
-    The annotation under the cursor, or nil.
-
-                                                         *sidenote.browse()*
-require("sidenote").browse({opts})
-    Open this file's listing. `opts.filter` narrows by `kind`, `state` or
-    `status`.
-
-                                                 *sidenote.browse_project()*
-require("sidenote").browse_project({opts})
-    Open the project listing. `opts.path` names any file inside it.
-
-                                                        *sidenote.refresh()*
-require("sidenote").refresh([{bufnr}])
-    Re-resolve and repaint, returning how many marks were placed.
-
-                                                           *sidenote.view()*
-                                                           *sidenote.open()*
-                                                           *sidenote.next()*
-                                                           *sidenote.prev()*
-The verbs behind the matching mappings. Each returns a boolean saying whether
-there was anything to act on.
+Cleanup is `:Sidenote project --status=orphaned`, then `VGd` and `:w`.
 
 ==============================================================================
-10. FOR AGENTS                                                *sidenote-agents*
+9. Lua API                                                      *sidenote-api*
 
-The store is plain files, so `rg` over `*.metadata.json` and the prose files is
-a supported interface. There is also a headless resolver: >
+`sidenote.add({opts})`
 
-    nvim --headless -l cli/sidenote.lua export /path/to/project
-    nvim --headless -l cli/sidenote.lua list /path/to/project
-    nvim --headless -l cli/sidenote.lua list /path/to/project --status orphaned
+Annotate the current buffer.
+
+`sidenote.refresh({bufnr})`
+
+Re-resolve and repaint a buffer's annotations.
+
+`sidenote.entries({bufnr})`
+
+Every annotation targeting a buffer, resolved against its current text.
+
+`sidenote.at_cursor()`
+
+Annotation under the cursor, preferring the one whose range contains it.
+
+`sidenote.browse({opts})`
+
+Open the editable listing of this file's annotations.
+
+`sidenote.browse_project({opts})`
+
+Open the editable listing of every annotation in the project.
+
+`sidenote.view()`
+
+Glance at the annotation under the cursor without leaving the code.
+
+`sidenote.open()`
+
+Open the annotation under the cursor for writing.
+
+`sidenote.next()`
+
+Jump to the next annotation and preview it.
+
+`sidenote.prev()`
+
+Jump to the previous annotation and preview it.
+
+==============================================================================
+10. For agents                                               *sidenote-agents*
+
+The store is plain files, so `rg` over `*.metadata.json` and the prose files
+is a supported interface. There is also a headless resolver:
+
+>bash
+    nvim --headless -l cli/sidenote.lua export /path/to/proj
+    nvim --headless -l cli/sidenote.lua list /path/to/proj
+    nvim --headless -l cli/sidenote.lua list /path/to/proj --status orphaned
 <
-`export` prints JSON on stdout. `list` prints one line per annotation: location,
-status, kind, state, summary, tab separated.
 
-                                                     *sidenote-export-gate*
+`export` prints JSON on stdout. `list` prints one tab-separated line per
+annotation: location, status, kind, state, summary.
+
+THE EXPORT GATE                                         *sidenote-export-gate*
+
 An annotation whose code no longer exists is never given a line number.
 
-"attached" and "drifted" export with a resolved position and a confidence to
-weigh it by. "ambiguous", "orphaned" and "filegone" export with
-`code_no_longer_exists: true`, no `line_start`, and their original `anchor_text`
-— so an agent can see what the note was written against and search for it,
-rather than be pointed at whatever happens to sit at that line now.
+`attached` and `drifted` export with a position and a confidence. `ambiguous`,
+`orphaned` and `filegone` export with `code_no_longer_exists: true`, no
+`line_start`, and their original `anchor_text`, so an agent can search for
+what the note was written against instead of being pointed at whatever now
+sits on that line.
 
-This is not caution for its own sake. A naive single-line fuzzy matcher measured
-8% precision against ground truth on real repository history: 51 firings for 4
-correct placements. A guess presented as a location sends an agent to edit code
-that was never the subject of the note.
+A naive single-line fuzzy matcher measured 8% precision against ground truth:
+51 firings for 4 correct placements. A guess presented as a location sends an
+agent to edit code that was never the subject.
+
+>json
+    {
+      "id": "01J9F3K2X7Q4V8M2ZC5T0BQWE",
+      "kind": "todo",
+      "state": "open",
+      "path": "lua/lobby.lua",
+      "status": "attached",
+      "confidence": 1,
+      "code_no_longer_exists": false,
+      "line_start": 42,
+      "line_end": 57,
+      "anchor_text": "function M.join_lobby(id)",
+      "prose": "race in lobby join"
+    }
+<
 
 `code_no_longer_exists` is always present, so branching on it needs no nil
 check. `line_start` is the field that disappears.
 
-Agents read; humans write. Nothing in this interface creates or resolves an
-annotation.
+Agents read. Humans write. Nothing here creates or resolves an annotation.
 
 ==============================================================================
-11. ANCHORING                                              *sidenote-anchoring*
+11. Anchoring                                             *sidenote-anchoring*
 
-A note records the bytes it was attached to, the lines above and below it, and
-several hashes. Finding it again runs a ladder, first unique win taking it: >
+A note records the bytes it was attached to, the lines around it, and several
+hashes. Finding it again runs a ladder, first unique win taking it:
 
-    L0  the whole file is unchanged           placed at the stored lines
-    L1  the bytes at those lines still match  attached
-    L2  the text appears exactly once         attached
-    L3  several matches, context decides      attached, or ambiguous
-    L4  matches once ignoring whitespace      attached, reformatted
-    L6  scored fuzzy match >= 0.80            drifted, with a confidence
-        below 0.60, or nothing found          orphaned
-        the file itself is gone               filegone
+tier                      test                       outcome
+L0                        the whole file is          placed at the stored
+                          unchanged                  lines
+L1                        the bytes at those lines   `attached`
+                          still match
+L2                        the text appears exactly   `attached`
+                          once
+L3                        several matches, context   `attached`, or
+                          decides                    `ambiguous`
+L4                        matches once ignoring      `attached`, reformatted
+                          whitespace
+L6                        scored fuzzy match >=      `drifted`, with a
+                          0.80                       confidence
+below 0.60, or nothing    `orphaned`
+found
+the file itself is gone   `filegone`
+
+The statuses, in worsening order:
+
+>
+    attached | drifted | ambiguous | orphaned | filegone
 <
+
 Two thresholds rather than one, because a low-confidence guess presented as
 truth rates worse with users than an honest orphan.
 
-The 0.80 and 0.60 thresholds are measured, not chosen. The repository's
-`harness/` samples real repository history and grades placements against
-`git blame --reverse`, with the results checked in.
+The 0.80 and 0.60 thresholds are measured. `harness/` samples real repository
+history and grades placements against `git blame --reverse`, with the results
+checked in.
 
-                                                    *sidenote-never-deleted*
-A note is never deleted by the plugin. Losing the anchor changes a note's
-status, never its existence, and orphaning only ever adds fields. Deletion is
-always something you asked for.
+NOTHING IS EVER AUTO-DELETED                          *sidenote-never-deleted*
+
+Losing the anchor changes a note's status, never its existence. Orphaning only
+adds fields. Deletion is always something you asked for.
 
 ==============================================================================
-12. HEALTH                                                    *sidenote-health*
+12. Health                                                   *sidenote-health*
 
-`:checkhealth sidenote` reports configuration validity, whether the global store
-is writable, and which optional tools were found.
+`:checkhealth sidenote` reports configuration validity, whether the global
+store is writable, the project store it found, and which optional tools are
+present.
 
-vim:tw=78:ts=8:noet:ft=help:norl:
+==============================================================================
+13. License                                                 *sidenote-license*
+
+MIT <LICENSE>.
+
+vim:tw=78:ts=8:ft=help:norl:

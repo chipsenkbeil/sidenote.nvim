@@ -33,12 +33,24 @@ local STRATEGIES = { project = true, global = true }
 ---@return sidenote.Config
 function M.defaults()
     return {
+        -- Extension and filetype of prose files
         filetype = "txt",
+
+        -- Stores to use, tried in order; also the read order
         strategy = { "project", "global" },
         global_dir = vim.fn.stdpath("data") .. "/sidenote",
         project_dir = ".annotations",
+
+        -- How a buffer shows that an annotation exists:
+        -- sign | virt_text | highlight | underline | none
         indicator = { style = "sign" },
+
+        -- Where a note appears when glanced at:
+        -- float | virt_lines | split | none
         preview = { style = "float", max_lines = 20 },
+
+        -- Where a note opens for writing:
+        -- split | float | toggle | current | tab
         editor = { style = "split", position = "right", size = 60 },
     }
 end

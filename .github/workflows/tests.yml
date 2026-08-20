@@ -94,3 +94,8 @@ jobs:
 
       - name: Audit the mechanical style rules
         run: make style
+
+      # Compares bytes rather than a VCS diff, so it means the same thing here
+      # and in a working tree that has other changes in it
+      - name: Check the generated docs are current
+        run: make docs-check

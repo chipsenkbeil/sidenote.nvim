@@ -54,10 +54,15 @@ end
 ---Bold and emphasis are dropped because vimdoc has neither; inline code keeps
 ---its backticks, which the help syntax highlights natively.
 ---@param text string
+---@param project string
 ---@return string
-local function inline(text)
+local function inline(text, project)
     -- Help references first, before the backticks they sit inside are seen
     text = text:gsub("`:h[elp]*%s+([^`]+)`", "|%1|")
+    -- A link within the document becomes the tag it points at, not a URL
+    text = text:gsub("%[[^%]]+%]%(#([%w-]+)%)", function(anchor)
+        return ("|%s-%s|"):format(project, anchor)
+    end)
     text = text:gsub("%[([^%]]+)%]%(([^)]+)%)", "%1 <%2>")
     text = text:gsub("%*%*([^*]+)%*%*", "%1")
     text = text:gsub("%f[%*]%*([^*]+)%*%f[^%*]", "%1")
@@ -163,7 +168,7 @@ local function parse(lines)
                     local cells = {}
                     for cell in lines[n]:gmatch("|([^|]*)") do
                         if cell:match("%S") then
-                            cells[#cells + 1] = inline(cell:match("^%s*(.-)%s*$"))
+                            cells[#cells + 1] = cell:match("^%s*(.-)%s*$")
                         end
                     end
                     rows[#rows + 1] = cells
@@ -219,8 +224,9 @@ local function column_widths(rows)
 end
 
 ---@param rows string[][]
+---@param project string
 ---@return string[]
-local function render_table(rows)
+local function render_table(rows, project)
     local widths = column_widths(rows)
     local out = {}
     for _, row in ipairs(rows) do
@@ -228,7 +234,7 @@ local function render_table(rows)
         -- taller instead of pushing the table past the page
         local wrapped, height = {}, 1
         for i, cell in ipairs(row) do
-            wrapped[i] = wrap(cell, widths[i])
+            wrapped[i] = wrap(inline(cell, project), widths[i])
             height = math.max(height, #wrapped[i])
         end
         for line = 1, height do
@@ -297,7 +303,7 @@ function M.render(lines, opts)
             vim.list_extend(out, heading(block.text:upper(), tag))
             out[#out + 1] = ""
         elseif block.kind == "paragraph" then
-            vim.list_extend(out, wrap(inline(block.text), M.WIDTH))
+            vim.list_extend(out, wrap(inline(block.text, opts.project), M.WIDTH))
             out[#out + 1] = ""
         elseif block.kind == "code" then
             out[#out + 1] = ">" .. (block.lang or "")
@@ -307,7 +313,7 @@ function M.render(lines, opts)
             out[#out + 1] = "<"
             out[#out + 1] = ""
         elseif block.kind == "table" then
-            vim.list_extend(out, render_table(block.rows))
+            vim.list_extend(out, render_table(block.rows, opts.project))
             out[#out + 1] = ""
         end
     end

@@ -1,4 +1,4 @@
-.PHONY: help test lint fmt fmt-check style check
+.PHONY: help test lint fmt fmt-check style docs docs-check check
 
 NVIM ?= nvim
 LUA_DIRS := lua spec harness plugin cli scripts
@@ -26,4 +26,10 @@ fmt-check: ## Fail if any source is unformatted
 style: ## Audit the mechanical lua-style rules
 	@$(NVIM) -l scripts/style_audit.lua $$(find $(LUA_DIRS) -name '*.lua')
 
-check: test lint fmt-check style ## Everything CI runs
+docs: ## Regenerate README reference blocks and doc/sidenote.txt from source
+	@$(NVIM) -l scripts/gendoc.lua
+
+docs-check: ## Fail if the committed docs are stale
+	@$(NVIM) -l scripts/gendoc.lua --check
+
+check: test lint fmt-check style docs-check ## Everything CI runs

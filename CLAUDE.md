@@ -34,6 +34,8 @@ make lint            # luacheck
 make fmt             # stylua, writes
 make fmt-check       # stylua, fails instead of writing
 make style           # the mechanical lua-style audit
+make docs            # regenerate README blocks and doc/sidenote.txt
+make docs-check      # fail if either is stale
 make check           # all of the above; run this before closing a change
 ```
 
@@ -48,6 +50,34 @@ not catch a luacheck warning for you.
 
 All four read their directory list from `LUA_DIRS` in the Makefile; adding a
 directory is one edit.
+
+## Documentation is generated
+
+**Never edit `doc/sidenote.txt`.** It is written by `make docs` and overwritten
+on every run. The sources are:
+
+| content | lives in |
+|---|---|
+| all narrative prose | `README.md` |
+| config defaults | `config.defaults()` |
+| commands, `<Plug>` mappings | `plugin/sidenote.lua` |
+| the Lua API | `---` annotations on `lua/sidenote/init.lua` |
+| anchor statuses | `resolve.STATUS_NAMES` |
+
+`scripts/gendoc.lua` expands `<!-- gen:name -->` blocks in the README from
+source, then `scripts/vimdoc.lua` converts the whole README to vimdoc. Both
+files are committed; `make docs-check` compares bytes and fails when either is
+stale. It compares rather than diffing against the VCS, so it means the same
+thing in a working tree that has other changes in it.
+
+Two things the generator will not do for you:
+
+- **A tag derived from a heading breaks when the heading is renamed.** Pin the
+  ones a reader may have bookmarked with `<!-- vimdoc:tag sidenote-thing -->`
+  above the heading. A test lists the pinned ones and fails if any disappears.
+- **The README must fit the page.** Code fences are indented four spaces and
+  never wrapped, so a sample wider than 74 columns overflows. Prose, tables and
+  headings all wrap or shrink on their own.
 
 ## Testing
 
@@ -106,12 +136,20 @@ one change per reviewable unit; `jj new` opens the next.
 **Every change must pass on its own**, not just the tip. Verify with:
 
 ```bash
-for c in $(jj log --no-graph -T 'change_id.short() ++ "\n"' | head -n -1); do
-  jj new "$c" >/dev/null 2>&1
-  printf '%s %s\n' "$c" "$(make test 2>&1 | tail -1)"
-  jj abandon @ >/dev/null 2>&1
+here=$(jj log --no-graph -T 'change_id.short()' -r @)
+for c in $(jj log --no-graph -T 'change_id.short() ++ "\n"' -r 'all() & ~root()'); do
+  jj edit "$c" || break
+  printf '%-14s ' "$c"; make test 2>&1 | grep -E '[0-9]+ passed'
 done
+jj edit "$here"
 ```
+
+**This loop only ever moves the working copy.** An earlier version created a
+scratch change with `jj new "$c"` and then ran `jj abandon @`. When the `jj new`
+failed — a stale id, an ambiguous prefix — `@` was still the real change, and
+`abandon` destroyed it. That cost three changes before it was replaced, each
+recovered with `jj op restore`. Never pair a suppressed `jj new` with
+`jj abandon @`.
 
 **`jj absorb` routes by blame, not by dependency.** It is right for style fixes
 and wrong for anything that adds a call to a module further up the stack: it
