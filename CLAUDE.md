@@ -254,6 +254,12 @@ already happened once here. Check `jj st` after every absorb.
   `t`/`T`, the source-buffer cycle plugs and the menu all go through it,
   so the rings and the write-then-repaint path cannot drift apart. Every
   write also calls `editor.redecorate_note`, keeping an open header true.
+- **Kind shows in the gutter only while the anchor is exact** (2026-08-20):
+  a healthy todo signs `☐`, checked to `☑` once no longer open; notes keep
+  `▍`; every hurt status keeps its own glyph — hurt is louder than kind.
+  `config.pen` takes a name or `{note=…, todo=…}`; a session-chosen pen
+  (`pen.for_kind` vs `pen.get`) beats both kind defaults, because the user
+  is holding it.
 - **A note buffer carries `b:sidenote`** ({id, root, source}), which is
   what DWIM reads: browse/browse_project from inside a note act on the
   annotated file. The context header re-draws from live extents on source
