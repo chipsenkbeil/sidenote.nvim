@@ -114,13 +114,16 @@ end
 
 local passed, failures = 0, {}
 for _, test in ipairs(tests) do
-    for _, entry in ipairs(test.context) do
-        for _, fn in ipairs(entry.before) do
-            fn()
+    -- Hooks run inside the protection: a throwing before_each fails this
+    -- test rather than killing the whole run
+    local ok, err = xpcall(function()
+        for _, entry in ipairs(test.context) do
+            for _, fn in ipairs(entry.before) do
+                fn()
+            end
         end
-    end
-
-    local ok, err = xpcall(test.fn, function(message)
+        test.fn()
+    end, function(message)
         return debug.traceback(tostring(message), 2)
     end)
 
