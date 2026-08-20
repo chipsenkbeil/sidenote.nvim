@@ -32,10 +32,6 @@ describe("the :Sidenote command", function()
         vim.g.sidenote = { strategy = "project" }
         vim.g.loaded_sidenote = nil
         dofile("plugin/sidenote.lua")
-        -- A browser opened in this shared window earlier left its fold options
-        -- behind, and an Ex range on a closed fold expands to the whole fold
-        vim.wo.foldenable = false
-        vim.wo.foldmethod = "manual"
     end)
 
     after_each(function()

@@ -96,12 +96,71 @@ local function rows_for(state)
     return out
 end
 
+---Window options `configure` overrides, saved beforehand so that leaving the
+---listing can give the window its own values back.
+local WINDOW_OPTIONS = {
+    "conceallevel",
+    "concealcursor",
+    "foldmethod",
+    "foldexpr",
+    "foldtext",
+    "foldenable",
+    "foldminlines",
+    "fillchars",
+    "wrap",
+    "foldlevel",
+}
+
+---Restore the options a window held before it showed a listing.
+---@param winid integer
+local function unconfigure(winid)
+    local saved = vim.w[winid].sidenote_restore
+    if not saved then
+        return
+    end
+    for _, option in ipairs(WINDOW_OPTIONS) do
+        vim.wo[winid][option] = saved[option]
+    end
+    vim.w[winid].sidenote_restore = nil
+end
+
+---Restore every configured window once it shows something else.
+---
+---The options are window-local, not buffer-local: without this, the file a
+---window shows after a listing inherits the folds and collapses into one.
+local installed = false
+local function install_restore()
+    if installed then
+        return
+    end
+    installed = true
+    vim.api.nvim_create_autocmd("BufWinEnter", {
+        group = vim.api.nvim_create_augroup("sidenote.browser", { clear = true }),
+        desc = "Give a window its own options back once it leaves the browser",
+        callback = function(event)
+            if vim.api.nvim_buf_get_name(event.buf):sub(1, #M.SCHEME) ~= M.SCHEME then
+                unconfigure(vim.api.nvim_get_current_win())
+            end
+        end,
+    })
+end
+
 ---Conceal and fold settings, all of which are window-local.
 ---
 ---Setting them on the buffer instead would silently do nothing and leave every
 ---id on screen.
 ---@param winid integer
 local function configure(winid)
+    -- Saved once per stay: re-listing in the same window must not replace the
+    -- user's values with the browser's own
+    if not vim.w[winid].sidenote_restore then
+        local saved = {}
+        for _, option in ipairs(WINDOW_OPTIONS) do
+            saved[option] = vim.wo[winid][option]
+        end
+        vim.w[winid].sidenote_restore = saved
+    end
+
     local wo = vim.wo[winid]
     wo.conceallevel = 3
     wo.concealcursor = "nvic"
@@ -281,6 +340,7 @@ local function show(state)
         bind(bufnr)
     end
 
+    install_restore()
     local winid = vim.api.nvim_get_current_win()
     vim.api.nvim_win_set_buf(winid, bufnr)
     vim.bo[bufnr].filetype = "sidenote"

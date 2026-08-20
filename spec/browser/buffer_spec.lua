@@ -141,6 +141,40 @@ describe("browser.open", function()
     end)
 end)
 
+describe("browser window options", function()
+    it("gives a window its own options back once it shows something else", function()
+        -- Fold and conceal settings are window-local, not buffer-local: left
+        -- behind, the next file shown there collapses into one closed fold
+        local winid = vim.api.nvim_get_current_win()
+        -- Step out of any listing an earlier test left in this window
+        vim.cmd.enew()
+        vim.wo[winid].foldmethod = "indent"
+        vim.wo[winid].conceallevel = 1
+        assert(browser.open(project_buffer(), { config = opts() }))
+        assert.eq(vim.wo[winid].foldmethod, "expr")
+
+        vim.cmd.enew()
+        assert.eq(vim.wo[winid].foldmethod, "indent")
+        assert.eq(vim.wo[winid].conceallevel, 1)
+    end)
+
+    it("saves the user's options, not its own, when re-listing in one window", function()
+        -- Widening with `-` reuses the window; saving again there would make
+        -- the browser's values the ones restored on leaving
+        local winid = vim.api.nvim_get_current_win()
+        -- Step out of any listing an earlier test left in this window
+        vim.cmd.enew()
+        vim.wo[winid].foldmethod = "indent"
+        local source = project_buffer()
+        assert(browser.open(source, { config = opts() }))
+        assert(browser.open_project(vim.api.nvim_buf_get_name(source), { config = opts() }))
+        assert.eq(vim.wo[winid].foldmethod, "expr")
+
+        vim.cmd.enew()
+        assert.eq(vim.wo[winid].foldmethod, "indent")
+    end)
+end)
+
 describe("browser.state", function()
     it("returns the rows as rendered, in buffer order", function()
         local source = project_buffer()
