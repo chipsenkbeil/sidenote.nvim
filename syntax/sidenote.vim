@@ -11,8 +11,9 @@ endif
 syn match sidenoteId /^\/\S\+ / conceal nextgroup=sidenoteKind
 syn match sidenoteKind /\S\+/ contained nextgroup=sidenoteState skipwhite
 syn match sidenoteState /\S\+/ contained nextgroup=sidenoteLocation skipwhite
-syn match sidenoteLocation /\S\+/ contained nextgroup=sidenoteSummary skipwhite
-syn match sidenoteSummary /.*/ contained
+" The location is the last column and runs to the end of the line, so a path
+" holding spaces still highlights as one thing
+syn match sidenoteLocation /.*$/ contained
 
 " Prose is every line the renderer indented beneath a header
 syn match sidenoteProse /^\s.*$/

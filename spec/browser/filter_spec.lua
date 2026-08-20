@@ -209,7 +209,7 @@ describe("browser filtering and the write path", function()
 
         local bufnr = assert(browser.open(t.alpha, { config = opts(), filter = { kind = "todo" } }))
         local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-        lines[1] = lines[1]:gsub("a todo$", "an edited todo")
+        lines[2] = lines[2]:gsub("a todo$", "an edited todo")
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
 
         browser.write(bufnr, {

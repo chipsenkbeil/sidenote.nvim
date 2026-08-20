@@ -12,7 +12,7 @@ local render = require("sidenote.browser.render")
 ---@field kind string kind column exactly as written
 ---@field state string state column exactly as written
 ---@field location string location column exactly as written
----@field prose string[] summary line followed by the body lines
+---@field prose string[] the indented lines beneath the header, summary first
 ---@field fields table<string, sidenote.browser.Field> column ranges, for <Tab>
 
 ---@class sidenote.browser.ParseError
@@ -27,8 +27,8 @@ local render = require("sidenote.browser.render")
 ---@class sidenote.browser.parse
 local M = {}
 
----Columns that carry a value before the summary, in order.
-local LEADING = { "kind", "state", "location" }
+---Columns that carry a value before the location, in order.
+local LEADING = { "kind", "state" }
 
 ---@param text string
 ---@return integer leading spaces the renderer would have added
@@ -49,11 +49,12 @@ local function check(row)
     return err
 end
 
----Read one column-0 line into an id and its four columns.
+---Read one column-0 line into an id and its three columns.
 ---
 ---A line carrying an id is an existing annotation; one without is a create.
----Columns are separated by a run of two or more spaces, which lets a path or a
----summary hold single spaces without becoming ambiguous.
+---Columns are separated by a run of two or more spaces; the location comes
+---last and runs to the end of the line, so even a path holding such a run
+---cannot be misread.
 ---@param text string
 ---@return sidenote.browser.Parsed|nil
 ---@return string|nil err
@@ -68,21 +69,17 @@ function M.header(text)
     local cursor = 1
     for _, name in ipairs(LEADING) do
         local gap_first, gap_last = rest:find("%s%s+", cursor)
-        -- Only the summary may be missing: the renderer strips the trailing
-        -- padding off a note nobody has written yet
         if not gap_first then
-            if name ~= "location" then
-                return nil, "expected four columns, separated by two or more spaces"
-            end
-            gap_first, gap_last = #rest + 1, #rest
+            return nil, "expected kind, state and a location, separated by two or more spaces"
         end
         row[name] = rest:sub(cursor, gap_first - 1)
         row.fields[name] = { first = offset + cursor, last = offset + gap_first - 1 }
         cursor = gap_last + 1
     end
 
-    row.prose[1] = rest:sub(cursor)
-    row.fields.summary = { first = offset + cursor, last = offset + #rest }
+    local trimmed = (rest:sub(cursor):gsub("%s+$", ""))
+    row.location = trimmed
+    row.fields.location = { first = offset + cursor, last = offset + cursor + #trimmed - 1 }
 
     local err = check(row)
     if err then

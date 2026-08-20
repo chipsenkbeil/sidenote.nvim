@@ -377,7 +377,7 @@ describe("browser edit to action, end to end", function()
         local state = assert(browser.state(bufnr))
 
         local edited = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-        edited[1] = edited[1]:gsub("the note$", "a better summary")
+        edited[2] = edited[2]:gsub("the note$", "a better summary")
 
         local actions = actions_from(state, edited)
         assert.eq(#actions, 1)

@@ -152,7 +152,8 @@ describe("browser.write", function()
 
         local applied, problems = browser.write(bufnr, { confirm = always_yes })
         assert.eq(applied, 0)
-        assert.eq(#problems, 1)
+        -- Two reports: the bad header, and the prose it orphaned beneath it
+        assert.eq(#problems, 2)
         assert.contains(problems[1], "1")
     end)
 
@@ -190,9 +191,9 @@ describe("browser.write", function()
         assert.eq_deep(assert(browser.state(bufnr)).rows, {})
     end)
 
-    it("refuses to write when a path holds consecutive spaces", function()
-        -- Such a path is indistinguishable from a column boundary, and would
-        -- otherwise diff as a move to a truncated location
+    it("round-trips a path holding consecutive spaces", function()
+        -- The location is the last column, so a run of spaces inside a path
+        -- cannot read as a boundary; the old refusal went with its reason
         local root = vim.fn.tempname()
         vim.fn.mkdir(root .. "/.sidenote", "p")
         local path = root .. "/two  spaces.lua"
@@ -207,12 +208,11 @@ describe("browser.write", function()
         local bufnr = assert(browser.open(source, { config = opts() }))
         local applied, problems = browser.write(bufnr, {
             confirm = function()
-                error("a dialog appeared for a listing that cannot be read back")
+                error("an untouched listing must produce no actions to confirm")
             end,
         })
         assert.eq(applied, 0)
-        assert.eq(#problems, 1)
-        assert.contains(problems[1], "consecutive spaces")
+        assert.eq_deep(problems, {})
     end)
 
     it("intercepts :w through a BufWriteCmd on the browser buffer", function()

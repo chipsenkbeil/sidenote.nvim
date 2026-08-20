@@ -86,9 +86,13 @@ describe("browser.open_project", function()
 
         local bufnr = assert(browser.open_project(t.root, { config = opts() }))
         local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-        assert.contains(lines[1], "first")
-        assert.contains(lines[2], "second")
-        assert.contains(lines[3], "third")
+        -- Each note is a header line and its summary indented beneath it
+        assert.contains(lines[1], "alpha.lua:1")
+        assert.contains(lines[2], "first")
+        assert.contains(lines[3], "alpha.lua:4")
+        assert.contains(lines[4], "second")
+        assert.contains(lines[5], "beta.lua:3")
+        assert.contains(lines[6], "third")
     end)
 
     it("shows each row's own file in its location column", function()
@@ -131,7 +135,7 @@ describe("browser.open_project", function()
         annotate(t.root, "alpha.lua", 4, { "summary", "a body line" })
         assert(browser.open_project(t.root, { config = opts() }))
         assert.eq(vim.fn.foldclosed(1), 1)
-        assert.eq(vim.fn.foldclosedend(1), 2)
+        assert.eq(vim.fn.foldclosedend(1), 3)
     end)
 end)
 
@@ -183,7 +187,8 @@ describe("browser project edits", function()
         local state = assert(browser.state(bufnr))
         local root = state.rows[2].entry.root
 
-        vim.api.nvim_buf_set_lines(bufnr, 1, 2, false, {})
+        -- The beta note is a header and its summary, lines 3 and 4
+        vim.api.nvim_buf_set_lines(bufnr, 2, 4, false, {})
         assert.eq(
             browser.write(bufnr, {
                 confirm = function()
@@ -202,7 +207,8 @@ describe("browser project edits", function()
         local bufnr = assert(browser.open_project(t.root, { config = opts() }))
 
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
-            "note  open      beta.lua    a brand new note",
+            "note  open      beta.lua",
+            "    a brand new note",
         })
         assert.eq(
             browser.write(bufnr, {

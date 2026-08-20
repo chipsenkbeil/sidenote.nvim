@@ -204,14 +204,13 @@ already happened once here. Check `jj st` after every absorb.
 - **`render.normalize` is the canonical form, and all three sides use it.** The
   rendered lines, the parsed result, and the browser's diff baseline. Any rule
   that lives in only one of them turns an untouched row into a phantom `write`
-  that then silently rewrites the note. This has already happened once: the
-  summary column sits behind the location column's padding, so its *own*
-  leading whitespace was indistinguishable from the gap and was being eaten.
-  Body lines keep their indentation; the summary line cannot.
-- **A path with two consecutive spaces cannot be shown in a listing**, for the
-  same reason: it reads as a column boundary. `browser.write` refuses such a
-  buffer outright and names the row. Capture, the store and the CLI handle
-  those paths fine — the restriction belongs only to the column-separated view.
+  that then silently rewrites the note. The summary (prose line one) stays
+  trimmed at both ends; body lines keep their own indentation.
+- **A header is `id kind state location`, and the summary lives with its
+  prose**, indented below (2026-08-20 redesign). A closed fold previews the
+  header's columns plus the summary via a chunked `foldtext`, display-only.
+  Location being the last column is what made a path holding two consecutive
+  spaces legal in a listing again — nothing follows it to be confused with.
 - **No required `setup()`.** Config is `vim.g.sidenote`, validated in
   `config.lua`, which returns defaults *alongside* any error so a bad config
   degrades rather than disabling the plugin.
@@ -232,9 +231,10 @@ already happened once here. Check `jj st` after every absorb.
 - **`nvim_open_win` speaks `above`/`below`; the config speaks `top`/`bottom`.**
   `window.lua` maps between them so nvim's vocabulary never leaks into user
   config.
-- **`foldtext = ""` renders a closed fold as its own line, conceal included.**
-  Verified on 0.12.4. This is what lets the browser hide prose behind real
-  folds without the concealed id reappearing on every collapsed row.
+- **`foldtext` returns highlighted chunks on 0.10+**, which is how a closed
+  row previews its columns and summary with real colors. The chunks are built
+  from the buffer's own lines at draw time, so an edit made while the fold was
+  open shows through the moment it closes.
 - **A vim operator applies to a whole closed fold**, so `dd` on a collapsed
   browser row deletes the annotation and all its prose. The browser gets that
   for free rather than implementing it.

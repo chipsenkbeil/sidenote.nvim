@@ -18,39 +18,37 @@ local function prose(text)
 end
 
 describe("browser.parse.header", function()
-    it("splits an id line into its four columns", function()
-        local row = assert(parse.header(header(ID, "note  open      m.lua:4    the summary")))
+    it("splits an id line into its three columns", function()
+        -- No summary here: it is prose line one, indented below the header
+        local row = assert(parse.header(header(ID, "note  open      m.lua:4")))
         assert.eq(row.id, ID)
         assert.eq(row.kind, "note")
         assert.eq(row.state, "open")
         assert.eq(row.location, "m.lua:4")
-        assert.eq(row.prose[1], "the summary")
+        assert.eq_deep(row.prose, {})
     end)
 
     it("reads a line with no id as a create", function()
-        local row = assert(parse.header("todo  open      m.lua    a brand new note"))
+        local row = assert(parse.header("todo  open      m.lua"))
         assert.is_nil(row.id)
         assert.eq(row.kind, "todo")
-        assert.eq(row.prose[1], "a brand new note")
+        assert.eq(row.location, "m.lua")
     end)
 
-    it("keeps a summary containing a double space intact", function()
-        -- Only the first three gaps are boundaries; the rest of the line is
-        -- the summary, verbatim
-        local row = assert(parse.header(header(ID, "note  open      m.lua:4    two  spaces")))
-        assert.eq(row.prose[1], "two  spaces")
+    it("keeps a path holding a double space intact", function()
+        -- The location is the last column and runs to the end of the line,
+        -- so a run of spaces inside it cannot read as a boundary
+        local row = assert(parse.header(header(ID, "note  open      my  file.lua:4")))
+        assert.eq(row.location, "my  file.lua:4")
     end)
 
-    it("accepts a row whose summary is empty", function()
-        -- The renderer strips trailing whitespace, so an unwritten note has no
-        -- fourth column at all
-        local row = assert(parse.header(header(ID, "note  open      m.lua:4")))
+    it("trims stray trailing whitespace off the location", function()
+        local row = assert(parse.header(header(ID, "note  open      m.lua:4   ")))
         assert.eq(row.location, "m.lua:4")
-        assert.eq(row.prose[1], "")
     end)
 
     it("keeps a single space inside a path", function()
-        local row = assert(parse.header(header(ID, "note  open      my file.lua:4    hi")))
+        local row = assert(parse.header(header(ID, "note  open      my file.lua:4")))
         assert.eq(row.location, "my file.lua:4")
     end)
 
@@ -80,25 +78,25 @@ describe("browser.parse.header", function()
     end)
 
     it("rejects a malformed location", function()
-        local row, err = parse.header(header(ID, "note  open      m.lua:15:4-20    x"))
+        local row, err = parse.header(header(ID, "note  open      m.lua:15:4-20"))
         assert.is_nil(row)
         assert.contains(err, "mixed forms")
     end)
 
     it("reports byte ranges for each column, so <Tab> can jump between them", function()
-        local text = header(ID, "note  open      m.lua:4    the summary")
+        local text = header(ID, "note  open      m.lua:4")
         local row = assert(parse.header(text))
         assert.eq(text:sub(row.fields.kind.first, row.fields.kind.last), "note")
         assert.eq(text:sub(row.fields.state.first, row.fields.state.last), "open")
         assert.eq(text:sub(row.fields.location.first, row.fields.location.last), "m.lua:4")
-        assert.eq(text:sub(row.fields.summary.first, row.fields.summary.last), "the summary")
     end)
 end)
 
 describe("browser.parse.buffer", function()
     it("attaches an indented line as prose of the header above it", function()
         local rows, errors = parse.buffer({
-            header(ID, "note  open      m.lua:4    summary"),
+            header(ID, "note  open      m.lua:4"),
+            prose("summary"),
             prose("body one"),
             prose("body two"),
         })
@@ -109,7 +107,8 @@ describe("browser.parse.buffer", function()
 
     it("keeps a blank line between two prose lines", function()
         local rows = parse.buffer({
-            header(ID, "note  open      m.lua:4    summary"),
+            header(ID, "note  open      m.lua:4"),
+            prose("summary"),
             prose("body one"),
             "",
             prose("body two"),
@@ -119,11 +118,13 @@ describe("browser.parse.buffer", function()
 
     it("drops blank lines trailing a block, so a spacer is not stored as prose", function()
         local rows = parse.buffer({
-            header(ID, "note  open      m.lua:4    summary"),
+            header(ID, "note  open      m.lua:4"),
+            prose("summary"),
             prose("body"),
             "",
             "",
-            header(OTHER, "note  open      m.lua:9    other"),
+            header(OTHER, "note  open      m.lua:9"),
+            prose("other"),
         })
         assert.eq_deep(rows[1].prose, { "summary", "body" })
         assert.eq_deep(rows[2].prose, { "other" })
@@ -132,7 +133,8 @@ describe("browser.parse.buffer", function()
     it("strips no more than the indent the renderer added", function()
         -- Prose that indents itself further keeps that shape
         local rows = parse.buffer({
-            header(ID, "note  open      m.lua:4    summary"),
+            header(ID, "note  open      m.lua:4"),
+            prose("summary"),
             prose("    deeper"),
         })
         assert.eq(rows[1].prose[2], "    deeper")
@@ -140,9 +142,9 @@ describe("browser.parse.buffer", function()
 
     it("records the line each row was read from", function()
         local rows = parse.buffer({
-            header(ID, "note  open      m.lua:4    one"),
+            header(ID, "note  open      m.lua:4"),
             prose("body"),
-            header(OTHER, "note  open      m.lua:9    two"),
+            header(OTHER, "note  open      m.lua:9"),
         })
         assert.eq(rows[1].lnum, 1)
         assert.eq(rows[2].lnum, 3)
@@ -157,8 +159,8 @@ describe("browser.parse.buffer", function()
     it("errors on the same id appearing twice, naming both lines", function()
         -- Which is exactly what yanking a row and pasting it produces
         local _, errors = parse.buffer({
-            header(ID, "note  open      m.lua:4    one"),
-            header(ID, "note  open      m.lua:9    two"),
+            header(ID, "note  open      m.lua:4"),
+            header(ID, "note  open      m.lua:9"),
         })
         assert.eq(#errors, 1)
         assert.eq(errors[1].lnum, 2)
@@ -167,8 +169,8 @@ describe("browser.parse.buffer", function()
 
     it("reports a bad row against its own line and keeps the others", function()
         local rows, errors = parse.buffer({
-            header(ID, "note  open      m.lua:4    fine"),
-            header(OTHER, "note  bogus     m.lua:9    broken"),
+            header(ID, "note  open      m.lua:4"),
+            header(OTHER, "note  bogus     m.lua:9"),
         })
         assert.eq(#rows, 1)
         assert.eq(#errors, 1)
@@ -243,8 +245,8 @@ describe("browser render and parse round-trip", function()
     end)
 
     it("round-trips a summary that opens with whitespace", function()
-        -- The summary sits behind the location column's padding, so parsing
-        -- cannot tell its own leading spaces from the gap
+        -- The summary stays trimmed in canonical form: it is what a closed
+        -- fold previews, and the preview trims
         round_trips({ "  leading spaces", "body" })
     end)
 

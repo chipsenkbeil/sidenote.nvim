@@ -121,9 +121,9 @@ local function configure(winid)
     set_local(winid, "concealcursor", "nvic")
     set_local(winid, "foldmethod", "expr")
     set_local(winid, "foldexpr", M.FOLDEXPR)
-    -- An empty foldtext renders a closed fold as its own header line, conceal
-    -- included, so a folded row reads exactly like an unfolded one
-    set_local(winid, "foldtext", "")
+    -- A closed fold renders as its header's columns plus a summary preview,
+    -- assembled as highlighted chunks; see M.foldtext
+    set_local(winid, "foldtext", "v:lua.require'sidenote.browser'.foldtext()")
     set_local(winid, "foldenable", true)
     -- A note with no body is a one-line fold, which vim leaves open at the
     -- default of 1. Zero keeps "every annotation is a closed fold" true
@@ -136,6 +136,48 @@ local function configure(winid)
     -- A closed fold never wraps, so leaving wrap on would change a row's shape
     -- the moment it is expanded. Summaries are untruncated and can be long
     set_local(winid, "wrap", false)
+end
+
+---Most of a summary a closed fold will preview before cutting off.
+local PREVIEW_MAX = 80
+
+---Render a closed row: its header's columns plus a preview of its summary.
+---
+---Built from the buffer lines, never from rendered state, so an edit made
+---while the fold was open shows through the moment it closes. Display only:
+---the preview may truncate, because nothing here can leak into a write.
+---@return {[1]: string, [2]: string}[] chunks
+function M.foldtext()
+    local start = vim.v.foldstart
+    local header = vim.fn.getline(start)
+    local row = parse.header(header)
+    if not row then
+        return { { header, "Normal" } }
+    end
+
+    -- The header's own text, sliced by field so each column keeps its color;
+    -- the concealed id is simply not emitted
+    local groups = { kind = "sidenoteKind", state = "sidenoteState", location = "sidenoteLocation" }
+    local chunks = {}
+    local cursor = row.fields.kind.first
+    for _, name in ipairs({ "kind", "state", "location" }) do
+        local field = row.fields[name]
+        if field.first > cursor then
+            chunks[#chunks + 1] = { header:sub(cursor, field.first - 1), "Normal" }
+        end
+        chunks[#chunks + 1] = { header:sub(field.first, field.last), groups[name] }
+        cursor = field.last + 1
+    end
+
+    local summary = start < vim.v.foldend and vim.trim(vim.fn.getline(start + 1)) or ""
+    if summary ~= "" then
+        if #summary > PREVIEW_MAX then
+            summary = summary:sub(1, PREVIEW_MAX) .. "…"
+        end
+        chunks[#chunks + 1] = { "  ", "Normal" }
+        chunks[#chunks + 1] = { summary, "sidenoteProse" }
+    end
+    return chunks
 end
 
 ---Collapse every annotation, so the browser reads as an index.
@@ -607,23 +649,6 @@ function M.write(bufnr, opts)
     local state = states[bufnr]
     if not state then
         return 0, { "not a sidenote browser" }
-    end
-
-    -- Checked before anything is parsed: a row whose own location cannot be
-    -- read back would otherwise diff as a move to a truncated path
-    local unreadable = {}
-    for i, row in ipairs(state.rows) do
-        if render.ambiguous(row) then
-            local complaint = "%s holds consecutive spaces, which a listing cannot tell from a"
-                .. " column boundary; edit this annotation from the source buffer"
-            unreadable[#unreadable + 1] = {
-                lnum = i,
-                message = complaint:format(row.entry.record.path),
-            }
-        end
-    end
-    if #unreadable > 0 then
-        return 0, reported(unreadable)
     end
 
     local rows, errors = parse.buffer(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))

@@ -56,12 +56,14 @@ local function without_id(line)
 end
 
 describe("browser.render columns", function()
-    it("names four columns, in the order they are written", function()
+    it("names three columns, in the order they are written", function()
+        -- The summary is not among them: it is prose line one, indented below
+        -- its header with the rest of the body
         local names = {}
         for _, column in ipairs(render.COLUMNS) do
             names[#names + 1] = column.name
         end
-        assert.eq_deep(names, { "kind", "state", "location", "summary" })
+        assert.eq_deep(names, { "kind", "state", "location" })
     end)
 
     it("prefixes a header with the concealed id and a single space", function()
@@ -70,31 +72,23 @@ describe("browser.render columns", function()
     end)
 
     it("separates every column by at least two spaces, so parsing can split on the gap", function()
-        -- The summary holds single spaces, so a run of two is unambiguously a
-        -- column boundary rather than prose
         local rest = without_id(render.rows({ row() })[1])
-        assert.eq(select(2, rest:gsub("%s%s+", "")), 3)
+        assert.eq(select(2, rest:gsub("%s%s+", "")), 2)
     end)
 
-    it("aligns columns across rows so the gutter does not jitter", function()
+    it("aligns columns across rows so the listing does not jitter", function()
         local lines = render.rows({
             row({ prose = { "short" } }),
             row({ id = OTHER, kind = "todo", state = "wontfix", line_start = 8 }),
         })
-        assert.eq(lines[1]:find("lua/lobby%.lua"), lines[2]:find("lua/lobby%.lua"))
+        assert.eq(lines[1]:find("lua/lobby%.lua"), lines[3]:find("lua/lobby%.lua"))
     end)
 
-    it("widens the location column to its longest entry", function()
-        local lines = render.rows({
-            row({ line_start = 1 }),
-            row({
-                id = OTHER,
-                path = "lua/deeply/nested/module.lua",
-                line_start = 100,
-                line_end = 200,
-            }),
-        })
-        assert.eq(lines[1]:find("race in lobby join"), lines[2]:find("race in lobby join"))
+    it("keeps a path holding consecutive spaces, since nothing follows it", function()
+        -- The location is the last column now, so a run of spaces inside it
+        -- can no longer read as a column boundary
+        local line = render.rows({ row({ path = "odd  name.lua" }) })[1]
+        assert.match(line, "odd  name%.lua:42$")
     end)
 end)
 
@@ -132,50 +126,39 @@ describe("browser syntax", function()
     end)
 end)
 
-describe("browser.render summary", function()
-    it("renders the summary as prose line one, untruncated", function()
+describe("browser.render prose", function()
+    it("indents every prose line beneath the header, the summary included", function()
+        local lines = render.rows({ row({ prose = { "one", "two", "three" } }) })
+        local indent = (" "):rep(render.PROSE_INDENT)
+        assert.eq(#lines, 4)
+        assert.eq(lines[2], indent .. "one")
+        assert.eq(lines[3], indent .. "two")
+        assert.eq(lines[4], indent .. "three")
+    end)
+
+    it("renders the summary untruncated", function()
         -- Truncating would make an untouched row differ from its own stored
         -- prose, and the write path would then replace it with the abbreviation
         local long = ("x"):rep(200)
-        assert.contains(render.rows({ row({ prose = { long } }) })[1], long)
+        assert.contains(render.rows({ row({ prose = { long } }) })[2], long)
     end)
 
-    it("renders an empty summary for a note with no prose", function()
-        -- No placeholder text: whatever is rendered here is read straight back
-        -- as prose line one, so a placeholder would write itself into the file
+    it("renders a note with no prose as its header alone", function()
         local lines = render.rows({ row({ prose = {} }) })
         assert.eq(#lines, 1)
-        assert.match(lines[1], "lua/lobby%.lua:42%s*$")
-    end)
-
-    it("renders prose line one verbatim, even when it is blank", function()
-        -- Taking the first NON-EMPTY line instead would drop the leading blank
-        -- on the way back through parse, silently editing an untouched note
-        local lines = render.rows({ row({ prose = { "", "the second line" } }) })
-        assert.match(lines[1], "lua/lobby%.lua:42%s*$")
-        assert.eq(lines[2], (" "):rep(render.PROSE_INDENT) .. "the second line")
-    end)
-end)
-
-describe("browser.render prose", function()
-    it("emits one indented line for every prose line after the first", function()
-        local lines = render.rows({ row({ prose = { "one", "two", "three" } }) })
-        local indent = (" "):rep(render.PROSE_INDENT)
-        assert.eq(#lines, 3)
-        assert.eq(lines[2], indent .. "two")
-        assert.eq(lines[3], indent .. "three")
+        assert.match(lines[1], "lua/lobby%.lua:42$")
     end)
 
     it("renders a blank prose line as an empty line, never as bare indentation", function()
         -- A trim-trailing-whitespace autocmd would strip an indent-only line,
         -- so the renderer never writes one in the first place
         local lines = render.rows({ row({ prose = { "one", "", "three" } }) })
-        assert.eq(lines[2], "")
+        assert.eq(lines[3], "")
     end)
 
     it("drops trailing blank prose lines", function()
         local lines = render.rows({ row({ prose = { "one", "two", "", "" } }) })
-        assert.eq(#lines, 2)
+        assert.eq(#lines, 3)
     end)
 
     it("keeps rows adjacent, so a fold covers exactly one annotation", function()
@@ -183,16 +166,15 @@ describe("browser.render prose", function()
             row({ prose = { "first", "body" } }),
             row({ id = OTHER, prose = { "second" } }),
         })
-        assert.eq(#lines, 3)
-        assert.match(lines[3], "^/" .. OTHER .. " ")
+        assert.eq(#lines, 5)
+        assert.match(lines[4], "^/" .. OTHER .. " ")
     end)
 end)
 
 describe("browser.render location", function()
     it("renders a file-scoped entry as a bare path", function()
         local line = without_id(render.rows({ row({ scope = "file" }) })[1])
-        assert.contains(line, "lua/lobby.lua ")
-        assert.falsy(line:find("lua/lobby%.lua:"))
+        assert.match(line, "lua/lobby%.lua$")
     end)
 
     it("renders a line range through the location grammar", function()

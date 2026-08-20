@@ -234,7 +234,9 @@ owns, and it lives in the gutter — silently while a note is healthy, as a
 status glyph the moment one is not.
 
 Each note is a real fold, so `za`, `zR`, `zM` and your own fold mappings work.
-Expanding one reveals its prose, indented, editable in place.
+A closed row previews the summary beside the note's columns; expanding it
+reveals the prose itself, indented beneath the header with the summary as its
+first line, editable in place.
 
 On `:w`:
 
