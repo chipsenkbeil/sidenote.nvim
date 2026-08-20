@@ -15,6 +15,26 @@
 ---@class sidenote.buffer
 local M = {}
 
+---Read a file's content the way a buffer would show it.
+---
+---A buffer holds lines, so its text carries no trailing newline; every anchor
+---and file hash is captured in that flavor. Reading raw bytes instead makes
+---the same file hash differently from disk than from a buffer, and the
+---whole-file fast path never fires for a headless run.
+---@param path string
+---@return string|nil content nil when the file does not exist
+function M.read(path)
+    if vim.fn.filereadable(path) ~= 1 then
+        return nil
+    end
+    local lines = vim.fn.readfile(path, "b")
+    -- vim.fn.readfile keeps a final newline as one empty trailing element
+    if #lines > 1 and lines[#lines] == "" then
+        lines[#lines] = nil
+    end
+    return table.concat(lines, "\n")
+end
+
 ---@param bufnr integer
 ---@param opts sidenote.buffer.TargetOpts
 ---@return sidenote.buffer.Target|nil

@@ -1,3 +1,4 @@
+local buffer = require("sidenote.buffer")
 local capture = require("sidenote.capture")
 local location = require("sidenote.location")
 local project = require("sidenote.store.project")
@@ -14,15 +15,6 @@ local M = {}
 ---@return string
 local function now()
     return os.date("!%Y-%m-%dT%H:%M:%SZ")
-end
-
----@param path string
----@return string|nil content nil when the file does not exist
-local function read(path)
-    if vim.fn.filereadable(path) ~= 1 then
-        return nil
-    end
-    return table.concat(vim.fn.readfile(path, "b"), "\n")
 end
 
 ---Turn a location's path into something the filesystem understands.
@@ -74,7 +66,7 @@ local function destination(action, state)
     if not wanted then
         return nil, parse_err
     end
-    local content = read(absolute(state, wanted.path))
+    local content = buffer.read(absolute(state, wanted.path))
     local checked, err = location.validate(wanted, content)
     if not checked then
         return nil, err

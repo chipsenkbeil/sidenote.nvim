@@ -93,6 +93,16 @@ describe("scan.project", function()
         assert.eq(#scan.project({ path = root, config = opts() }), 1)
     end)
 
+    it("resolves an untouched file at L0, straight off the file hash", function()
+        -- Disk carries a trailing newline the buffer never shows; unless both
+        -- flavors hash alike, the O(1) tier never fires for a headless run
+        local root = project()
+        annotate(root, "alpha.lua", 4)
+
+        local entries = scan.project({ path = root, config = opts() })
+        assert.eq(entries[1].resolution.tier, "L0")
+    end)
+
     it("reports a deleted source file as filegone rather than skipping it", function()
         -- A note about code that no longer exists is exactly what a human needs
         -- to see

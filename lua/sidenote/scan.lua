@@ -1,3 +1,4 @@
+local buffer = require("sidenote.buffer")
 local project = require("sidenote.store.project")
 local resolve = require("sidenote.core.resolve")
 local session = require("sidenote.session")
@@ -27,10 +28,7 @@ local function content_of(path)
             end
         end
     end
-    if vim.fn.filereadable(path) ~= 1 then
-        return nil
-    end
-    return table.concat(vim.fn.readfile(path, "b"), "\n")
+    return buffer.read(path)
 end
 
 ---Every record in the project's stores, with the root it came from.
