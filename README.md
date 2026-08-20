@@ -68,16 +68,22 @@ Defaults shown:
 
 ```lua
 vim.g.sidenote = {
-    filetype = "txt",                   -- extension and filetype of prose files
-    strategy = { "project", "global" }, -- where notes are stored, in order
+    -- Extension and filetype of prose files
+    filetype = "txt",
 
+    -- Where notes are stored, tried in order
+    strategy = { "project", "global" },
     global_dir = vim.fn.stdpath("data") .. "/sidenote",
     project_dir = ".annotations",
 
-    indicator = { style = "sign" },     -- sign | virt_text | highlight | underline | none
-    preview = { style = "float", max_lines = 20 }, -- float | virt_lines | split | none
+    -- sign | virt_text | highlight | underline | none
+    indicator = { style = "sign" },
+
+    -- float | virt_lines | split | none
+    preview = { style = "float", max_lines = 20 },
+
+    -- split | float | toggle | current | tab
     editor = { style = "split", position = "right", size = 60 },
-                                        -- split | float | toggle | current | tab
 }
 ```
 
@@ -168,7 +174,7 @@ sidenote: apply 5 changes?
 
   WRITE    2 notes' prose
   CHANGE   1 annotation   kind   note -> todo
-  MOVE     lua/lobby.lua:88 -> lua/net/lobby.lua:31   (re-anchored by content)
+  MOVE     lua/lobby.lua:88 -> lua/net/lobby.lua:31  (re-anchored)
 
   ── these lose information ──
   RESCOPE  lua/lobby.lua:42-57 -> lua/lobby.lua       (DROPS ANCHOR)
@@ -229,7 +235,7 @@ nvim --headless -l cli/sidenote.lua export /path/to/project
 
 # One greppable line each: location, status, kind, state, summary
 nvim --headless -l cli/sidenote.lua list /path/to/project
-nvim --headless -l cli/sidenote.lua list /path/to/project --status orphaned
+nvim --headless -l cli/sidenote.lua list /path/to/proj --status orphaned
 ```
 
 ### The export gate, and why it exists
