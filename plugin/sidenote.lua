@@ -288,6 +288,10 @@ vim.keymap.set("n", "<Plug>(SidenoteMenu)", function()
     require("sidenote.menu").open()
 end, { desc = "Open the menu for the note under the cursor" })
 
+vim.keymap.set("n", "<Plug>(SidenoteDelete)", function()
+    require("sidenote").delete()
+end, { desc = "Delete the note under the cursor, after confirming" })
+
 vim.keymap.set("n", "<Plug>(SidenoteCycleKind)", function()
     require("sidenote.cycle").at_cursor("kind", 1)
 end, { desc = "Flip the note under the cursor between note and todo" })

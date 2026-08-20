@@ -76,3 +76,45 @@ describe("cycle.at_cursor", function()
         assert.falsy(cycle.at_cursor("state", 1))
     end)
 end)
+
+describe("sidenote.delete", function()
+    before_each(function()
+        vim.g.sidenote = { strategy = "project", filetype = "org" }
+    end)
+
+    after_each(function()
+        vim.g.sidenote = nil
+        vim.cmd("silent! %bwipeout!")
+    end)
+
+    it("deletes the note under the cursor after a quoting confirmation", function()
+        local result = on_note()
+        local fh = assert(io.open(store.prose_path(result.root, result.id, "org"), "w"))
+        fh:write("the doomed note\n")
+        fh:close()
+
+        local asked
+        local original = vim.fn.confirm
+        vim.fn.confirm = function(prompt)
+            asked = prompt
+            return 1
+        end
+        local deleted = require("sidenote").delete()
+        vim.fn.confirm = original
+
+        assert.truthy(deleted)
+        assert.contains(asked, "the doomed note")
+        assert.falsy(vim.uv.fs_stat(store.meta_path(result.root, result.id)))
+    end)
+
+    it("keeps the note when the confirmation is declined", function()
+        local result = on_note()
+        local original = vim.fn.confirm
+        vim.fn.confirm = function()
+            return 2
+        end
+        assert.falsy(require("sidenote").delete())
+        vim.fn.confirm = original
+        assert.truthy(vim.uv.fs_stat(store.meta_path(result.root, result.id)))
+    end)
+end)

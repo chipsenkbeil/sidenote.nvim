@@ -239,6 +239,27 @@ function M.toggle_highlight()
     return shown
 end
 
+---Delete the annotation under the cursor, after a confirmation that quotes
+---the prose it would destroy.
+---@return boolean deleted
+function M.delete()
+    local entry = M.at_cursor()
+    if not entry then
+        vim.notify("sidenote: no annotation under the cursor", vim.log.levels.WARN)
+        return false
+    end
+    local cfg = config()
+    local store = require("sidenote.store")
+    local summary = store.summary(entry.root, entry.id, cfg.filetype)
+    local asked = ('sidenote: delete "%s"?'):format(summary or "no prose")
+    if vim.fn.confirm(asked, "&Delete\n&Cancel", 2) ~= 1 then
+        return false
+    end
+    store.delete(entry.root, entry.id, cfg.filetype)
+    require("sidenote.session").refresh(vim.api.nvim_get_current_buf(), cfg)
+    return true
+end
+
 ---The active pen's name, or nil when new notes start penless.
 ---@return string|nil
 function M.pen()

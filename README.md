@@ -58,6 +58,7 @@ vim.keymap.set("n", "<Leader>sh", "<Plug>(SidenoteToggleHighlight)")
 vim.keymap.set("n", "<Leader>sf", "<Plug>(SidenoteFollow)")
 vim.keymap.set("n", "<Leader>sp", "<Plug>(SidenotePen)")
 vim.keymap.set("n", "<Leader>sm", "<Plug>(SidenoteMenu)")
+vim.keymap.set("n", "<Leader>sd", "<Plug>(SidenoteDelete)")
 vim.keymap.set("n", "]n", "<Plug>(SidenoteViewNext)")
 vim.keymap.set("n", "[n", "<Plug>(SidenoteViewPrev)")
 ```
@@ -83,6 +84,7 @@ No default mappings are installed.
 | `<Plug>(SidenoteFollow)` | Toggle the note editor following the cursor |
 | `<Plug>(SidenotePen)` | Rotate the active pen for new notes |
 | `<Plug>(SidenoteMenu)` | Open the menu for the note under the cursor |
+| `<Plug>(SidenoteDelete)` | Delete the note under the cursor, after confirming |
 | `<Plug>(SidenoteCycleKind)` | Flip the note under the cursor between note and todo |
 | `<Plug>(SidenoteCycleState)` | Cycle the state of the note under the cursor |
 | `<Plug>(SidenoteCycleStateBack)` | Cycle the state of the note under the cursor, backward |
@@ -321,7 +323,8 @@ deleting confirms first, quoting the prose it would destroy.
 For single keystrokes instead, the cycle plugs rotate one field of the
 note under the cursor, org-style: `(SidenoteCycleKind)`,
 `(SidenoteCycleState)` and `(SidenoteCyclePen)`, the latter two with
-`…Back)` variants.
+`…Back)` variants. `<Plug>(SidenoteDelete)` is the menu's delete standing
+alone — the same confirmation, the same quote.
 
 <!-- vimdoc:tag sidenote-storage -->
 
@@ -487,6 +490,10 @@ Jump to the previous annotation and preview it.
 `sidenote.toggle_highlight()`
 
 Toggle this buffer's range highlights, the way spell is toggled.
+
+`sidenote.delete()`
+
+Delete the annotation under the cursor, after a confirmation that quotes
 
 `sidenote.pen()`
 

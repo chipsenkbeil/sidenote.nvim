@@ -154,7 +154,10 @@ local function validate(cfg)
     elseif type(cfg.pen) == "table" then
         for kind, name in pairs(cfg.pen) do
             if kind ~= "note" and kind ~= "todo" then
-                return fail("pen", ("%s is not a kind; expected note or todo"):format(tostring(kind)))
+                return fail(
+                    "pen",
+                    ("%s is not a kind; expected note or todo"):format(tostring(kind))
+                )
             end
             if not cfg.pens[name] then
                 return fail(
