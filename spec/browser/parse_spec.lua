@@ -19,14 +19,26 @@ local function prose(text)
 end
 
 describe("browser.parse.header", function()
-    it("splits an id line into its three columns", function()
-        -- No summary here: it is prose line one, indented below the header
-        local row = assert(parse.header(header(ID, "note  open      m.lua:4")))
+    it("splits an id line into its four columns", function()
+        -- No summary here: it is prose line one, sitting below the header
+        local row = assert(parse.header(header(ID, "note  open      -  m.lua:4")))
         assert.eq(row.id, ID)
         assert.eq(row.kind, "note")
         assert.eq(row.state, "open")
+        assert.is_nil(row.pen, "the placeholder means no pen")
         assert.eq(row.location, "m.lua:4")
         assert.eq_deep(row.prose, {})
+    end)
+
+    it("reads a named pen out of its column", function()
+        local row = assert(parse.header(header(ID, "note  open      yellow  m.lua:4")))
+        assert.eq(row.pen, "yellow")
+    end)
+
+    it("rejects a pen that is not a word", function()
+        local row, err = parse.header(header(ID, "note  open      ???  m.lua:4"))
+        assert.is_nil(row)
+        assert.contains(err, "pen")
     end)
 
     it("treats an unmarked line as no header at all", function()
@@ -46,17 +58,17 @@ describe("browser.parse.header", function()
     it("keeps a path holding a double space intact", function()
         -- The location is the last column and runs to the end of the line,
         -- so a run of spaces inside it cannot read as a boundary
-        local row = assert(parse.header(header(ID, "note  open      my  file.lua:4")))
+        local row = assert(parse.header(header(ID, "note  open      -  my  file.lua:4")))
         assert.eq(row.location, "my  file.lua:4")
     end)
 
     it("trims stray trailing whitespace off the location", function()
-        local row = assert(parse.header(header(ID, "note  open      m.lua:4   ")))
+        local row = assert(parse.header(header(ID, "note  open      -  m.lua:4   ")))
         assert.eq(row.location, "m.lua:4")
     end)
 
     it("keeps a single space inside a path", function()
-        local row = assert(parse.header(header(ID, "note  open      my file.lua:4")))
+        local row = assert(parse.header(header(ID, "note  open      -  my file.lua:4")))
         assert.eq(row.location, "my file.lua:4")
     end)
 
@@ -67,13 +79,13 @@ describe("browser.parse.header", function()
     end)
 
     it("rejects an unknown kind", function()
-        local row, err = parse.header(header(ID, "idea  open      m.lua:4    x"))
+        local row, err = parse.header(header(ID, "idea  open      -  m.lua:4"))
         assert.is_nil(row)
         assert.contains(err, "idea")
     end)
 
     it("rejects an unknown state", function()
-        local row, err = parse.header(header(ID, "note  pending   m.lua:4    x"))
+        local row, err = parse.header(header(ID, "note  pending   -  m.lua:4"))
         assert.is_nil(row)
         assert.contains(err, "pending")
     end)
@@ -81,21 +93,22 @@ describe("browser.parse.header", function()
     it("rejects answered, which nothing produces", function()
         -- Reserved for an agent verb that was cut; accepting it here would be
         -- the one door back in
-        local row = parse.header(header(ID, "note  answered  m.lua:4    x"))
+        local row = parse.header(header(ID, "note  answered  -  m.lua:4"))
         assert.is_nil(row)
     end)
 
     it("rejects a malformed location", function()
-        local row, err = parse.header(header(ID, "note  open      m.lua:15:4-20"))
+        local row, err = parse.header(header(ID, "note  open      -  m.lua:15:4-20"))
         assert.is_nil(row)
         assert.contains(err, "mixed forms")
     end)
 
     it("reports byte ranges for each column, so <Tab> can jump between them", function()
-        local text = header(ID, "note  open      m.lua:4")
+        local text = header(ID, "note  open      -  m.lua:4")
         local row = assert(parse.header(text))
         assert.eq(text:sub(row.fields.kind.first, row.fields.kind.last), "note")
         assert.eq(text:sub(row.fields.state.first, row.fields.state.last), "open")
+        assert.eq(text:sub(row.fields.pen.first, row.fields.pen.last), "-")
         assert.eq(text:sub(row.fields.location.first, row.fields.location.last), "m.lua:4")
     end)
 end)
@@ -103,7 +116,7 @@ end)
 describe("browser.parse.buffer", function()
     it("attaches an unmarked line as prose of the header above it", function()
         local rows, errors = parse.buffer({
-            header(ID, "note  open      m.lua:4"),
+            header(ID, "note  open      -  m.lua:4"),
             prose("summary"),
             prose("body one"),
             prose("body two"),
@@ -115,7 +128,7 @@ describe("browser.parse.buffer", function()
 
     it("keeps a blank line between two prose lines", function()
         local rows = parse.buffer({
-            header(ID, "note  open      m.lua:4"),
+            header(ID, "note  open      -  m.lua:4"),
             prose("summary"),
             prose("body one"),
             "",
@@ -126,12 +139,12 @@ describe("browser.parse.buffer", function()
 
     it("drops blank lines trailing a block, so a spacer is not stored as prose", function()
         local rows = parse.buffer({
-            header(ID, "note  open      m.lua:4"),
+            header(ID, "note  open      -  m.lua:4"),
             prose("summary"),
             prose("body"),
             "",
             "",
-            header(OTHER, "note  open      m.lua:9"),
+            header(OTHER, "note  open      -  m.lua:9"),
             prose("other"),
         })
         assert.eq_deep(rows[1].prose, { "summary", "body" })
@@ -141,7 +154,7 @@ describe("browser.parse.buffer", function()
     it("keeps a prose line's own indentation verbatim", function()
         -- Nothing is added on render, so nothing is stripped here
         local rows = parse.buffer({
-            header(ID, "note  open      m.lua:4"),
+            header(ID, "note  open      -  m.lua:4"),
             prose("summary"),
             prose("    a code block"),
         })
@@ -150,9 +163,9 @@ describe("browser.parse.buffer", function()
 
     it("records the line each row was read from", function()
         local rows = parse.buffer({
-            header(ID, "note  open      m.lua:4"),
+            header(ID, "note  open      -  m.lua:4"),
             prose("body"),
-            header(OTHER, "note  open      m.lua:9"),
+            header(OTHER, "note  open      -  m.lua:9"),
         })
         assert.eq(rows[1].lnum, 1)
         assert.eq(rows[2].lnum, 3)
@@ -167,8 +180,8 @@ describe("browser.parse.buffer", function()
     it("errors on the same id appearing twice, naming both lines", function()
         -- Which is exactly what yanking a row and pasting it produces
         local _, errors = parse.buffer({
-            header(ID, "note  open      m.lua:4"),
-            header(ID, "note  open      m.lua:9"),
+            header(ID, "note  open      -  m.lua:4"),
+            header(ID, "note  open      -  m.lua:9"),
         })
         assert.eq(#errors, 1)
         assert.eq(errors[1].lnum, 2)
@@ -177,8 +190,8 @@ describe("browser.parse.buffer", function()
 
     it("reports a bad row against its own line and keeps the others", function()
         local rows, errors = parse.buffer({
-            header(ID, "note  open      m.lua:4"),
-            header(OTHER, "note  bogus     m.lua:9"),
+            header(ID, "note  open      -  m.lua:4"),
+            header(OTHER, "note  bogus     -  m.lua:9"),
         })
         assert.eq(#rows, 1)
         assert.eq(#errors, 1)
@@ -207,6 +220,7 @@ describe("browser render and parse round-trip", function()
                     id = ID,
                     kind = "todo",
                     state = "wontfix",
+                    pen = "coral",
                     path = "lua/lobby.lua",
                     scope = "lines",
                     line_start = 42,
@@ -228,6 +242,7 @@ describe("browser render and parse round-trip", function()
         assert.eq(rows[1].id, ID)
         assert.eq(rows[1].kind, "todo")
         assert.eq(rows[1].state, "wontfix")
+        assert.eq(rows[1].pen, "coral")
         assert.eq(rows[1].location, "lua/lobby.lua:42-57")
         assert.eq_deep(rows[1].prose, render.normalize(annotation_prose))
     end

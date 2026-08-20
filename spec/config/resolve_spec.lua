@@ -21,6 +21,14 @@ describe("config.defaults", function()
         config.defaults().filetype = "mutated"
         assert.eq(config.defaults().filetype, "txt")
     end)
+
+    it("seeds org-remark's four pens, each pointing at its own group", function()
+        local pens = config.defaults().pens
+        for _, name in ipairs({ "yellow", "coral", "blue", "green" }) do
+            local group = "SidenotePen" .. name:sub(1, 1):upper() .. name:sub(2)
+            assert.eq(pens[name], group)
+        end
+    end)
 end)
 
 describe("config.resolve", function()
@@ -104,5 +112,22 @@ describe("config.resolve", function()
         local _, err = config.resolve({ preview = "float" })
         assert.contains(err, "vim.g.sidenote.preview")
         assert.contains(err, "expected a table")
+    end)
+
+    it("merges custom pens over the seeded ones", function()
+        local resolved, err = config.resolve({ pens = { pink = "MyPinkWash" } })
+        assert.is_nil(err)
+        assert.eq(resolved.pens.pink, "MyPinkWash")
+        assert.eq(resolved.pens.yellow, "SidenotePenYellow")
+    end)
+
+    it("rejects a pen name that could not sit in a browser column", function()
+        local _, err = config.resolve({ pens = { ["two words"] = "Group" } })
+        assert.contains(err, "vim.g.sidenote.pens")
+    end)
+
+    it("rejects a pen whose group is not a string", function()
+        local _, err = config.resolve({ pens = { pink = 5 } })
+        assert.contains(err, "vim.g.sidenote.pens.pink")
     end)
 end)

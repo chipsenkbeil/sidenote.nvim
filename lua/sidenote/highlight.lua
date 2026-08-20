@@ -61,6 +61,18 @@ local MARK_DEFAULTS = {
     filegone = "DiagnosticVirtualTextError",
 }
 
+---Background washes for the seeded pens, one pair per screen background.
+---
+---A wash and nothing else: setting a foreground would paint over the code's
+---own colors, which is not how a highlighter reads.
+---@type table<string, {dark: string, light: string}>
+local PEN_WASHES = {
+    SidenotePenYellow = { dark = "#5f5320", light = "#ffef9e" },
+    SidenotePenCoral = { dark = "#6b3a34", light = "#ffd6cc" },
+    SidenotePenBlue = { dark = "#2f4a6e", light = "#cfe2ff" },
+    SidenotePenGreen = { dark = "#2f5a3c", light = "#d1f0d7" },
+}
+
 ---Extmark priority per status, so the worst mark wins a shared line.
 ---
 ---The sign column shows one glyph; an orphan hiding behind an attached note's
@@ -99,6 +111,10 @@ function M.setup()
     end
     for status, group in pairs(M.MARKS) do
         vim.api.nvim_set_hl(0, group, { link = MARK_DEFAULTS[status], default = true })
+    end
+    local shade = vim.o.background == "light" and "light" or "dark"
+    for group, wash in pairs(PEN_WASHES) do
+        vim.api.nvim_set_hl(0, group, { bg = wash[shade], default = true })
     end
     vim.api.nvim_set_hl(0, M.PROSE, { link = "Comment", default = true })
 end

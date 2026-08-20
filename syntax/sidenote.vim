@@ -10,7 +10,8 @@ endif
 
 syn match sidenoteId /^\/\w\+ / conceal nextgroup=sidenoteKind
 syn match sidenoteKind /\S\+/ contained nextgroup=sidenoteState skipwhite
-syn match sidenoteState /\S\+/ contained nextgroup=sidenoteLocation skipwhite
+syn match sidenoteState /\S\+/ contained nextgroup=sidenotePen skipwhite
+syn match sidenotePen /\S\+/ contained nextgroup=sidenoteLocation skipwhite
 " The location is the last column and runs to the end of the line, so a path
 " holding spaces still highlights as one thing
 syn match sidenoteLocation /.*$/ contained
@@ -20,6 +21,7 @@ syn match sidenoteProse /^\(\/\w\+ \)\@!.*$/
 
 hi def link sidenoteKind Identifier
 hi def link sidenoteState Keyword
+hi def link sidenotePen Special
 hi def link sidenoteLocation Directory
 hi def link sidenoteProse Comment
 

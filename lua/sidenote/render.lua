@@ -3,10 +3,16 @@ local highlight = require("sidenote.highlight")
 ---@class sidenote.render.Entry
 ---@field id string annotation this mark stands for
 ---@field status sidenote.Status anchor status, deciding the styling
+---@field pen? string pen name coloring the ink instead of the status
 ---@field line_start? integer first line, 1-based, absent when unplaced
 ---@field line_end? integer last line, inclusive
 ---@field col_start? integer first byte column, 1-based, for a range's exact span
 ---@field col_end? integer last byte column, inclusive
+
+---@class sidenote.render.PaintOpts
+---@field style string sign, virt_text, highlight, underline or none
+---@field highlight? string the range overlay mode: off, on, always or never
+---@field pens? table<string, string> mapping of pen name -> highlight group its ink uses
 
 ---Paints resolved annotations into a buffer.
 ---
@@ -86,9 +92,10 @@ end
 ---@param bufnr integer
 ---@param entry sidenote.render.Entry
 ---@param style string
+---@param pens table<string, string>|nil pen name -> highlight group
 ---@return integer|nil col 0-based start column, nil when nothing is drawn
 ---@return table|nil opts extmark options
-local function mark_opts(bufnr, entry, style)
+local function mark_opts(bufnr, entry, style, pens)
     local group = highlight.GROUPS[entry.status]
     if style == "sign" then
         -- A ranged sign mark repeats its glyph on every covered line, and here
@@ -108,12 +115,14 @@ local function mark_opts(bufnr, entry, style)
     -- Ink over the text and only the text, the way a marker pen reads: exact
     -- columns for a range, through the last line's end otherwise
     if style == "highlight" or style == "underline" then
+        -- A pen the caller no longer knows degrades to the status ink
+        local pen = entry.pen and pens and pens[entry.pen]
         local end_row, end_col = span_end(bufnr, entry)
         return span_start(entry),
             {
                 end_row = end_row,
                 end_col = end_col,
-                hl_group = style == "highlight" and highlight.MARKS[entry.status]
+                hl_group = style == "highlight" and (pen or highlight.MARKS[entry.status])
                     or highlight.UNDERLINES[entry.status],
             }
     end
@@ -123,7 +132,7 @@ end
 ---Clear and repaint every entry, returning how many were actually placed.
 ---@param bufnr integer
 ---@param entries sidenote.render.Entry[]
----@param opts {style: string, highlight?: string}
+---@param opts sidenote.render.PaintOpts
 ---@return integer placed
 function M.paint(bufnr, entries, opts)
     if not defined then
@@ -146,14 +155,14 @@ function M.paint(bufnr, entries, opts)
         -- An unplaced or out-of-range entry is skipped rather than clamped:
         -- clamping is how an annotation ends up pointing at unrelated code
         if entry.line_start and entry.line_end and entry.line_end <= count then
-            local col, mark = mark_opts(bufnr, entry, opts.style)
+            local col, mark = mark_opts(bufnr, entry, opts.style, opts.pens)
             if mark then
                 mark.priority = highlight.PRIORITIES[entry.status]
                 vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, entry.line_start - 1, col, mark)
                 placed = placed + 1
             end
             if overlay then
-                local ink, range = mark_opts(bufnr, entry, "highlight")
+                local ink, range = mark_opts(bufnr, entry, "highlight", opts.pens)
                 range.priority = highlight.PRIORITIES[entry.status]
                 vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, entry.line_start - 1, ink, range)
             end

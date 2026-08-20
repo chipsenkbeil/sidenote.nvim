@@ -243,26 +243,28 @@ describe("browser.row_at", function()
 end)
 
 describe("browser column navigation", function()
-    local LINE = "/01J9F3K2X7Q4V8M2ZC5T0BQWE note  open      m.lua:4    the summary"
+    local LINE = "/01J9F3K2X7Q4V8M2ZC5T0BQWE note  open      coral  m.lua:4"
 
     it("steps forward through the columns", function()
         local kind = assert(browser.next_column(LINE, 1))
         assert.eq(LINE:sub(kind, kind + 3), "note")
         local state = assert(browser.next_column(LINE, kind))
         assert.eq(LINE:sub(state, state + 3), "open")
-        local loc = assert(browser.next_column(LINE, state))
+        local pen = assert(browser.next_column(LINE, state))
+        assert.eq(LINE:sub(pen, pen + 4), "coral")
+        local loc = assert(browser.next_column(LINE, pen))
         assert.eq(LINE:sub(loc, loc + 6), "m.lua:4")
     end)
 
     it("stops at the last column rather than wrapping", function()
-        local summary = LINE:find("the summary")
-        assert.is_nil(browser.next_column(LINE, summary))
+        local loc = LINE:find("m.lua")
+        assert.is_nil(browser.next_column(LINE, loc))
     end)
 
     it("steps backward through the columns", function()
-        local summary = LINE:find("the summary")
-        local loc = assert(browser.prev_column(LINE, summary))
-        assert.eq(LINE:sub(loc, loc + 6), "m.lua:4")
+        local loc = LINE:find("m.lua")
+        local pen = assert(browser.prev_column(LINE, loc))
+        assert.eq(LINE:sub(pen, pen + 4), "coral")
     end)
 
     it("stops at the first column rather than wrapping", function()

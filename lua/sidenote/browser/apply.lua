@@ -100,6 +100,23 @@ end
 
 CHECKS.rescope = CHECKS.move
 
+CHECKS.change = function(action, state)
+    -- The parser checks only a pen's shape; whether it is configured is
+    -- answered here, where the config is
+    if action.field == "pen" and action.to ~= nil then
+        local pens = state.config.pens or {}
+        if not pens[action.to] then
+            local known = vim.tbl_keys(pens)
+            table.sort(known)
+            return ("unknown pen %q; configured pens: %s"):format(
+                action.to,
+                table.concat(known, ", ")
+            )
+        end
+    end
+    return nil
+end
+
 CHECKS.write = function(action, state)
     local row = row_for(state, action.id)
     if not row then

@@ -29,6 +29,7 @@ function M.entry(root, rec, resolution)
     return {
         id = rec.id,
         status = resolution.status,
+        pen = rec.pen,
         line_start = resolution.line_start,
         line_end = resolution.line_end,
         -- Columns travel only for a range, whose ink covers its exact span
@@ -95,7 +96,11 @@ function M.refresh(bufnr, cfg)
     if not buffer.target(bufnr, { scope = "file" }) then
         return 0
     end
-    return render.paint(bufnr, M.entries(bufnr, cfg), cfg.indicator)
+    return render.paint(bufnr, M.entries(bufnr, cfg), {
+        style = cfg.indicator.style,
+        highlight = cfg.indicator.highlight,
+        pens = cfg.pens,
+    })
 end
 
 ---Write verified anchors back after their buffer was saved.

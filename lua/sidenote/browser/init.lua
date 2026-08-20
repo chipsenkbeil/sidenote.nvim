@@ -162,10 +162,15 @@ function M.foldtext()
 
     -- The header's own text, sliced by field so each column keeps its color;
     -- the concealed id is simply not emitted
-    local groups = { kind = "sidenoteKind", state = "sidenoteState", location = "sidenoteLocation" }
+    local groups = {
+        kind = "sidenoteKind",
+        state = "sidenoteState",
+        pen = "sidenotePen",
+        location = "sidenoteLocation",
+    }
     local chunks = {}
     local cursor = row.fields.kind.first
-    for _, name in ipairs({ "kind", "state", "location" }) do
+    for _, name in ipairs({ "kind", "state", "pen", "location" }) do
         local field = row.fields[name]
         if field.first > cursor then
             chunks[#chunks + 1] = { header:sub(cursor, field.first - 1), "Normal" }
@@ -224,7 +229,9 @@ local function paint(bufnr, state)
             }
         end
     end
-    indicator.paint(bufnr, marks, { style = "sign" })
+    -- Never the range overlay: the listing is text about notes, not the
+    -- annotated code, so pen and status ink belong to the source alone
+    indicator.paint(bufnr, marks, { style = "sign", highlight = "never" })
     close_all(bufnr)
 end
 
@@ -327,22 +334,50 @@ local function help(actions)
     end
 end
 
----Which field a cycle at the cursor means: kind on its own column, else state.
+---Which field a cycle at the cursor means: kind or pen on their own columns,
+---and state everywhere else on the row.
 ---@param bufnr integer
----@return "kind"|"state"
+---@return "kind"|"state"|"pen"
 local function cycle_target(bufnr)
     local lnum, col = unpack(vim.api.nvim_win_get_cursor(0))
     local text = vim.api.nvim_buf_get_lines(bufnr, lnum - 1, lnum, false)[1] or ""
     local row = parse.header(text)
-    if row and col + 1 >= row.fields.kind.first and col + 1 <= row.fields.kind.last then
-        return "kind"
+    if not row then
+        return "state"
+    end
+    for _, name in ipairs({ "kind", "pen" }) do
+        local field = row.fields[name]
+        if col + 1 >= field.first and col + 1 <= field.last then
+            return name
+        end
     end
     return "state"
 end
 
----Rotate a row's `kind` or `state` in place, the way org rotates a headline.
+---The values a field rotates through, in a stable order.
 ---
----One pair of keys serves both: the column under the cursor decides, and
+---A pen's ring opens with the placeholder, so cycling can put the pen back
+---down; the configured names follow, sorted, since a table has no order.
+---@param field "kind"|"state"|"pen"
+---@param cfg sidenote.Config
+---@return string[]
+local function ring_for(field, cfg)
+    if field == "kind" then
+        return record.KIND_NAMES
+    end
+    if field == "state" then
+        return record.STATE_NAMES
+    end
+    local names = vim.tbl_keys(cfg.pens or {})
+    table.sort(names)
+    table.insert(names, 1, render.NO_PEN)
+    return names
+end
+
+---Rotate a row's `kind`, `state` or `pen` in place, the way org rotates a
+---headline.
+---
+---One pair of keys serves all three: the column under the cursor decides, and
 ---state is the default everywhere else on the row. One deliberate keystroke
 ---is its own confirmation, so the record is written directly and the listing
 ---repainted; the batched `:w` dialog is for text edits. A listing holding
@@ -365,14 +400,15 @@ local function cycle(bufnr, offset)
     if not rec then
         return
     end
-    local names = field == "kind" and record.KIND_NAMES or record.STATE_NAMES
+    local names = ring_for(field, state.config)
     local at = 1
     for i, name in ipairs(names) do
-        if name == rec[field] then
+        if name == (rec[field] or render.NO_PEN) then
             at = i
         end
     end
-    rec[field] = names[(at - 1 + offset) % #names + 1]
+    local turned = names[(at - 1 + offset) % #names + 1]
+    rec[field] = turned ~= render.NO_PEN and turned or nil
 
     local ok, err = store.update(row.entry.root, rec)
     if not ok then
@@ -509,14 +545,14 @@ local function bind(bufnr)
         },
         {
             lhs = "t",
-            desc = "Cycle state forward; kind when on its column",
+            desc = "Cycle state forward; kind or pen on their columns",
             fn = function()
                 cycle(bufnr, 1)
             end,
         },
         {
             lhs = "T",
-            desc = "Cycle state backward; kind when on its column",
+            desc = "Cycle state backward; kind or pen on their columns",
             fn = function()
                 cycle(bufnr, -1)
             end,

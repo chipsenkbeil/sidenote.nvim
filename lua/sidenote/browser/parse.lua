@@ -11,6 +11,7 @@ local render = require("sidenote.browser.render")
 ---@field lnum integer buffer line the header sat on, 1-based
 ---@field kind string kind column exactly as written
 ---@field state string state column exactly as written
+---@field pen string|nil pen column, nil when it held the `-` placeholder
 ---@field location string location column exactly as written
 ---@field prose string[] the lines beneath the header, summary first
 ---@field fields table<string, sidenote.browser.Field> column ranges, for <Tab>
@@ -29,7 +30,7 @@ local render = require("sidenote.browser.render")
 local M = {}
 
 ---Columns that carry a value before the location, in order.
-local LEADING = { "kind", "state" }
+local LEADING = { "kind", "state", "pen" }
 
 ---@param row sidenote.browser.Parsed
 ---@return string|nil err
@@ -39,6 +40,11 @@ local function check(row)
     end
     if not record.STATES[row.state] then
         return ("unknown state %q; expected open, resolved, wontfix or archived"):format(row.state)
+    end
+    -- Shape only: whether the pen is configured needs the config, which the
+    -- applying layer has and a parser does not
+    if row.pen ~= nil and not row.pen:match("^%w[%w_-]*$") then
+        return ("%q is not a pen; use a word, or - for none"):format(row.pen)
     end
     local _, err = location.parse(row.location)
     return err
@@ -66,11 +72,14 @@ function M.header(text)
     for _, name in ipairs(LEADING) do
         local gap_first, gap_last = rest:find("%s%s+", cursor)
         if not gap_first then
-            return nil, "expected kind, state and a location, separated by two or more spaces"
+            return nil, "expected kind, state, pen and a location, separated by two or more spaces"
         end
         row[name] = rest:sub(cursor, gap_first - 1)
         row.fields[name] = { first = offset + cursor, last = offset + gap_first - 1 }
         cursor = gap_last + 1
+    end
+    if row.pen == render.NO_PEN then
+        row.pen = nil
     end
 
     local trimmed = (rest:sub(cursor):gsub("%s+$", ""))

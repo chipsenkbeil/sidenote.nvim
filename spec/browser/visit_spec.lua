@@ -8,6 +8,7 @@ local function opts()
         strategy = { "project" },
         project_dir = ".sidenote",
         global_dir = vim.fn.tempname(),
+        pens = { blue = "SidenotePenBlue", green = "SidenotePenGreen" },
         indicator = { style = "sign" },
         preview = { style = "float", max_lines = 20 },
         editor = { style = "split", position = "right", size = 60 },
@@ -212,6 +213,27 @@ describe("browser gutter", function()
         assert.eq(#marks, 1)
         assert.eq(vim.trim(marks[1][4].sign_text), require("sidenote.highlight").SIGNS.orphaned)
     end)
+
+    it("never draws the range overlay in a listing, even toggled on there", function()
+        -- The listing is text about notes, not annotated code, so ink
+        -- belongs to the source buffer alone
+        local source = project_buffer()
+        annotate(source, 4)
+        vim.api.nvim_buf_set_lines(source, 0, -1, false, { "entirely", "different", "words" })
+        local render = require("sidenote.render")
+
+        local listing = assert(browser.open(source, { config = opts() }))
+        render.toggle(listing, "off")
+        assert(browser.open(source, { config = opts() }))
+
+        local marks = vim.api.nvim_buf_get_extmarks(listing, render.NAMESPACE, 0, -1, {
+            details = true,
+        })
+        assert.gt(#marks, 0, "the status sign itself must survive")
+        for _, mark in ipairs(marks) do
+            assert.is_nil(mark[4].hl_group, "overlay ink in the listing")
+        end
+    end)
 end)
 
 describe("browser column stepping", function()
@@ -248,6 +270,26 @@ describe("browser cycling", function()
         assert.contains(vim.api.nvim_buf_get_lines(0, 0, 1, false)[1], "todo")
         press("T")
         assert.eq(store.read(result.root, result.id).kind, "note")
+    end)
+
+    it("cycles the pen on its column, with the placeholder in the ring", function()
+        -- The ring is `-` then the configured pens sorted by name, so a
+        -- backward step from the first pen puts the pen back down
+        local source = project_buffer()
+        local result = annotate(source, 4)
+        vim.api.nvim_set_current_buf(assert(browser.open(source, { config = opts() })))
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+        press("<Tab>")
+        press("<Tab>")
+        press("<Tab>")
+        press("t")
+        assert.eq(store.read(result.root, result.id).pen, "blue")
+        press("t")
+        assert.eq(store.read(result.root, result.id).pen, "green")
+        press("T")
+        press("T")
+        assert.is_nil(store.read(result.root, result.id).pen)
     end)
 
     it("cycles the state everywhere else, wrapping at both ends", function()

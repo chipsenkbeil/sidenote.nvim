@@ -8,6 +8,7 @@ local OTHER = "01J9F3K2X7Q4V8M2ZC5T0BQWF"
 ---@field create? boolean true for a row the user typed, which carries no id
 ---@field kind? "note"|"todo" defaults to note
 ---@field state? string lifecycle position, defaults to open
+---@field pen? string pen name, defaults to none
 ---@field path? string defaults to lua/lobby.lua
 ---@field line_start? integer defaults to 42
 ---@field line_end? integer defaults to line_start
@@ -46,6 +47,7 @@ local function before(specs)
                     id = spec.id or ID,
                     kind = spec.kind or "note",
                     state = spec.state or "open",
+                    pen = spec.pen,
                     path = spec.path or "lua/lobby.lua",
                     scope = spec.scope or "lines",
                     line_start = whole_file and 0 or line_start,
@@ -71,6 +73,7 @@ local function after(specs)
             lnum = i,
             kind = spec.kind or "note",
             state = spec.state or "open",
+            pen = spec.pen,
             location = location_of(spec),
             prose = spec.prose or { "the summary" },
             fields = {},
@@ -149,6 +152,26 @@ describe("browser.diff change", function()
         assert.eq(#actions, 1)
         assert.eq(actions[1].field, "state")
         assert.eq(actions[1].to, "wontfix")
+    end)
+
+    it("reports a pen picked up where there was none", function()
+        local actions = diff.compute(before({ {} }), after({ { pen = "yellow" } }))
+        assert.eq(#actions, 1)
+        assert.eq(actions[1].field, "pen")
+        assert.is_nil(actions[1].from)
+        assert.eq(actions[1].to, "yellow")
+    end)
+
+    it("reports a pen put back down as a change to none", function()
+        local actions = diff.compute(before({ { pen = "yellow" } }), after({ {} }))
+        assert.eq(#actions, 1)
+        assert.eq(actions[1].field, "pen")
+        assert.eq(actions[1].from, "yellow")
+        assert.is_nil(actions[1].to)
+    end)
+
+    it("produces nothing for a row whose pen column stayed the placeholder", function()
+        assert.eq_deep(diff.compute(before({ {} }), after({ {} })), {})
     end)
 
     it("reports one action per column when both changed", function()

@@ -136,6 +136,16 @@ describe("browser.confirm callouts", function()
         assert.contains(text({ CHANGE }), "note -> todo")
     end)
 
+    it("shows a pen picked up or put down as the placeholder", function()
+        -- A nil side is rendered, not formatted: %s on nil would throw
+        local picked =
+            { kind = "change", id = ID, lossy = false, field = "pen", from = nil, to = "yellow" }
+        assert.contains(text({ picked }), "- -> yellow")
+        local dropped =
+            { kind = "change", id = ID, lossy = false, field = "pen", from = "yellow", to = nil }
+        assert.contains(text({ dropped }), "yellow -> -")
+    end)
+
     it("returns nothing at all when there are no actions", function()
         assert.eq_deep(confirm.summary({}), {})
     end)

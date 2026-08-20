@@ -11,6 +11,7 @@ local function opts()
         strategy = { "project" },
         project_dir = ".sidenote",
         global_dir = vim.fn.tempname(),
+        pens = { yellow = "SidenotePenYellow" },
         indicator = { style = "sign" },
         preview = { style = "float", max_lines = 20 },
         editor = { style = "split", position = "right", size = 60 },
@@ -152,6 +153,26 @@ describe("browser.apply.validate", function()
         vim.bo[prose_buf].modified = false
     end)
 
+    it("rejects a pen the config does not know", function()
+        local p = project()
+        local id = annotate(p.source, 4, { "the note" })
+        local state = state_of(p.source)
+        local action =
+            { kind = "change", id = id, lnum = 1, lossy = false, field = "pen", to = "sparkles" }
+        local errors = apply.validate({ action }, state)
+        assert.eq(#errors, 1)
+        assert.contains(errors[1].message, "sparkles")
+    end)
+
+    it("always accepts putting a pen back down", function()
+        local p = project()
+        local id = annotate(p.source, 4, { "the note" })
+        local state = state_of(p.source)
+        local action =
+            { kind = "change", id = id, lnum = 1, lossy = false, field = "pen", from = "yellow" }
+        assert.eq_deep(apply.validate({ action }, state), {})
+    end)
+
     it("passes a set of actions that are all possible", function()
         local p = project()
         local id = annotate(p.source, 4, { "the note" })
@@ -206,6 +227,20 @@ describe("browser.apply.run", function()
         assert.eq(apply.run({ action }, state), 1)
         assert.eq(stored(state, id).state, "wontfix")
         assert.eq(stored(state, id).kind, "note")
+    end)
+
+    it("writes a picked-up pen into the metadata, and clears one put down", function()
+        local p = project()
+        local id = annotate(p.source, 4, { "the note" })
+        local state = state_of(p.source)
+
+        local pick = { kind = "change", id = id, lossy = false, field = "pen", to = "yellow" }
+        assert.eq(apply.run({ pick }, state), 1)
+        assert.eq(stored(state, id).pen, "yellow")
+
+        local drop = { kind = "change", id = id, lossy = false, field = "pen", from = "yellow" }
+        assert.eq(apply.run({ drop }, state), 1)
+        assert.is_nil(stored(state, id).pen)
     end)
 
     it("rewrites prose on a write, leaving the record alone", function()

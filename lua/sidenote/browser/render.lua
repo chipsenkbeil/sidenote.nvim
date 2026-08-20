@@ -26,8 +26,13 @@ local M = {}
 M.COLUMNS = {
     { name = "kind", width = 4 },
     { name = "state", width = 8 },
+    -- Sized to content: pen names are user-configured, so no width is safe
+    { name = "pen", width = 0 },
     { name = "location", width = 0 },
 }
+
+---What the pen column renders when a row carries none.
+M.NO_PEN = "-"
 
 ---Spaces between one column and the next.
 ---
@@ -65,10 +70,10 @@ function M.normalize(prose)
 end
 
 ---@param row sidenote.browser.Row
----@return string[] cells kind, state and location, unpadded
+---@return string[] cells kind, state, pen and location, unpadded
 local function cells(row)
     local rec = row.entry.record
-    return { rec.kind, rec.state, location.format(rec) }
+    return { rec.kind, rec.state, rec.pen or M.NO_PEN, location.format(rec) }
 end
 
 ---Width of each column, taking the widest cell where the column is not fixed.

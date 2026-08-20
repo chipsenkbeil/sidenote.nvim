@@ -26,6 +26,7 @@
 ---@field project_dir string directory name used for an in-project store
 ---@field cache_dir string where scans cache resolutions, never inside a store
 ---@field template? fun(ctx: sidenote.template.Context): string[]|nil seeds a new note's buffer
+---@field pens table<string, string> mapping of pen name -> highlight group its ink uses
 ---@field indicator sidenote.IndicatorConfig how annotations appear in a source buffer
 ---@field preview sidenote.PreviewConfig how a note is glanced at
 ---@field editor sidenote.EditorConfig how a note opens for writing
@@ -56,6 +57,15 @@ function M.defaults()
         -- Where scans cache resolutions; never inside a store, which may be
         -- committed
         cache_dir = vim.fn.stdpath("cache") .. "/sidenote",
+
+        -- Pens a note can carry, each naming the highlight group its ink
+        -- uses; custom entries merge over these
+        pens = {
+            yellow = "SidenotePenYellow",
+            coral = "SidenotePenCoral",
+            blue = "SidenotePenBlue",
+            green = "SidenotePenGreen",
+        },
 
         -- Style: sign | virt_text | highlight | underline | none. The range
         -- overlay: off | on (toggleable defaults) | always | never (pinned)
@@ -109,6 +119,23 @@ local function validate(cfg)
 
     if cfg.template ~= nil and type(cfg.template) ~= "function" then
         return fail("template", ("expected a function, got %s"):format(type(cfg.template)))
+    end
+
+    if type(cfg.pens) ~= "table" then
+        return fail("pens", ("expected a table, got %s"):format(type(cfg.pens)))
+    end
+    for name, group in pairs(cfg.pens) do
+        -- The same shape the record accepts: anything else could not sit in
+        -- a browser column
+        if type(name) ~= "string" or not name:match("^%w[%w_-]*$") then
+            return fail("pens", ("%s is not a pen name; use a word"):format(tostring(name)))
+        end
+        if type(group) ~= "string" then
+            return fail(
+                ("pens.%s"):format(name),
+                ("expected a highlight group name, got %s"):format(type(group))
+            )
+        end
     end
 
     -- Checked before their styles are read: indexing a number would throw, and

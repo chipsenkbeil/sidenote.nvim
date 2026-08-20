@@ -88,7 +88,7 @@ Inside a browser buffer only:
 | `<CR>` | open this note's prose for writing |
 | `gf` | jump to the code the note is about |
 | `a` | create a note on a file, and open it |
-| `t` `T` | cycle state forward and back — or kind, on its column |
+| `t` `T` | cycle state forward and back — or kind or pen, on their columns |
 | `fk` `fs` `fa` | filter by kind, state, or anchor status |
 | `ff` | filter by path substring |
 | `fc` | clear every filter |
@@ -140,6 +140,15 @@ vim.g.sidenote = {
     -- committed
     cache_dir = vim.fn.stdpath("cache") .. "/sidenote",
 
+    -- Pens a note can carry, each naming the highlight group its ink
+    -- uses; custom entries merge over these
+    pens = {
+        yellow = "SidenotePenYellow",
+        coral = "SidenotePenCoral",
+        blue = "SidenotePenBlue",
+        green = "SidenotePenGreen",
+    },
+
     -- Style: sign | virt_text | highlight | underline | none. The range
     -- overlay: off | on (toggleable defaults) | always | never (pinned)
     indicator = { style = "sign", highlight = "off" },
@@ -164,8 +173,29 @@ Signs span every line of a multi-line note, and when notes overlap the worst
 anchor status wins the gutter. `:Sidenote highlight` additionally marks the
 annotated text itself — ink over the words, a range by its exact columns —
 per buffer, the way `:set spell!` toggles: `on` flips the default, `always`
-and `never` pin it. The pens are the `SidenoteMark*` groups, one per anchor
-status, yours to restyle.
+and `never` pin it. By default the ink is the `SidenoteMark*` groups, one per
+anchor status, yours to restyle.
+
+<!-- vimdoc:tag sidenote-pens -->
+
+### Pens
+
+A note can carry a pen, coloring its ink like a highlighter. Four come
+seeded — `yellow`, `coral`, `blue` and `green`, background washes in the
+`SidenotePen*` groups — and adding your own is one config entry naming the
+highlight group its ink should use:
+
+```lua
+vim.g.sidenote = {
+    pens = { pink = "MyPinkWash" },
+}
+```
+
+Custom entries merge over the seeded ones. Pick a pen up in the browser: `t`
+and `T` on its column cycle through `-` (none) and every configured pen, or
+type the name and `:w`. A penless note keeps the status ink; anchor health
+stays on the sign either way, so a drifted note is visible whatever color it
+wears.
 
 A `template` function seeds the buffer a new note opens into:
 
@@ -232,9 +262,9 @@ a store from global to in-repo is a `mv`.
 An editable listing, in the spirit of oil.nvim:
 
 ```
-▍ note  open      lua/lobby.lua:42-57    race in lobby join
-▍ todo  open      lua/lobby.lua:88       refactor onto the new API
-! note  wontfix   lua/lobby.lua          the old retry loop
+▍ note  open      yellow  lua/lobby.lua:42-57    race in lobby join
+▍ todo  open      -       lua/lobby.lua:88       move onto the new API
+! note  wontfix   -       lua/lobby.lua          the old retry loop
 ```
 
 Every column is yours to edit. Anchor status is the one thing the machine
@@ -251,7 +281,7 @@ On `:w`:
 | edit | result |
 |---|---|
 | any prose line, including the summary | rewrites that note |
-| `kind` or `state` | updates the record |
+| `kind`, `state` or the pen | updates the record |
 | the position in the location | re-scopes, re-anchored |
 | the path in the location | moves it, re-anchored |
 | deleting a row | deletes the note |

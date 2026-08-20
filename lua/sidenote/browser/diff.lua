@@ -19,7 +19,10 @@ local location = require("sidenote.location")
 local M = {}
 
 ---Columns whose edit means the same thing whatever the value.
-local COLUMNS = { "kind", "state" }
+---
+---Pen included: a record with none and a parsed `-` placeholder are both nil
+---by the time they reach the comparison, so the placeholder never diffs.
+local COLUMNS = { "kind", "state", "pen" }
 
 ---@param a string[]
 ---@param b string[]

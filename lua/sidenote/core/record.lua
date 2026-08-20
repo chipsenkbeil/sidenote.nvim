@@ -10,6 +10,7 @@ local hash = require("sidenote.core.hash")
 ---@field schema integer on-disk format version of this record
 ---@field kind "note"|"todo" whether the note is information or a request to act
 ---@field state "open"|"resolved"|"wontfix"|"archived" lifecycle position
+---@field pen string|nil configured pen coloring the note's ink, nil for the status look
 ---@field project_key string identity of the project the path is relative to
 ---@field path string annotated file, relative to the project root
 ---@field scope "file"|"lines"|"range" what the annotation covers
@@ -157,6 +158,7 @@ function M.reanchor(rec, opts)
         now = opts.now,
     })
     fresh.state = rec.state
+    fresh.pen = rec.pen
     fresh.captured = rec.captured
     return fresh
 end
@@ -183,6 +185,11 @@ function M.validate(rec)
     if not M.STATES[rec.state] then
         return false,
             ("state: expected open|resolved|wontfix|archived, got %s"):format(tostring(rec.state))
+    end
+    -- Word characters with interior - or _: anything else could not sit in a
+    -- browser column, where `-` alone is the placeholder a penless row renders
+    if rec.pen ~= nil and not tostring(rec.pen):match("^%w[%w_-]*$") then
+        return false, ("pen: expected a word, got %s"):format(tostring(rec.pen))
     end
     if type(rec.line_start) ~= "number" or type(rec.line_end) ~= "number" then
         return false, "line_start/line_end: expected numbers"

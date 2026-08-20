@@ -64,6 +64,7 @@ describe("the generated help file", function()
             ":Sidenote",
             "vim.g.sidenote",
             "sidenote-browser",
+            "sidenote-pens",
             "sidenote-export-gate",
             "sidenote-storage",
             "sidenote-filtering",

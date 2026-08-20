@@ -49,7 +49,9 @@ end
 ---@return string
 local function detail(action)
     if action.kind == "change" then
-        return ("%s   %s -> %s"):format(action.field, action.from, action.to)
+        -- A pen change has a nil side when it is picked up or put down; the
+        -- placeholder is how the column renders that
+        return ("%s   %s -> %s"):format(action.field, action.from or "-", action.to or "-")
     end
     return ("%s -> %s"):format(action.from, action.to)
 end

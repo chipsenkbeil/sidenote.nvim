@@ -206,7 +206,7 @@ already happened once here. Check `jj st` after every absorb.
   that lives in only one of them turns an untouched row into a phantom `write`
   that then silently rewrites the note. The summary (prose line one) stays
   trimmed at both ends; body lines keep their own indentation.
-- **A header is `id kind state location`, and the summary lives with its
+- **A header is `id kind state pen location`, and the summary lives with its
   prose**, verbatim at the margin below (2026-08-20 redesign). The concealed
   `/<id> ` marker is the grammar's only delimiter: ids are word characters, so
   prose mentioning `/etc/hosts` cannot read as a header, and everything
@@ -215,6 +215,11 @@ already happened once here. Check `jj st` after every absorb.
   the header's columns plus the summary via a chunked `foldtext`,
   display-only. Location being the last column is what made a path holding
   two consecutive spaces legal in a listing again.
+- **A pen is a record field naming a configured highlight group** (added
+  2026-08-20). `-` in the column means none; parse maps it to nil, so the
+  placeholder can never diff. The parser checks only a pen's shape — whether
+  it is configured is `apply`'s question, since only apply has the config.
+  Pen ink colors the span; anchor health stays on the sign/underline channel.
 - **No required `setup()`.** Config is `vim.g.sidenote`, validated in
   `config.lua`, which returns defaults *alongside* any error so a bad config
   degrades rather than disabling the plugin.

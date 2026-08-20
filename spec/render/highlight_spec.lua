@@ -67,6 +67,25 @@ describe("highlight.MARKS", function()
     end)
 end)
 
+describe("highlight pens", function()
+    local PENS = { "SidenotePenYellow", "SidenotePenCoral", "SidenotePenBlue", "SidenotePenGreen" }
+
+    it("gives each seeded pen a background wash, the way a highlighter reads", function()
+        highlight.setup()
+        for _, group in ipairs(PENS) do
+            local hl = vim.api.nvim_get_hl(0, { name = group })
+            assert.not_nil(hl.bg, group .. " has no background")
+            assert.is_nil(hl.fg, group .. " sets a foreground over the code's own")
+        end
+    end)
+
+    it("defers to a colorscheme that already colored a pen", function()
+        vim.api.nvim_set_hl(0, "SidenotePenCoral", { bg = "#123456" })
+        highlight.setup()
+        assert.eq(vim.api.nvim_get_hl(0, { name = "SidenotePenCoral" }).bg, 0x123456)
+    end)
+end)
+
 describe("highlight.setup", function()
     it("defines every group", function()
         highlight.setup()

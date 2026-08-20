@@ -164,6 +164,51 @@ describe("render.paint", function()
         assert.eq(marks(bufnr)[1][4].hl_group, highlight.MARKS.attached)
     end)
 
+    it("inks with a note's pen when it names one the caller knows", function()
+        local bufnr = scratch(LINES)
+        render.paint(
+            bufnr,
+            { { id = "a", status = "attached", line_start = 2, line_end = 2, pen = "coral" } },
+            { style = "highlight", pens = { coral = "SidenotePenCoral" } }
+        )
+        assert.eq(marks(bufnr)[1][4].hl_group, "SidenotePenCoral")
+    end)
+
+    it("falls back to the status ink for a pen the caller does not know", function()
+        -- A pen dropped from the config degrades rather than erroring
+        local bufnr = scratch(LINES)
+        render.paint(
+            bufnr,
+            { { id = "a", status = "drifted", line_start = 2, line_end = 2, pen = "gone" } },
+            { style = "highlight", pens = {} }
+        )
+        assert.eq(marks(bufnr)[1][4].hl_group, highlight.MARKS.drifted)
+    end)
+
+    it("keeps the underline style on status, where a wash has nothing to say", function()
+        local bufnr = scratch(LINES)
+        render.paint(
+            bufnr,
+            { { id = "a", status = "attached", line_start = 2, line_end = 2, pen = "coral" } },
+            { style = "underline", pens = { coral = "SidenotePenCoral" } }
+        )
+        assert.eq(marks(bufnr)[1][4].hl_group, highlight.UNDERLINES.attached)
+    end)
+
+    it("inks the range overlay with the pen too", function()
+        local bufnr = scratch(LINES)
+        render.paint(
+            bufnr,
+            { { id = "a", status = "attached", line_start = 2, line_end = 2, pen = "blue" } },
+            { style = "sign", highlight = "always", pens = { blue = "SidenotePenBlue" } }
+        )
+        local found = false
+        for _, mark in ipairs(marks(bufnr)) do
+            found = found or mark[4].hl_group == "SidenotePenBlue"
+        end
+        assert.eq(found, true)
+    end)
+
     it("puts the sign at end of line when the style is virt_text", function()
         local bufnr = scratch(LINES)
         render.paint(

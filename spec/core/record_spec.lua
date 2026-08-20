@@ -168,6 +168,25 @@ describe("record.validate", function()
         assert.eq(ok, false)
         assert.match(err, "project_key")
     end)
+
+    it("accepts a record with no pen, and one naming a pen", function()
+        assert.eq(record.validate(capture()), true)
+        local rec = capture()
+        rec.pen = "yellow"
+        assert.eq(record.validate(rec), true)
+    end)
+
+    it("rejects a pen that could not sit in a browser column", function()
+        -- Columns split on runs of spaces, and a bare `-` is the placeholder
+        -- a penless row renders
+        for _, bad in ipairs({ "-", "two words", "" }) do
+            local rec = capture()
+            rec.pen = bad
+            local ok, err = record.validate(rec)
+            assert.eq(ok, false, ("pen %q"):format(bad))
+            assert.match(err, "pen")
+        end
+    end)
 end)
 
 describe("record JSON round-trip", function()
@@ -229,6 +248,20 @@ describe("record.reanchor", function()
         assert.eq(fresh.kind, "todo")
         assert.eq(fresh.state, "wontfix", "a re-anchor is not a fresh capture")
         assert.eq(fresh.project_key, original.project_key)
+    end)
+
+    it("keeps the pen, which the user owns like kind and state", function()
+        local original = capture()
+        original.pen = "coral"
+        local fresh = record.reanchor(original, {
+            path = "lua/m.lua",
+            content = CONTENT,
+            scope = "lines",
+            line_start = 7,
+            line_end = 7,
+            now = LATER,
+        })
+        assert.eq(fresh.pen, "coral")
     end)
 
     it("keeps the original capture instant", function()

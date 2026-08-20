@@ -14,6 +14,7 @@ local OTHER = "01J9F3K2X7Q4V8M2ZC5T0BQWF"
 ---@field col_start? integer defaults to 0, meaning no columns were captured
 ---@field col_end? integer defaults to col_start
 ---@field resolved? integer line the resolver placed it on, when it drifted
+---@field pen? string pen name, defaults to none
 ---@field prose? string[] defaults to one summary line
 
 ---Build a row without touching a store, which is the point of a pure renderer.
@@ -37,6 +38,7 @@ local function row(opts)
                 id = opts.id or ID,
                 kind = opts.kind or "note",
                 state = opts.state or "open",
+                pen = opts.pen,
                 path = opts.path or "lua/lobby.lua",
                 scope = scope,
                 line_start = whole_file and 0 or line_start,
@@ -56,14 +58,14 @@ local function without_id(line)
 end
 
 describe("browser.render columns", function()
-    it("names three columns, in the order they are written", function()
-        -- The summary is not among them: it is prose line one, indented below
+    it("names four columns, in the order they are written", function()
+        -- The summary is not among them: it is prose line one, sitting below
         -- its header with the rest of the body
         local names = {}
         for _, column in ipairs(render.COLUMNS) do
             names[#names + 1] = column.name
         end
-        assert.eq_deep(names, { "kind", "state", "location" })
+        assert.eq_deep(names, { "kind", "state", "pen", "location" })
     end)
 
     it("prefixes a header with the concealed id and a single space", function()
@@ -73,7 +75,13 @@ describe("browser.render columns", function()
 
     it("separates every column by at least two spaces, so parsing can split on the gap", function()
         local rest = without_id(render.rows({ row() })[1])
-        assert.eq(select(2, rest:gsub("%s%s+", "")), 2)
+        assert.eq(select(2, rest:gsub("%s%s+", "")), 3)
+    end)
+
+    it("renders a penless row with a placeholder, and a pen by its name", function()
+        local lines = render.rows({ row(), row({ id = OTHER, pen = "coral" }) })
+        assert.contains(without_id(lines[1]), "  -  ")
+        assert.contains(without_id(lines[3]), "  coral  ")
     end)
 
     it("aligns columns across rows so the listing does not jitter", function()
