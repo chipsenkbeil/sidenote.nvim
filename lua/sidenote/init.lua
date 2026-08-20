@@ -103,6 +103,17 @@ function M.at_cursor(entries)
     return best or whole
 end
 
+---The buffer a command should act on: from inside a note, its own source.
+---@param bufnr integer
+---@return integer
+local function dwim(bufnr)
+    local note = vim.b[bufnr].sidenote
+    if note and note.source and vim.api.nvim_buf_is_loaded(note.source) then
+        return note.source
+    end
+    return bufnr
+end
+
 ---@class sidenote.BrowseOpts
 ---@field bufnr? integer source buffer, defaulting to the current one
 ---@field filter? sidenote.browser.Filter which annotations survive into the listing
@@ -113,7 +124,7 @@ end
 ---@return string|nil err
 function M.browse(opts)
     opts = opts or {}
-    return require("sidenote.browser").open(opts.bufnr or vim.api.nvim_get_current_buf(), {
+    return require("sidenote.browser").open(opts.bufnr or dwim(vim.api.nvim_get_current_buf()), {
         config = config(),
         filter = opts.filter,
     })
@@ -131,11 +142,11 @@ function M.browse_project(opts)
     opts = opts or {}
     local from = opts.path
     if not from or from == "" then
-        -- From inside a listing, widen what it lists: the listing's own
-        -- buffer name is sidenote://…, which is no path at all
+        -- A listing widens to what it lists, and a note stands in for the
+        -- file it annotates; neither buffer's own name is a project path
         local bufnr = vim.api.nvim_get_current_buf()
         local state = require("sidenote.browser").state(bufnr)
-        from = state and state.path or vim.api.nvim_buf_get_name(bufnr)
+        from = state and state.path or vim.api.nvim_buf_get_name(dwim(bufnr))
     end
     if from == "" then
         from = vim.fn.getcwd()

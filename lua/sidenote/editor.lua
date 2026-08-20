@@ -1,6 +1,7 @@
 local config = require("sidenote.config")
 local highlight = require("sidenote.highlight")
 local location = require("sidenote.location")
+local render = require("sidenote.render")
 local store = require("sidenote.store")
 local window = require("sidenote.window")
 
@@ -22,6 +23,10 @@ local SNIPPET_LINES = 3
 
 ---@type integer|nil
 local current
+
+---Notes decorated per prose buffer, which is what live refresh re-draws.
+---@type table<integer, sidenote.editor.Note>
+local decorated = {}
 
 ---@return integer|nil winid
 function M.winid()
@@ -147,6 +152,41 @@ function M.header(entry, source)
     return lines
 end
 
+---Watch what the header depends on, re-drawing when either side changes.
+---@param bufnr integer prose buffer
+---@param entry sidenote.editor.Note
+local function watch(bufnr, entry)
+    local group = vim.api.nvim_create_augroup("sidenote.header." .. bufnr, { clear = true })
+    if entry.source and vim.api.nvim_buf_is_valid(entry.source) then
+        vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+            group = group,
+            buffer = entry.source,
+            desc = "Keep the open note's header true to the code it quotes",
+            callback = function()
+                M.redecorate(bufnr)
+            end,
+        })
+    end
+    vim.api.nvim_create_autocmd("BufWinEnter", {
+        group = group,
+        buffer = bufnr,
+        desc = "Re-draw the header on returning to the note",
+        callback = function()
+            M.redecorate(bufnr)
+        end,
+    })
+    vim.api.nvim_create_autocmd("BufWipeout", {
+        group = group,
+        buffer = bufnr,
+        once = true,
+        desc = "Drop the header's state along with its buffer",
+        callback = function()
+            decorated[bufnr] = nil
+            pcall(vim.api.nvim_del_augroup_by_id, group)
+        end,
+    })
+end
+
 ---Paint the header above the prose and pin the identity into the winbar.
 ---
 ---The virtual lines sit above row 0, which a window opened at the very top
@@ -167,9 +207,48 @@ local function decorate(bufnr, winid, entry)
     end
 
     vim.api.nvim_set_option_value("winbar", M.headline(entry), { win = winid, scope = "local" })
+    -- Reveal the header only while the view sits at the top; a re-draw must
+    -- never scroll a note the user has moved down into
     vim.api.nvim_win_call(winid, function()
-        vim.fn.winrestview({ topline = 1, topfill = #lines })
+        if vim.fn.winsaveview().topline == 1 then
+            vim.fn.winrestview({ topline = 1, topfill = #lines })
+        end
     end)
+    decorated[bufnr] = entry
+    watch(bufnr, entry)
+end
+
+---Re-draw a prose buffer's header from the note's current truth.
+---
+---The extent comes from the live mark when the source is painted, and the
+---record is re-read, so an edit beside the code or a cycle in the browser
+---shows through without reopening the note.
+---@param bufnr integer prose buffer
+---@return boolean drawn
+function M.redecorate(bufnr)
+    local note = decorated[bufnr]
+    if not note or not vim.api.nvim_buf_is_valid(bufnr) then
+        return false
+    end
+
+    local rec = store.read(note.root, note.id)
+    if rec then
+        note.record = rec
+    end
+    local live = note.source
+        and vim.api.nvim_buf_is_valid(note.source)
+        and render.extent(note.source, note.id)
+    if live and not live.invalid then
+        note.line_start, note.line_end = live.line_start, live.line_end
+        note.status = live.status
+    end
+
+    local winid = vim.fn.win_findbuf(bufnr)[1]
+    if not winid then
+        return false
+    end
+    decorate(bufnr, winid, note)
+    return true
 end
 
 ---Open a note, returning the window showing it.
@@ -198,9 +277,19 @@ function M.open(entry, opts, filetype)
     -- From the file, not the parameter: a note written under an earlier
     -- `filetype` setting keeps the highlighting its extension names
     vim.bo[bufnr].filetype = vim.fn.fnamemodify(path, ":e")
+    -- What DWIM commands and live refresh read back
+    vim.b[bufnr].sidenote = { id = entry.id, root = entry.root, source = entry.source }
 
     local winid = M.winid()
     if winid then
+        -- The note being left is flushed first, so the store on disk never
+        -- lies to a reader outside the editor
+        local leaving = vim.api.nvim_win_get_buf(winid)
+        if leaving ~= bufnr and vim.bo[leaving].modified and vim.b[leaving].sidenote then
+            vim.api.nvim_buf_call(leaving, function()
+                vim.cmd("silent update")
+            end)
+        end
         vim.api.nvim_win_set_buf(winid, bufnr)
         if opts.focus then
             vim.api.nvim_set_current_win(winid)

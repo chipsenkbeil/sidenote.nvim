@@ -51,16 +51,6 @@ local function point()
         return
     end
 
-    -- The prose being left is flushed, so the store never lies to a reader
-    if win then
-        local leaving = vim.api.nvim_win_get_buf(win)
-        if vim.bo[leaving].modified then
-            vim.api.nvim_buf_call(leaving, function()
-                vim.cmd("silent update")
-            end)
-        end
-    end
-
     local cfg = held or config.get()
     shown = entry.id
     local note =

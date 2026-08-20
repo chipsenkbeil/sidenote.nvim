@@ -260,6 +260,87 @@ describe("editor.header", function()
     end)
 end)
 
+describe("editor DWIM context", function()
+    before_each(function()
+        vim.g.sidenote = { strategy = "project", filetype = "org" }
+    end)
+
+    after_each(function()
+        vim.g.sidenote = nil
+        local winid = editor.winid()
+        if winid then
+            require("sidenote.window").close(winid)
+        end
+        vim.cmd("silent! %bwipeout!")
+    end)
+
+    it("stamps the prose buffer with the note it holds", function()
+        local entry, source = annotated()
+        entry.source = source
+        local winid = editor.open(entry, opts().editor, "org")
+        local bufnr = vim.api.nvim_win_get_buf(winid)
+        local held = vim.b[bufnr].sidenote
+        assert.eq(held.id, entry.id)
+        assert.eq(held.source, source)
+    end)
+
+    it("browsing from a note lists the annotated file, not the note's own", function()
+        local entry, source = annotated()
+        entry.source = source
+        local winid = editor.open(entry, opts().editor, "org")
+        vim.api.nvim_set_current_win(winid)
+
+        local listing = assert(require("sidenote").browse())
+        assert.eq(
+            vim.api.nvim_buf_get_name(listing),
+            "sidenote://" .. vim.uv.fs_realpath(vim.api.nvim_buf_get_name(source))
+        )
+    end)
+
+    it("saves the note it re-points away from", function()
+        local first, source = annotated()
+        first.source = source
+        local winid = editor.open(first, opts().editor, "org")
+        local prose = vim.api.nvim_win_get_buf(winid)
+        vim.api.nvim_buf_set_lines(prose, 0, -1, false, { "left behind, but kept" })
+
+        local second = annotated()
+        editor.open(second, opts().editor, "org")
+        assert.eq(store.prose(first.root, first.id, "org"), "left behind, but kept\n")
+    end)
+
+    it("re-draws the header when the annotated code changes", function()
+        local entry, source = annotated()
+        entry.source = source
+        session.refresh(source, opts())
+        local winid = editor.open(entry, opts().editor, "org")
+        local bufnr = vim.api.nvim_win_get_buf(winid)
+
+        vim.api.nvim_buf_set_lines(source, 0, 0, false, { "-- pushed down" })
+        vim.api.nvim_buf_call(source, function()
+            vim.cmd("doautocmd TextChanged")
+        end)
+
+        local marks = vim.api.nvim_buf_get_extmarks(bufnr, editor.NAMESPACE, 0, -1, {
+            details = true,
+        })
+        assert.contains(marks[1][4].virt_lines[1][1][1], "5", "the quote follows the code")
+    end)
+
+    it("re-reads the record, so a cycle elsewhere shows through", function()
+        local entry, source = annotated()
+        entry.source = source
+        local winid = editor.open(entry, opts().editor, "org")
+        local bufnr = vim.api.nvim_win_get_buf(winid)
+
+        local rec = assert(store.read(entry.root, entry.id))
+        rec.kind = "todo"
+        assert(store.update(entry.root, rec))
+        assert.truthy(editor.redecorate(bufnr))
+        assert.contains(vim.wo[winid].winbar, "todo")
+    end)
+end)
+
 describe("editor.open context", function()
     it("paints the header above the prose, revealed by filler lines", function()
         local entry, source = annotated()

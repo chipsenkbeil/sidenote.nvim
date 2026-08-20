@@ -233,6 +233,13 @@ anchor short of exact shows its status and confidence in the status color,
 keeping the originally captured line on a `was:` row — the one place you
 write about code also tells you honestly where that code stands.
 
+The header stays true while you work: editing the annotated code re-draws
+the quote, and a change made in the browser shows through on return. A
+note buffer also knows what it is — `b:sidenote` carries its id and
+source — so browsing from inside a note lists the *annotated file's*
+notes, never the store directory, and the note the editor moves away from
+is saved on its way out.
+
 <!-- vimdoc:tag sidenote-follow -->
 
 ### Follow
