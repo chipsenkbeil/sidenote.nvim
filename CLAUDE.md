@@ -229,6 +229,20 @@ already happened once here. Check `jj st` after every absorb.
   and a mark placed on a guess both fall back to the resolver, which is what
   keeps `false_stale > wrong` intact. There is no edit-driven re-resolve;
   do not reintroduce one — it fights the edit in progress.
+- **The editor's context header is display-only extmarks** (2026-08-20,
+  from the org-remark review): virtual lines above row 0 plus a winbar
+  mirror of the location. Lines above row 0 are invisible at scroll-top
+  until `winrestview({topline = 1, topfill = N})` asks for filler rows —
+  verified with a screen probe; do not remove the winrestview call and
+  trust the extmark alone. The snippet shows the code as it reads *now*
+  (org-remark shows capture-time text and its own comments admit that
+  misleads); drift appears in the status color with confidence and a
+  `was:` line.
+- **Follow mode is re-pointing one window, not a window system**
+  (`follow.lua`). `at_cursor` over entries cached per changedtick; the
+  panel keeps the last note over unannotated code; a modified prose buffer
+  is `:update`d before the panel moves off it, so the on-disk store never
+  lies to the CLI or an agent; closing the panel turns following off.
 - **No required `setup()`.** Config is `vim.g.sidenote`, validated in
   `config.lua`, which returns defaults *alongside* any error so a bad config
   degrades rather than disabling the plugin.
