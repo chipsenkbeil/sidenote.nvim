@@ -8,6 +8,9 @@ local M = {}
 ---Prose shown as virtual text beneath annotated code.
 M.PROSE = "SidenoteProse"
 
+---The note editor's context header, comment-colored so it reads as margin.
+M.CONTEXT = "SidenoteContext"
+
 ---Severity ordering, expressed by borrowing the diagnostic vocabulary: an
 ---exact anchor is information, a guessed one is a hint, and anything the
 ---resolver declined to place is a warning or worse.
@@ -117,6 +120,7 @@ function M.setup()
         vim.api.nvim_set_hl(0, group, { bg = wash[shade], default = true })
     end
     vim.api.nvim_set_hl(0, M.PROSE, { link = "Comment", default = true })
+    vim.api.nvim_set_hl(0, M.CONTEXT, { link = "Comment", default = true })
 end
 
 return M

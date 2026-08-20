@@ -211,6 +211,18 @@ The seed is an unsaved edit — the prose file stays empty until you write the
 buffer yourself. `ctx` carries `path`, `filetype`, `scope`, `line_start`,
 `line_end` and `text`.
 
+<!-- vimdoc:tag sidenote-context-header -->
+
+### The note editor
+
+A note opens under a context header: comment-colored virtual lines naming
+its location, kind, state and pen, then a short snippet of the annotated
+code *as it reads right now*. The location stays pinned in the window's
+winbar once a long note scrolls. An anchor that is short of exact shows its
+status and confidence there in the status color, keeping the originally
+captured line on a `was:` marker — so the one place you write about code
+also tells you honestly where that code stands.
+
 <!-- vimdoc:tag sidenote-storage -->
 
 ### Where notes are stored

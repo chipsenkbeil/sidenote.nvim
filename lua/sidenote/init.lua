@@ -167,7 +167,8 @@ function M.open()
     end
     local cfg = config()
     local editor = vim.tbl_extend("force", cfg.editor, { focus = true })
-    require("sidenote.editor").open(entry, editor, cfg.filetype)
+    local note = vim.tbl_extend("keep", { source = vim.api.nvim_get_current_buf() }, entry)
+    require("sidenote.editor").open(note, editor, cfg.filetype)
     return true
 end
 
