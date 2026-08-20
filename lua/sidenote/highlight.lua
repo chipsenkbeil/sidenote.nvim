@@ -14,6 +14,9 @@ M.CONTEXT = "SidenoteContext"
 ---A healthy anchor with no prose yet, dimmed into a deletion candidate.
 M.BARE = "SidenoteBare"
 
+---The note editor's winbar, backed like a statusline so it reads as chrome.
+M.WINBAR = "SidenoteWinbar"
+
 ---Severity ordering, expressed by borrowing the diagnostic vocabulary: an
 ---exact anchor is information, a guessed one is a hint, and anything the
 ---resolver declined to place is a warning or worse.
@@ -125,6 +128,7 @@ function M.setup()
     vim.api.nvim_set_hl(0, M.PROSE, { link = "Comment", default = true })
     vim.api.nvim_set_hl(0, M.CONTEXT, { link = "Comment", default = true })
     vim.api.nvim_set_hl(0, M.BARE, { link = "NonText", default = true })
+    vim.api.nvim_set_hl(0, M.WINBAR, { link = "StatusLine", default = true })
 end
 
 return M

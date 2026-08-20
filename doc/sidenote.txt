@@ -236,13 +236,15 @@ buffer yourself. `ctx` carries `path`, `filetype`, `scope`, `line_start`,
 
 THE NOTE EDITOR                                      *sidenote-context-header*
 
-A note opens under a context header: comment-colored virtual lines naming its
-location, kind, state and pen, then a short snippet of the annotated code as
-it reads right now. The location stays pinned in the window's winbar once a
-long note scrolls. An anchor that is short of exact shows its status and
-confidence there in the status color, keeping the originally captured line on
-a `was:` marker — so the one place you write about code also tells you
-honestly where that code stands.
+A note opens under its identity, pinned in the window's winbar on a
+statusline-like background: location, kind and state, plus a swatch drawn in
+the note's actual ink — the pen's wash, or a squiggle when the indicator
+style is `underline`. Beneath it, a quoted snippet of the annotated code as it
+reads right now, each line behind its own source line number and a `│`,
+closed with a divider so the quote never blends into your prose. An anchor
+short of exact shows its status and confidence in the status color, keeping
+the originally captured line on a `was:` row — the one place you write about
+code also tells you honestly where that code stands.
 
 FOLLOW                                                       *sidenote-follow*
 

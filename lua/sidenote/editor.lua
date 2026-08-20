@@ -1,3 +1,4 @@
+local config = require("sidenote.config")
 local highlight = require("sidenote.highlight")
 local location = require("sidenote.location")
 local store = require("sidenote.store")
@@ -39,6 +40,7 @@ end
 ---@field line_start? integer first line the note covers now
 ---@field line_end? integer last line, inclusive
 ---@field source? integer loaded buffer of the annotated file, for the snippet
+---@field config? sidenote.Config configuration, for pens and the ink style
 
 ---Trim a snippet line and clip it to the header's width.
 ---@param text string
@@ -51,37 +53,67 @@ local function clipped(text)
     return text
 end
 
----Build the context header shown above a note's prose.
+---The winbar line naming the open note: its identity, pinned.
 ---
----One line of identity — location, kind, state, pen, and the anchor status
----whenever it is short of exact — then a short snippet of the annotated
----code. The snippet reads `source` when it is loaded, so it shows the code
----as it is now; without one it falls back to the stored anchor text. A
----drifted note keeps its stored text visible on a `was:` line, since what
----the snippet shows is then only the resolver's best idea.
+---Location, kind and state on the winbar's own background, then a swatch
+---drawn in the note's actual ink — the pen's wash, the status mark for a
+---penless note, or a squiggle when the configured style is `underline` —
+---and the anchor status with its confidence whenever it is short of exact.
 ---@param entry sidenote.editor.Note
----@param source integer|nil loaded buffer of the annotated file
----@return {[1]: string, [2]: string}[][] lines chunk lines, never empty
-function M.header(entry, source)
+---@return string winbar statusline-format text
+function M.headline(entry)
     local rec = assert(entry.record)
-    local res = entry.resolution
+    local cfg = entry.config or config.get()
+    local bar = "%#" .. highlight.WINBAR .. "#"
 
-    local first = { { location.format(rec), highlight.CONTEXT } }
-    for _, part in ipairs({ rec.kind, rec.state, rec.pen }) do
-        first[#first + 1] = { " · " .. part, highlight.CONTEXT }
+    local parts = {
+        bar,
+        " ",
+        location.format(rec):gsub("%%", "%%%%"),
+        "  ",
+        rec.kind,
+        " · ",
+        rec.state,
+        " · ",
+    }
+    if rec.pen then
+        parts[#parts + 1] = rec.pen .. " "
     end
-    if entry.status and entry.status ~= "attached" then
-        local label = entry.status
-        local confidence = res and res.confidence
+    local status = entry.status or "attached"
+    if cfg.indicator.style == "underline" then
+        parts[#parts + 1] = "%#" .. highlight.UNDERLINES[status] .. "#~~~"
+    else
+        local ink = rec.pen and (cfg.pens or {})[rec.pen] or highlight.MARKS[status]
+        parts[#parts + 1] = "%#" .. ink .. "#■"
+    end
+    parts[#parts + 1] = bar
+
+    if status ~= "attached" then
+        local label = status
+        local confidence = entry.resolution and entry.resolution.confidence
         if confidence and confidence > 0 and confidence < 1 then
             label = ("%s %.2f"):format(label, confidence)
         end
-        first[#first + 1] = { " · " .. label, highlight.GROUPS[entry.status] }
+        parts[#parts + 1] = " · %#" .. highlight.GROUPS[status] .. "#" .. label .. bar
     end
-    local lines = { first }
+    return table.concat(parts)
+end
 
+---The quoted snippet shown above a note's prose, identity-free.
+---
+---The code the note covers, each line under its own source line number and
+---behind a `│`, closed by a divider so the quote never bleeds into prose.
+---Read from `source` when it is loaded — the code as it is now — else from
+---the stored anchor text. A drifted note keeps its stored first line on a
+---`was:` row, since the snippet is then only the resolver's best idea. A
+---file-wide note has no snippet at all; the winbar carries its identity.
+---@param entry sidenote.editor.Note
+---@param source integer|nil loaded buffer of the annotated file
+---@return {[1]: string, [2]: string}[][] lines chunk lines, possibly empty
+function M.header(entry, source)
+    local rec = assert(entry.record)
     if rec.scope == "file" then
-        return lines
+        return {}
     end
 
     local live = source
@@ -91,23 +123,35 @@ function M.header(entry, source)
             and vim.api.nvim_buf_get_lines(source, entry.line_start - 1, entry.line_end, false)
         or nil
     local body = live or vim.split(rec.text, "\n")
+    local first = (live and entry.line_start or rec.line_start) or 1
+    local width = #tostring(first + math.min(#body, SNIPPET_LINES) - 1)
+
+    local lines = {}
     for i = 1, math.min(#body, SNIPPET_LINES) do
-        lines[#lines + 1] = { { clipped(body[i]), highlight.CONTEXT } }
+        lines[#lines + 1] = {
+            { ("%" .. width .. "d │ "):format(first + i - 1), "LineNr" },
+            { clipped(body[i]), highlight.CONTEXT },
+        }
+    end
+    if #body > SNIPPET_LINES then
+        lines[#lines + 1] = { { (" "):rep(width) .. " │ ⋯", "LineNr" } }
     end
     if live and entry.status == "drifted" then
         lines[#lines + 1] = {
+            { (" "):rep(width) .. " │ ", "LineNr" },
             { "was: ", highlight.GROUPS.drifted },
             { clipped(vim.split(rec.text, "\n")[1]), highlight.CONTEXT },
         }
     end
+    lines[#lines + 1] = { { ("─"):rep(48), highlight.CONTEXT } }
     return lines
 end
 
----Paint the header above the prose and pin the location into the winbar.
+---Paint the header above the prose and pin the identity into the winbar.
 ---
 ---The virtual lines sit above row 0, which a window opened at the very top
 ---does not show until filler rows are asked for; `topfill` is that ask. The
----winbar duplicates the location because virtual lines scroll away with
+---winbar alone carries the identity, because virtual lines scroll away with
 ---line 1 in a note longer than its window.
 ---@param bufnr integer prose buffer
 ---@param winid integer editor window
@@ -115,17 +159,14 @@ end
 local function decorate(bufnr, winid, entry)
     local lines = M.header(entry, entry.source)
     vim.api.nvim_buf_clear_namespace(bufnr, M.NAMESPACE, 0, -1)
-    vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, 0, 0, {
-        virt_lines = lines,
-        virt_lines_above = true,
-    })
+    if #lines > 0 then
+        vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, 0, 0, {
+            virt_lines = lines,
+            virt_lines_above = true,
+        })
+    end
 
-    local label = location.format(entry.record):gsub("%%", "%%%%")
-    vim.api.nvim_set_option_value(
-        "winbar",
-        "%#" .. highlight.CONTEXT .. "#" .. label,
-        { win = winid, scope = "local" }
-    )
+    vim.api.nvim_set_option_value("winbar", M.headline(entry), { win = winid, scope = "local" })
     vim.api.nvim_win_call(winid, function()
         vim.fn.winrestview({ topline = 1, topfill = #lines })
     end)

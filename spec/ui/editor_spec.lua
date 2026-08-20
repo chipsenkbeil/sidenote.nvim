@@ -10,6 +10,7 @@ local function opts()
         strategy = { "project" },
         project_dir = ".sidenote",
         global_dir = vim.fn.tempname(),
+        pens = { blue = "SidenotePenBlue" },
         indicator = { style = "sign" },
         preview = { style = "float", max_lines = 20 },
         editor = { style = "split", position = "right", size = 40 },
@@ -145,34 +146,82 @@ describe("editor.open", function()
     end)
 end)
 
+describe("editor.headline", function()
+    ---@param entry sidenote.session.Entry
+    ---@return sidenote.editor.Note
+    local function noted(entry)
+        return vim.tbl_extend("keep", { config = opts() }, entry)
+    end
+
+    it("carries the location, kind and state on the winbar's own color", function()
+        local entry = annotated()
+        local bar = editor.headline(noted(entry))
+        assert.contains(bar, "m.lua:4")
+        assert.contains(bar, "note")
+        assert.contains(bar, "open")
+        assert.contains(bar, "%#SidenoteWinbar#")
+        assert.falsy(bar:find("attached", 1, true), "a healthy anchor needs no label")
+    end)
+
+    it("shows a pen as a swatch in its own ink, named", function()
+        local entry = annotated()
+        entry.record.pen = "blue"
+        local bar = editor.headline(noted(entry))
+        assert.contains(bar, "blue")
+        assert.contains(bar, "%#SidenotePenBlue#■")
+    end)
+
+    it("swatches a penless note in its status ink", function()
+        local entry = annotated()
+        assert.contains(
+            editor.headline(noted(entry)),
+            "%#" .. require("sidenote.highlight").MARKS.attached .. "#■"
+        )
+    end)
+
+    it("shows a squiggle when the ink is the underline style", function()
+        local entry = annotated()
+        local note = noted(entry)
+        note.config.indicator = { style = "underline" }
+        assert.contains(
+            editor.headline(note),
+            "%#" .. require("sidenote.highlight").UNDERLINES.attached .. "#~"
+        )
+    end)
+
+    it("shows drift with its confidence, in the status color", function()
+        local entry = annotated()
+        entry.status = "drifted"
+        entry.resolution =
+            { status = "drifted", line_start = 4, line_end = 4, confidence = 0.85, tier = "L6" }
+        local bar = editor.headline(noted(entry))
+        assert.contains(bar, "drifted 0.85")
+        assert.contains(bar, "%#" .. require("sidenote.highlight").GROUPS.drifted .. "#")
+    end)
+
+    it("escapes a path that carries a percent", function()
+        local entry = annotated()
+        entry.record.path = "odd%name.lua"
+        assert.contains(editor.headline(noted(entry)), "odd%%name.lua")
+    end)
+end)
+
 describe("editor.header", function()
-    it("names the location, kind and state on its first line", function()
-        local entry, source = annotated()
-        entry.source = source
-        local first = text_of(editor.header(entry, source)[1])
-        assert.contains(first, "m.lua:4")
-        assert.contains(first, "note")
-        assert.contains(first, "open")
-        assert.falsy(first:find("attached", 1, true), "a healthy anchor needs no label")
-    end)
-
-    it("names the pen when the note carries one", function()
-        local entry, source = annotated()
-        entry.record.pen = "coral"
-        assert.contains(text_of(editor.header(entry, source)[1]), "coral")
-    end)
-
-    it("snippets the code as it reads in the buffer now", function()
+    it("quotes the code with its own line numbers, as it reads now", function()
         local entry, source = annotated()
         local lines = editor.header(entry, source)
-        assert.gt(#lines, 1)
-        assert.contains(text_of(lines[2]), "return 1")
-        assert.eq(lines[2][1][2], "SidenoteContext")
+        local quoted = text_of(lines[1])
+        assert.contains(quoted, "4 │ ")
+        assert.contains(quoted, "return 1")
     end)
 
-    it("shows drift in the status color, keeping the stored text below", function()
-        -- Synthetic drift: the header is display logic, and what the
-        -- resolver would grade this edit is not the point here
+    it("closes the quote with a divider, so snippet never bleeds into prose", function()
+        local entry, source = annotated()
+        local lines = editor.header(entry, source)
+        assert.contains(text_of(lines[#lines]), "─")
+    end)
+
+    it("keeps the stored text on a was: line when the note drifted", function()
         local entry, source = annotated()
         vim.api.nvim_buf_set_text(source, 3, 9, 3, 10, { "waited" })
         entry.status = "drifted"
@@ -180,22 +229,25 @@ describe("editor.header", function()
             { status = "drifted", line_start = 4, line_end = 4, confidence = 0.85, tier = "L6" }
 
         local lines = editor.header(entry, source)
-        local first = lines[1]
-        assert.contains(text_of(first), "drifted 0.85")
-        assert.eq(first[#first][2], require("sidenote.highlight").GROUPS.drifted)
-        assert.contains(text_of(lines[2]), "waited", "the snippet reads the buffer as it is now")
-        local last = text_of(lines[#lines])
-        assert.contains(last, "was:")
-        assert.contains(last, "return 1")
+        assert.contains(text_of(lines[1]), "waited", "the snippet reads the buffer as it is now")
+        local was = text_of(lines[#lines - 1])
+        assert.contains(was, "was:")
+        assert.contains(was, "return 1")
     end)
 
-    it("says a file-wide note plainly, never rendering empty", function()
+    it("marks a snippet cut short vertically", function()
+        -- A five-line span shows three lines and admits the rest exists
+        local entry, source = annotated()
+        entry.line_start, entry.line_end = 1, 5
+        local lines = editor.header(entry, source)
+        assert.contains(text_of(lines[#lines - 1]), "⋯")
+    end)
+
+    it("has no snippet for a file-wide note; the winbar carries identity", function()
         local entry, source = annotated()
         entry.record.scope = "file"
         entry.record.text = ""
-        local lines = editor.header(entry, source)
-        assert.eq(#lines, 1)
-        assert.contains(text_of(lines[1]), "m.lua")
+        assert.eq_deep(editor.header(entry, source), {})
     end)
 
     it("clips a snippet line rather than letting it run on", function()

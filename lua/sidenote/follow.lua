@@ -63,7 +63,8 @@ local function point()
 
     local cfg = held or config.get()
     shown = entry.id
-    local note = vim.tbl_extend("keep", { source = vim.api.nvim_get_current_buf() }, entry)
+    local note =
+        vim.tbl_extend("keep", { source = vim.api.nvim_get_current_buf(), config = cfg }, entry)
     editor.open(note, vim.tbl_extend("force", cfg.editor, { focus = false }), cfg.filetype)
 end
 

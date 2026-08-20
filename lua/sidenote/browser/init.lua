@@ -582,7 +582,11 @@ local function bind(bufnr)
                     return
                 end
                 local where = vim.tbl_extend("force", state.config.editor, { focus = true })
-                local note = vim.tbl_extend("keep", { source = state.source }, row.entry)
+                local note = vim.tbl_extend(
+                    "keep",
+                    { source = state.source, config = state.config },
+                    row.entry
+                )
                 editor.open(note, where, state.config.filetype)
             end,
         },
