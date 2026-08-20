@@ -21,11 +21,22 @@ local PER_ACTION = { move = true, rescope = true, change = true }
 ---Order kinds appear in, so the dialog reads the same way every time.
 local ORDER = { "write", "create", "change", "move", "rescope", "delete" }
 
-local NOTES = {
-    move = "(re-anchored by content)",
-    rescope = "(DROPS ANCHOR)",
-    delete = "(REMOVES PROSE FILE)",
-}
+---What an action does or costs, shown at the end of its row.
+---
+---By cost, not by kind: a rescope within the file keeps its anchor, and a move
+---to file scope drops it.
+---@param kind string
+---@param lossy boolean
+---@return string|nil
+local function note_for(kind, lossy)
+    if kind == "delete" then
+        return "(REMOVES PROSE FILE)"
+    end
+    if kind == "move" or kind == "rescope" then
+        return lossy and "(DROPS ANCHOR)" or "(re-anchored by content)"
+    end
+    return nil
+end
 
 ---@param count integer
 ---@param singular string
@@ -55,9 +66,9 @@ end
 
 ---@param kind string
 ---@param body string
+---@param note string|nil
 ---@return string
-local function row(kind, body)
-    local note = NOTES[kind]
+local function row(kind, body, note)
     local line = ("  %-8s %s"):format(kind:upper(), body)
     return note and (line .. "   " .. note) or line
 end
@@ -76,10 +87,10 @@ local function describe(actions)
         local group = by_kind[kind]
         if group and PER_ACTION[kind] then
             for _, action in ipairs(group) do
-                lines[#lines + 1] = row(kind, detail(action))
+                lines[#lines + 1] = row(kind, detail(action), note_for(kind, action.lossy))
             end
         elseif group then
-            lines[#lines + 1] = row(kind, counted(kind, #group))
+            lines[#lines + 1] = row(kind, counted(kind, #group), note_for(kind, group[1].lossy))
         end
     end
     return lines

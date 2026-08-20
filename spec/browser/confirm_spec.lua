@@ -112,6 +112,22 @@ describe("browser.confirm callouts", function()
         assert.contains(text({ RESCOPE }), "DROPS ANCHOR")
     end)
 
+    it("says a non-lossy rescope is re-anchored, never that it drops the anchor", function()
+        -- The note follows what the action costs, not which kind it is
+        local narrowing =
+            vim.tbl_extend("force", RESCOPE, { lossy = false, to = "lua/lobby.lua:45" })
+        local body = text({ narrowing })
+        assert.contains(body, "re-anchored by content")
+        assert.falsy(body:find("DROPS ANCHOR", 1, true))
+    end)
+
+    it("says a move that widens to file scope drops the anchor", function()
+        local widening = vim.tbl_extend("force", MOVE, { lossy = true, to = "lua/net/lobby.lua" })
+        local body = text({ widening })
+        assert.contains(body, "DROPS ANCHOR")
+        assert.falsy(body:find("re-anchored", 1, true))
+    end)
+
     it("warns that a delete removes the prose file", function()
         -- The one action that destroys a document rather than a record
         assert.contains(text({ DELETE }), "REMOVES PROSE FILE")

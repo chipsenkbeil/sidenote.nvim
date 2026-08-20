@@ -59,7 +59,7 @@ local function relocation(row, parsed)
         lnum = parsed.lnum,
         from = from,
         to = parsed.location,
-        lossy = not moved and wanted ~= nil and wanted.scope == "file" and rec.scope ~= "file",
+        lossy = wanted ~= nil and wanted.scope == "file" and rec.scope ~= "file",
     }
 end
 

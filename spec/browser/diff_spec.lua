@@ -188,6 +188,14 @@ describe("browser.diff location", function()
         assert.truthy(actions[1].lossy)
     end)
 
+    it("flags a move that also widens to file scope as lossy", function()
+        -- The path changed too, but the anchor is dropped all the same
+        local edited = after({ { path = "lua/net.lua", scope = "file" } })
+        local actions = diff.compute(before({ {} }), edited)
+        assert.eq(actions[1].kind, "move")
+        assert.truthy(actions[1].lossy)
+    end)
+
     it("does not flag a narrowing rescope as lossy", function()
         local state = before({ { line_start = 42, line_end = 57 } })
         local actions = diff.compute(state, after({ { line_start = 45, line_end = 46 } }))
