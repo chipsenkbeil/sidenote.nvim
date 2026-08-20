@@ -20,11 +20,7 @@ local store = require("sidenote.store")
 local strategy = require("sidenote.store.strategy")
 local window = require("sidenote.window")
 
----@class sidenote.browser.Filter
----@field status? sidenote.Status keep only annotations the resolver put here
----@field kind? "note"|"todo" keep only notes or only requests to act
----@field state? string keep only one lifecycle position
----@field path? string keep only paths containing this, literally
+---@alias sidenote.browser.Filter sidenote.Filter
 
 ---@class sidenote.browser.State
 ---@field scope "file"|"project" how wide a set the listing covers
@@ -96,16 +92,7 @@ local function prose_of(entry, filetype)
     return render.normalize(text and hash.split(text) or {})
 end
 
----Whether an entry passes the listing's filter.
----@param entry sidenote.session.Entry
----@param filter sidenote.browser.Filter
----@return boolean
-local function survives(entry, filter)
-    return (filter.status == nil or entry.status == filter.status)
-        and (filter.kind == nil or entry.record.kind == filter.kind)
-        and (filter.state == nil or entry.record.state == filter.state)
-        and (filter.path == nil or entry.record.path:find(filter.path, 1, true) ~= nil)
-end
+local survives = require("sidenote.filter").survives
 
 ---Resolve whatever set the listing covers.
 ---

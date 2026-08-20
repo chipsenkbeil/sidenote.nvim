@@ -240,6 +240,24 @@ function M.toggle_highlight()
     return shown
 end
 
+---This buffer's annotations as the window's location list.
+---@param opts? sidenote.list.Opts
+---@return integer listed
+function M.loclist(opts)
+    opts = opts or {}
+    opts.bufnr = opts.bufnr or dwim(vim.api.nvim_get_current_buf())
+    return require("sidenote.list").loclist(opts)
+end
+
+---The whole project's annotations as the quickfix list.
+---@param opts? sidenote.list.Opts
+---@return integer listed
+function M.qflist(opts)
+    opts = opts or {}
+    opts.bufnr = opts.bufnr or dwim(vim.api.nvim_get_current_buf())
+    return require("sidenote.list").qflist(opts)
+end
+
 ---Delete the annotation under the cursor, after a confirmation that quotes
 ---the prose it would destroy.
 ---@return boolean deleted

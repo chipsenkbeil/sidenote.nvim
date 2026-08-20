@@ -15,6 +15,8 @@ local SUBCOMMANDS = {
     "highlight",
     "follow",
     "pen",
+    "loclist",
+    "qflist",
 }
 
 -- The state global statuslines read: plugin-owned output, seeded from the
@@ -164,6 +166,22 @@ vim.api.nvim_create_user_command("Sidenote", function(cmd)
         end
     elseif subcommand == "follow" then
         require("sidenote").follow()
+    elseif subcommand == "loclist" then
+        local path, filter, filter_err = listing_args(cmd.fargs)
+        if filter_err then
+            report(filter_err)
+        elseif path then
+            report("loclist covers this buffer; use :Sidenote qflist " .. path)
+        else
+            require("sidenote").loclist({ filter = filter })
+        end
+    elseif subcommand == "qflist" then
+        local path, filter, filter_err = listing_args(cmd.fargs)
+        if filter_err then
+            report(filter_err)
+        else
+            require("sidenote").qflist({ path = path, filter = filter })
+        end
     elseif subcommand == "pen" then
         local pen = require("sidenote.pen")
         local function tell()
@@ -218,7 +236,9 @@ end, {
         if subcommand == "pen" then
             return matching(require("sidenote.pen").ring())
         end
-        if subcommand ~= "browse" and subcommand ~= "project" then
+        local filtered =
+            { browse = true, project = true, loclist = true, qflist = true }
+        if not filtered[subcommand] then
             return {}
         end
 
