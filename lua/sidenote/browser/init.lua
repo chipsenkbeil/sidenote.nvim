@@ -10,6 +10,7 @@ local hash = require("sidenote.core.hash")
 local indicator = require("sidenote.render")
 local parse = require("sidenote.browser.parse")
 local project = require("sidenote.store.project")
+local record = require("sidenote.core.record")
 local render = require("sidenote.browser.render")
 local scan = require("sidenote.scan")
 local session = require("sidenote.session")
@@ -322,6 +323,49 @@ local function help(actions)
     end
 end
 
+---Rotate a row's `kind` or `state` in place, the way org rotates a headline.
+---
+---One deliberate keystroke is its own confirmation, so the record is written
+---directly and the listing repainted; the batched `:w` dialog is for text
+---edits. A listing holding unsaved edits is left alone: repainting it would
+---eat them.
+---@param bufnr integer
+---@param field "kind"|"state"
+---@param offset integer 1 forward, -1 backward
+local function cycle(bufnr, field, offset)
+    local row = M.row_at(bufnr, vim.fn.line("."))
+    local state = states[bufnr]
+    if not row or not state then
+        return
+    end
+    if vim.bo[bufnr].modified then
+        vim.notify("sidenote: apply or discard your edits first (:w)", vim.log.levels.WARN)
+        return
+    end
+
+    local rec = store.read(row.entry.root, row.entry.id)
+    if not rec then
+        return
+    end
+    local names = field == "kind" and record.KIND_NAMES or record.STATE_NAMES
+    local at = 1
+    for i, name in ipairs(names) do
+        if name == rec[field] then
+            at = i
+        end
+    end
+    rec[field] = names[(at - 1 + offset) % #names + 1]
+
+    local ok, err = store.update(row.entry.root, rec)
+    if not ok then
+        vim.notify("sidenote: " .. tostring(err), vim.log.levels.ERROR)
+        return
+    end
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    paint(bufnr, state)
+    pcall(vim.api.nvim_win_set_cursor, 0, cursor)
+end
+
 ---Mappings that live only inside a browser buffer, kept as data first.
 ---
 ---One list serves twice — the keymaps are built from it and `?` renders it —
@@ -350,6 +394,27 @@ local function bind(bufnr)
             desc = "Jump to the code this note is about",
             fn = function()
                 visit(bufnr)
+            end,
+        },
+        {
+            lhs = "t",
+            desc = "Toggle note and todo",
+            fn = function()
+                cycle(bufnr, "kind", 1)
+            end,
+        },
+        {
+            lhs = ">",
+            desc = "Cycle state forward",
+            fn = function()
+                cycle(bufnr, "state", 1)
+            end,
+        },
+        {
+            lhs = "<",
+            desc = "Cycle state backward",
+            fn = function()
+                cycle(bufnr, "state", -1)
             end,
         },
         {

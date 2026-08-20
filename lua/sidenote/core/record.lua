@@ -54,21 +54,28 @@ M.CONTEXT = 3
 
 local SCOPES = { file = true, lines = true, range = true }
 
----Whether the note is information or a request to act.
+---Whether the note is information or a request to act, in cycling order.
 ---
----Exported so the browser validates the column it renders against the same set
----this module writes.
----@type table<string, boolean>
-M.KINDS = { note = true, todo = true }
+---Exported so the browser validates and rotates the column it renders against
+---the same set this module writes.
+---@type string[]
+M.KIND_NAMES = { "note", "todo" }
 
----Lifecycle positions a record may hold.
+---Lifecycle positions a record may hold, in cycling order.
+---@type string[]
+M.STATE_NAMES = { "open", "resolved", "wontfix", "archived" }
+
 ---@type table<string, boolean>
-M.STATES = {
-    open = true,
-    resolved = true,
-    wontfix = true,
-    archived = true,
-}
+M.KINDS = {}
+for _, name in ipairs(M.KIND_NAMES) do
+    M.KINDS[name] = true
+end
+
+---@type table<string, boolean>
+M.STATES = {}
+for _, name in ipairs(M.STATE_NAMES) do
+    M.STATES[name] = true
+end
 
 ---@param opts sidenote.core.record.Opts
 ---@return sidenote.Annotation

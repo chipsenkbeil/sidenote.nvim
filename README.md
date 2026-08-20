@@ -87,6 +87,8 @@ Inside a browser buffer only:
 |---|---|
 | `<CR>` | open this note's prose for writing |
 | `gf` | jump to the code the note is about |
+| `t` | toggle note and todo, in place |
+| `>` `<` | cycle state forward and backward, in place |
 | `<Tab>` `<S-Tab>` | move between columns |
 | `-` | widen to every annotation in the project |
 | `?` | this table, as a float |
