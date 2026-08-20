@@ -89,6 +89,31 @@ describe("browser gf", function()
     end)
 end)
 
+describe("browser toggling back", function()
+    it("returns to the listed file when browsing from its listing", function()
+        -- The alternative is a listing of the listing, which nobody wants;
+        -- this makes one mapping a true toggle
+        local source, path = project_buffer()
+        annotate(source, 4)
+        local listing = assert(browser.open(source, { config = opts() }))
+
+        browser.open(listing, { config = opts() })
+        assert.eq(vim.api.nvim_buf_get_name(0), path)
+    end)
+
+    it("stays put with a hint when a project listing has no one file", function()
+        local source = project_buffer()
+        annotate(source, 4)
+        local name = vim.api.nvim_buf_get_name(source)
+        local listing = assert(browser.open_project(name, { config = opts() }))
+
+        local bufnr, err = browser.open(listing, { config = opts() })
+        assert.is_nil(bufnr)
+        assert.contains(err, "gf")
+        assert.eq(vim.api.nvim_get_current_buf(), listing)
+    end)
+end)
+
 describe("browser help", function()
     it("answers ? with a float listing every browser mapping", function()
         local source = project_buffer()

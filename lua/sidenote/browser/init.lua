@@ -415,13 +415,26 @@ end
 ---@field filter? sidenote.browser.Filter which annotations survive into the listing
 
 ---Open the listing for one source buffer, in the current window.
+---
+---From inside a file's listing this goes back to the file instead, so one
+---mapping toggles between the two. A project listing has no single file to
+---return to and says so.
 ---@param source integer
 ---@param opts? sidenote.browser.OpenOpts
----@return integer|nil bufnr
+---@return integer|nil bufnr the listing, or the listed file when toggling back
 ---@return string|nil err
 function M.open(source, opts)
     opts = opts or {}
     local cfg = opts.config or config.get()
+
+    local state = states[source]
+    if state then
+        if state.scope ~= "file" then
+            return nil, "this lists the whole project; gf jumps to a note's code"
+        end
+        vim.cmd.edit(vim.fn.fnameescape(state.path))
+        return vim.api.nvim_get_current_buf(), nil
+    end
 
     local target, target_err = buffer.target(source, { scope = "file" })
     if not target then
