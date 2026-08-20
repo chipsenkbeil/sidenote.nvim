@@ -4,6 +4,8 @@ local highlight = require("sidenote.highlight")
 ---@field id string annotation this mark stands for
 ---@field status sidenote.Status anchor status, deciding the styling
 ---@field pen? string pen name coloring the ink instead of the status
+---@field kind? string note or todo, deciding a healthy anchor's glyph
+---@field state? string lifecycle position, checking a done todo's box
 ---@field summary? string first prose line, nil while the note has none
 ---@field confidence? number resolver confidence at placement, kept by the tracker
 ---@field line_start? integer first line, 1-based, absent when unplaced
@@ -156,10 +158,16 @@ local function mark_opts(bufnr, entry, style, pens)
         -- A healthy note with no prose dims into the deletion candidate it
         -- is; a hurt anchor keeps its status color, prose or none
         local ink = entry.status == "attached" and not entry.summary and highlight.BARE or group
+
+        -- A healthy todo signs as a box, checked once it is no longer open
+        local glyph = highlight.SIGNS[entry.status]
+        if entry.status == "attached" and entry.kind == "todo" then
+            glyph = entry.state == "open" and highlight.TODO.open or highlight.TODO.done
+        end
         return 0,
             {
                 end_row = entry.line_end - 1,
-                sign_text = highlight.SIGNS[entry.status],
+                sign_text = glyph,
                 sign_hl_group = ink,
             }
     end

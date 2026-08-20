@@ -184,8 +184,11 @@ previewing and a persistent right split for editing is a normal combination
 that one setting cannot express.
 
 Signs span every line of a multi-line note, and when notes overlap the worst
-anchor status wins the gutter. A healthy note with no prose yet shows a
-dimmed sign — a bare anchor is a deletion candidate, and looks like one.
+anchor status wins the gutter. A healthy todo signs as `☐`, checked off to
+`☑` once it is no longer open; notes keep the `▍` stripe, and every hurt
+status keeps its own glyph — hurt is louder than kind. A healthy note with
+no prose yet shows a dimmed sign — a bare anchor is a deletion candidate,
+and looks like one.
 The `summary` style goes further and puts prose line one at the end of the
 line, in the note's own pen: margin notes you read without asking.
 

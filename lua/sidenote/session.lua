@@ -31,6 +31,8 @@ function M.entry(root, rec, resolution)
         id = rec.id,
         status = resolution.status,
         pen = rec.pen,
+        kind = rec.kind,
+        state = rec.state,
         confidence = resolution.confidence,
         line_start = resolution.line_start,
         line_end = resolution.line_end,

@@ -36,6 +36,8 @@ describe("highlight.SIGNS", function()
         for _, status in ipairs(STATUSES) do
             assert.lte(vim.fn.strdisplaywidth(highlight.SIGNS[status]), 2)
         end
+        assert.lte(vim.fn.strdisplaywidth(highlight.TODO.open), 2)
+        assert.lte(vim.fn.strdisplaywidth(highlight.TODO.done), 2)
     end)
 
     it("gives every status its own glyph", function()

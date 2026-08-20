@@ -209,6 +209,55 @@ describe("render.paint", function()
         assert.eq(found, true)
     end)
 
+    it("signs a healthy open todo as an unchecked box", function()
+        -- Kind shows only while the anchor is exact; hurt stays louder
+        local bufnr = scratch(LINES)
+        render.paint(bufnr, {
+            {
+                id = "a",
+                status = "attached",
+                kind = "todo",
+                state = "open",
+                summary = "do it",
+                line_start = 2,
+                line_end = 2,
+            },
+        }, { style = "sign" })
+        assert.eq(vim.trim(marks(bufnr)[1][4].sign_text), highlight.TODO.open)
+    end)
+
+    it("checks the box off once the todo is no longer open", function()
+        local bufnr = scratch(LINES)
+        render.paint(bufnr, {
+            {
+                id = "a",
+                status = "attached",
+                kind = "todo",
+                state = "resolved",
+                summary = "did it",
+                line_start = 2,
+                line_end = 2,
+            },
+        }, { style = "sign" })
+        assert.eq(vim.trim(marks(bufnr)[1][4].sign_text), highlight.TODO.done)
+    end)
+
+    it("keeps the status glyph on a hurt todo, since hurt is louder", function()
+        local bufnr = scratch(LINES)
+        render.paint(bufnr, {
+            {
+                id = "a",
+                status = "drifted",
+                kind = "todo",
+                state = "open",
+                summary = "do it",
+                line_start = 2,
+                line_end = 2,
+            },
+        }, { style = "sign" })
+        assert.eq(vim.trim(marks(bufnr)[1][4].sign_text), highlight.SIGNS.drifted)
+    end)
+
     it("dims the sign of a healthy note that has no prose yet", function()
         -- A bare anchor is a deletion candidate, and it should look like one
         local bufnr = scratch(LINES)

@@ -109,6 +109,13 @@ M.SIGNS = {
     filegone = "✗",
 }
 
+---Glyphs a healthy todo signs with: a box, checked once it is not open.
+---
+---Kind shows only while the anchor is exact; every hurt status keeps its
+---own glyph, since hurt is louder than kind.
+---@type {open: string, done: string}
+M.TODO = { open = "☐", done = "☑" }
+
 function M.setup()
     for status, group in pairs(M.GROUPS) do
         local link = "DiagnosticSign" .. SEVERITY[status]
