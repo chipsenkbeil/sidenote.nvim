@@ -256,8 +256,9 @@ already happened once here. Check `jj st` after every absorb.
 
 The resolution ladder in `core/resolve.lua` runs L0 (whole-file hash) → L1
 (exact at hint) → L2 (literal whole-file search) → L3 (context disambiguation) →
-L4 (whitespace-normalized) → L6 (scored fuzzy). L5 is reserved for a treesitter
-tier that does not exist yet.
+L4 (whitespace-normalized) → L6 (scored fuzzy). There is no L5: the number was
+reserved for a treesitter tier and cut unbuilt; spec §6 records why, and the
+corrected case for ever reviving it.
 
 The 0.80 accept and 0.60 guess thresholds are **measured, not guessed**.
 `harness/` samples real repository history and grades placements against
@@ -278,11 +279,18 @@ What the measurements established, and what a change here must not undo:
 
 ## Status
 
-**Slices 1–7 are implemented**, as a thirty-change stack. The browser
+**Slices 1–7 are implemented**, as a stack of over fifty changes. The browser
 covers a single file and the whole project, with filtering by kind, state and
-anchor status. The agent interface ships as `lua/sidenote/export.lua` behind the
-confidence gate, plus `cli/sidenote.lua` for headless runs. There is a README
-and hand-written vimdoc, both checked against the code by tests.
+anchor status. The agent interface ships as `lua/sidenote/export.lua` behind
+the confidence gate, `cli/sidenote.lua` for headless runs, and an agent skill
+at `skills/sidenote/SKILL.md` the README points consumers at. Write-back
+(spec §6) runs on `BufWritePost` via `session.written`. Docs are generated.
 
-Not built, and deliberately: the `answer` verb, the retention window that ages
-a terminal state into `archived`, the L5 treesitter tier, and MCP.
+A full review on 2026-08-19 fixed twenty-odd findings; the ones that were
+decisions are **recorded in the spec with their reasons**: the agent `answer`
+verb and its `answered` state are cut, the retention window is cut, and the
+L5 treesitter tier is cut along with the never-captured `symbol`/`ts_path`
+fields.
+
+Spec'd but unbuilt, pending a decision: the `template` capture hook (§8), the
+index cache as something the resolve paths actually consult (§4/§6), and MCP.
