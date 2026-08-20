@@ -52,6 +52,29 @@ describe("pen", function()
         assert.contains(err, "blue")
     end)
 
+    it("inks each kind from its own configured default", function()
+        local cfg = opts()
+        cfg.pen = { note = "green", todo = "blue" }
+        assert.eq(pen.for_kind("note", cfg), "green")
+        assert.eq(pen.for_kind("todo", cfg), "blue")
+        assert.is_nil(pen.get(cfg), "no single pen is held")
+    end)
+
+    it("lets one configured name ink both kinds", function()
+        local cfg = opts()
+        cfg.pen = "green"
+        assert.eq(pen.for_kind("note", cfg), "green")
+        assert.eq(pen.for_kind("todo", cfg), "green")
+    end)
+
+    it("holds a chosen pen over every kind default", function()
+        local cfg = opts()
+        cfg.pen = { note = "green", todo = "blue" }
+        assert.truthy(pen.set("blue", cfg))
+        assert.eq(pen.for_kind("note", cfg), "blue")
+        assert.eq(pen.for_kind("todo", cfg), "blue")
+    end)
+
     it("rotates none -> pens sorted -> none", function()
         local cfg = opts()
         assert.eq(pen.cycle(cfg), "blue")

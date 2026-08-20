@@ -108,6 +108,18 @@ describe("capture.run", function()
         assert.is_nil(store.read(bare.root, bare.id).pen)
     end)
 
+    it("inks each kind from its own default pen", function()
+        local bufnr = project_buffer()
+        local cfg = opts()
+        cfg.pens = { coral = "SidenotePenCoral", blue = "SidenotePenBlue" }
+        cfg.pen = { note = "blue", todo = "coral" }
+
+        local note = capture.run(bufnr, { scope = "file", config = cfg })
+        local todo = capture.run(bufnr, { scope = "file", kind = "todo", config = cfg })
+        assert.eq(store.read(note.root, note.id).pen, "blue")
+        assert.eq(store.read(todo.root, todo.id).pen, "coral")
+    end)
+
     it("records vcs provenance as nil outside a repository", function()
         local bufnr = project_buffer()
         local result = capture.run(bufnr, { scope = "file", config = opts() })

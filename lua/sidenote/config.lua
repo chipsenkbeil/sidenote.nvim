@@ -27,7 +27,7 @@
 ---@field cache_dir string where scans cache resolutions, never inside a store
 ---@field template? fun(ctx: sidenote.template.Context): string[]|nil seeds a new note's buffer
 ---@field pens table<string, string> mapping of pen name -> highlight group its ink uses
----@field pen? string pen freshly captured notes pick up, nil for none
+---@field pen? string|{note?: string, todo?: string} pen fresh captures pick up, one name or split by kind
 ---@field indicator sidenote.IndicatorConfig how annotations appear in a source buffer
 ---@field preview sidenote.PreviewConfig how a note is glanced at
 ---@field editor sidenote.EditorConfig how a note opens for writing
@@ -65,7 +65,7 @@ function M.defaults()
         -- committed
         cache_dir = vim.fn.stdpath("cache") .. "/sidenote",
 
-        -- The pen fresh notes pick up; `:Sidenote pen` changes it live
+        -- Pen fresh notes pick up: a name, or { note = "…", todo = "…" }
         -- pen = "yellow",
 
         -- Pens a note can carry, each naming the highlight group its ink
@@ -147,8 +147,24 @@ local function validate(cfg)
             )
         end
     end
-    if cfg.pen ~= nil and not cfg.pens[cfg.pen] then
-        return fail("pen", ("%s is not a configured pen"):format(tostring(cfg.pen)))
+    if type(cfg.pen) == "string" then
+        if not cfg.pens[cfg.pen] then
+            return fail("pen", ("%s is not a configured pen"):format(cfg.pen))
+        end
+    elseif type(cfg.pen) == "table" then
+        for kind, name in pairs(cfg.pen) do
+            if kind ~= "note" and kind ~= "todo" then
+                return fail("pen", ("%s is not a kind; expected note or todo"):format(tostring(kind)))
+            end
+            if not cfg.pens[name] then
+                return fail(
+                    ("pen.%s"):format(kind),
+                    ("%s is not a configured pen"):format(tostring(name))
+                )
+            end
+        end
+    elseif cfg.pen ~= nil then
+        return fail("pen", ("expected a pen name or a table by kind, got %s"):format(type(cfg.pen)))
     end
 
     -- Checked before their styles are read: indexing a number would throw, and

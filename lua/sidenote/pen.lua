@@ -14,14 +14,36 @@ local active
 ---@type boolean whether the session overrode the configured pen
 local chosen = false
 
----The active pen's name, or nil when notes start penless.
+---The single pen held right now, or nil when none is.
+---
+---A kind-split config holds no single pen, so this is nil until one is
+---chosen; `for_kind` is what a capture asks.
 ---@param cfg? sidenote.Config
 ---@return string|nil
 function M.get(cfg)
     if chosen then
         return active
     end
-    return (cfg or config.get()).pen
+    local pen = (cfg or config.get()).pen
+    return type(pen) == "string" and pen or nil
+end
+
+---The pen a fresh capture of `kind` picks up.
+---
+---A pen chosen this session wins outright — the user is holding it — then
+---the config decides: one name inks both kinds, a table inks each its own.
+---@param kind "note"|"todo"
+---@param cfg? sidenote.Config
+---@return string|nil
+function M.for_kind(kind, cfg)
+    if chosen then
+        return active
+    end
+    local pen = (cfg or config.get()).pen
+    if type(pen) == "table" then
+        return pen[kind]
+    end
+    return pen
 end
 
 ---Mirror the active pen into the read-only state global.

@@ -151,7 +151,7 @@ vim.g.sidenote = {
     -- committed
     cache_dir = vim.fn.stdpath("cache") .. "/sidenote",
 
-    -- The pen fresh notes pick up; `:Sidenote pen` changes it live
+    -- Pen fresh notes pick up: a name, or { note = "…", todo = "…" }
     -- pen = "yellow",
 
     -- Pens a note can carry, each naming the highlight group its ink
@@ -221,10 +221,19 @@ stays on the sign either way, so a drifted note is visible whatever color it
 wears.
 
 New notes are inked with the **active pen**. It starts as `pen` in your
-config — unset starts penless — and `:Sidenote pen` changes it for the
-session: bare, it offers the ring; with a name (`:Sidenote pen coral`,
-`:Sidenote pen none`) it sets directly. `<Plug>(SidenotePen)` rotates
-through `none` and every configured pen.
+config — one name for everything, or split by kind, so a todo lands in a
+different color than a note:
+
+```lua
+vim.g.sidenote = {
+    pen = { note = "green", todo = "coral" },
+}
+```
+
+`:Sidenote pen` changes it for the session: bare, it offers the ring; with
+a name (`:Sidenote pen coral`, `:Sidenote pen none`) it sets directly, and
+a chosen pen wins over both kind defaults — you are holding it.
+`<Plug>(SidenotePen)` rotates through `none` and every configured pen.
 
 <!-- vimdoc:tag sidenote-statusline -->
 
