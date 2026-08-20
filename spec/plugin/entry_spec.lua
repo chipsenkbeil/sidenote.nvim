@@ -84,7 +84,7 @@ describe("command and mapping coverage", function()
 
     it("completes every subcommand the command actually handles", function()
         local src = entry_source()
-        local listed = src:match("local SUBCOMMANDS = (%b{})")
+        local listed = src:match("local SUBCOMMANDS =%s*(%b{})")
         for _, name in ipairs({
             "add",
             "browse",
@@ -102,7 +102,7 @@ describe("command and mapping coverage", function()
     it("never lists a subcommand it cannot handle", function()
         -- A completion entry that errors is worse than no completion at all
         local src = entry_source()
-        for name in src:match("local SUBCOMMANDS = (%b{})"):gmatch('"(%w+)"') do
+        for name in src:match("local SUBCOMMANDS =%s*(%b{})"):gmatch('"(%w+)"') do
             assert.contains(src, ('subcommand == "%s"'):format(name))
         end
     end)

@@ -1,5 +1,6 @@
 ---@class sidenote.IndicatorConfig
 ---@field style "sign"|"virt_text"|"highlight"|"underline"|"none" how an annotation announces itself
+---@field highlight "off"|"on"|"always"|"never" range-highlight overlay: a toggleable default, or pinned
 
 ---@class sidenote.PreviewConfig
 ---@field style "float"|"virt_lines"|"split"|"none" where a note is shown when glanced at
@@ -35,6 +36,7 @@ local M = {}
 
 local INDICATOR_STYLES =
     { sign = true, virt_text = true, highlight = true, underline = true, none = true }
+local HIGHLIGHT_MODES = { off = true, on = true, always = true, never = true }
 local PREVIEW_STYLES = { float = true, virt_lines = true, split = true, none = true }
 local EDITOR_STYLES = { split = true, float = true, toggle = true, current = true, tab = true }
 local POSITIONS = { left = true, right = true, top = true, bottom = true }
@@ -55,9 +57,9 @@ function M.defaults()
         -- committed
         cache_dir = vim.fn.stdpath("cache") .. "/sidenote",
 
-        -- How a buffer shows that an annotation exists:
-        -- sign | virt_text | highlight | underline | none
-        indicator = { style = "sign" },
+        -- Style: sign | virt_text | highlight | underline | none. The range
+        -- overlay: off | on (toggleable defaults) | always | never (pinned)
+        indicator = { style = "sign", highlight = "off" },
 
         -- Where a note appears when glanced at:
         -- float | virt_lines | split | none
@@ -119,6 +121,12 @@ local function validate(cfg)
 
     if not INDICATOR_STYLES[cfg.indicator.style] then
         return fail("indicator.style", ("unknown style %s"):format(tostring(cfg.indicator.style)))
+    end
+    if not HIGHLIGHT_MODES[cfg.indicator.highlight] then
+        return fail(
+            "indicator.highlight",
+            ("expected off|on|always|never, got %s"):format(tostring(cfg.indicator.highlight))
+        )
     end
     if not PREVIEW_STYLES[cfg.preview.style] then
         return fail("preview.style", ("unknown style %s"):format(tostring(cfg.preview.style)))

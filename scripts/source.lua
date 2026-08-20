@@ -86,7 +86,7 @@ end
 ---@return string[]
 function M.subcommands(path)
     local body = table.concat(lines_of(path), "\n")
-    local listed = assert(body:match("local SUBCOMMANDS = (%b{})"), "no SUBCOMMANDS in " .. path)
+    local listed = assert(body:match("local SUBCOMMANDS =%s*(%b{})"), "no SUBCOMMANDS in " .. path)
     local out = {}
     for name in listed:gmatch('"(%w+)"') do
         out[#out + 1] = name

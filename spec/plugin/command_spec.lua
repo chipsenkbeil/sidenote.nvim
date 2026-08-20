@@ -191,6 +191,31 @@ describe("the :Sidenote command", function()
         assert.eq(only_record(root).scope, "file")
     end)
 
+    it("toggles range highlights with the highlight subcommand", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,4")
+
+        local render = require("sidenote.render")
+        local function range_marks()
+            local found = 0
+            local marks =
+                vim.api.nvim_buf_get_extmarks(0, render.NAMESPACE, 0, -1, { details = true })
+            for _, mark in ipairs(marks) do
+                if mark[4].hl_group then
+                    found = found + 1
+                end
+            end
+            return found
+        end
+
+        assert.eq(range_marks(), 0)
+        vim.cmd("Sidenote highlight")
+        assert.eq(range_marks(), 1)
+        vim.cmd("Sidenote highlight")
+        assert.eq(range_marks(), 0)
+    end)
+
     it("captures a visual selection as lines scope too", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")

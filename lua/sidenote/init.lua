@@ -197,4 +197,18 @@ function M.prev()
     return jump("prev")
 end
 
+---Toggle this buffer's range highlights, the way spell is toggled.
+---@return boolean|nil shown nil when the config pins them always or never
+function M.toggle_highlight()
+    local cfg = config()
+    local bufnr = vim.api.nvim_get_current_buf()
+    local shown = require("sidenote.render").toggle(bufnr, cfg.indicator.highlight)
+    if shown == nil then
+        vim.notify("sidenote: highlights are pinned " .. cfg.indicator.highlight)
+        return nil
+    end
+    require("sidenote.session").refresh(bufnr, cfg)
+    return shown
+end
+
 return M

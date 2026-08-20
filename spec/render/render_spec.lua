@@ -144,6 +144,49 @@ describe("render.paint", function()
     end)
 end)
 
+describe("render range highlights", function()
+    it("overlays the range once toggled on, and takes it back off", function()
+        -- The org-remark look, but opt-in per buffer the way spell is: a
+        -- permanent background tint fights syntax highlighting
+        local bufnr = scratch(LINES)
+        local entries = { { id = "a", status = "attached", line_start = 2, line_end = 4 } }
+        local opts = { style = "sign", highlight = "off" }
+
+        render.paint(bufnr, entries, opts)
+        assert.eq(#marks(bufnr), 1)
+
+        assert.truthy(render.toggle(bufnr, opts.highlight))
+        render.paint(bufnr, entries, opts)
+        assert.eq(#marks(bufnr), 2)
+
+        assert.falsy(render.toggle(bufnr, opts.highlight))
+        render.paint(bufnr, entries, opts)
+        assert.eq(#marks(bufnr), 1)
+    end)
+
+    it("shows highlights from the start when configured on", function()
+        local bufnr = scratch(LINES)
+        render.paint(bufnr, {
+            { id = "a", status = "attached", line_start = 2, line_end = 4 },
+        }, { style = "sign", highlight = "on" })
+        assert.eq(#marks(bufnr), 2)
+    end)
+
+    it("refuses to toggle a pinned mode", function()
+        local bufnr = scratch(LINES)
+        assert.is_nil(render.toggle(bufnr, "always"))
+        assert.is_nil(render.toggle(bufnr, "never"))
+    end)
+
+    it("adds nothing on top of the highlight style itself", function()
+        local bufnr = scratch(LINES)
+        render.paint(bufnr, {
+            { id = "a", status = "attached", line_start = 2, line_end = 4 },
+        }, { style = "highlight", highlight = "always" })
+        assert.eq(#marks(bufnr), 1)
+    end)
+end)
+
 describe("render.clear", function()
     it("removes every mark it placed", function()
         local bufnr = scratch(LINES)

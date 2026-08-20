@@ -53,6 +53,7 @@ vim.keymap.set("n", "<Leader>so", "<Plug>(SidenoteOpen)")
 vim.keymap.set("n", "<Leader>sb", "<Plug>(SidenoteBrowse)")
 vim.keymap.set("n", "<Leader>sB", "<Plug>(SidenoteBrowseProject)")
 vim.keymap.set("n", "<Leader>sr", "<Plug>(SidenoteRefresh)")
+vim.keymap.set("n", "<Leader>sh", "<Plug>(SidenoteToggleHighlight)")
 vim.keymap.set("n", "]n", "<Plug>(SidenoteViewNext)")
 vim.keymap.set("n", "[n", "<Plug>(SidenoteViewPrev)")
 ```
@@ -73,6 +74,7 @@ No default mappings are installed.
 | `<Plug>(SidenoteBrowse)` | Open the editable listing of this file's annotations |
 | `<Plug>(SidenoteBrowseProject)` | Open the editable listing of every annotation in the project |
 | `<Plug>(SidenoteRefresh)` | Re-resolve and repaint annotations |
+| `<Plug>(SidenoteToggleHighlight)` | Toggle range highlights in this buffer |
 | `<Plug>(SidenoteView)` | Preview the annotation under the cursor |
 | `<Plug>(SidenoteOpen)` | Open the annotation under the cursor for writing |
 | `<Plug>(SidenoteViewNext)` | Jump to the next annotation and preview it |
@@ -97,7 +99,8 @@ Fold verbs need no mapping. The folds are real.
 
 <!-- gen:commands -->
 ```vim
-:Sidenote add | browse | project | refresh | view | open | next | prev
+:Sidenote add | browse | project | refresh | view | open | next
+          | prev | highlight
 ```
 <!-- /gen:commands -->
 
@@ -131,9 +134,9 @@ vim.g.sidenote = {
     -- committed
     cache_dir = vim.fn.stdpath("cache") .. "/sidenote",
 
-    -- How a buffer shows that an annotation exists:
-    -- sign | virt_text | highlight | underline | none
-    indicator = { style = "sign" },
+    -- Style: sign | virt_text | highlight | underline | none. The range
+    -- overlay: off | on (toggleable defaults) | always | never (pinned)
+    indicator = { style = "sign", highlight = "off" },
 
     -- Where a note appears when glanced at:
     -- float | virt_lines | split | none
@@ -150,6 +153,11 @@ Three display knobs, because they answer three questions: how you know a note
 exists, how you glance at it, and where you write it. A transient float for
 previewing and a persistent right split for editing is a normal combination
 that one setting cannot express.
+
+Signs span every line of a multi-line note, and when notes overlap the worst
+anchor status wins the gutter. `:Sidenote highlight` additionally tints each
+annotated range, per buffer, the way `:set spell!` toggles — `on` flips the
+default, `always` and `never` pin it.
 
 A `template` function seeds the buffer a new note opens into:
 
@@ -315,6 +323,10 @@ Jump to the next annotation and preview it.
 `sidenote.prev()`
 
 Jump to the previous annotation and preview it.
+
+`sidenote.toggle_highlight()`
+
+Toggle this buffer's range highlights, the way spell is toggled.
 
 <!-- /gen:api -->
 

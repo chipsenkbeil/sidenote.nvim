@@ -24,6 +24,40 @@ function M.clear(bufnr)
     vim.api.nvim_buf_clear_namespace(bufnr, M.NAMESPACE, 0, -1)
 end
 
+---Per-buffer overrides of the configured highlight default.
+---@type table<integer, boolean>
+local overrides = {}
+
+---Whether range highlights show in a buffer, under the configured mode.
+---@param bufnr integer
+---@param mode string|nil off, on, always or never; nil reads as off
+---@return boolean
+function M.highlighted(bufnr, mode)
+    if mode == "always" then
+        return true
+    end
+    if mode == "never" then
+        return false
+    end
+    local override = overrides[bufnr]
+    if override ~= nil then
+        return override
+    end
+    return mode == "on"
+end
+
+---Flip a buffer's range highlights, the way `:set spell!` flips spelling.
+---@param bufnr integer
+---@param mode string|nil the configured default
+---@return boolean|nil shown nil when the mode pins highlights on or off
+function M.toggle(bufnr, mode)
+    if mode == "always" or mode == "never" then
+        return nil
+    end
+    overrides[bufnr] = not M.highlighted(bufnr, mode)
+    return overrides[bufnr]
+end
+
 ---@param entry sidenote.render.Entry
 ---@param style string
 ---@return table|nil opts extmark options, or nil when nothing should be drawn
@@ -61,7 +95,7 @@ end
 ---Clear and repaint every entry, returning how many were actually placed.
 ---@param bufnr integer
 ---@param entries sidenote.render.Entry[]
----@param opts {style: string}
+---@param opts {style: string, highlight?: string}
 ---@return integer placed
 function M.paint(bufnr, entries, opts)
     if not defined then
@@ -74,6 +108,10 @@ function M.paint(bufnr, entries, opts)
         return 0
     end
 
+    -- The overlay repeats the highlight style on top of the configured one,
+    -- so it adds nothing when highlight already is the style
+    local overlay = opts.style ~= "highlight" and M.highlighted(bufnr, opts.highlight)
+
     local count = vim.api.nvim_buf_line_count(bufnr)
     local placed = 0
     for _, entry in ipairs(entries) do
@@ -85,6 +123,11 @@ function M.paint(bufnr, entries, opts)
                 mark.priority = highlight.PRIORITIES[entry.status]
                 vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, entry.line_start - 1, 0, mark)
                 placed = placed + 1
+            end
+            if overlay then
+                local range = mark_opts(entry, "highlight")
+                range.priority = highlight.PRIORITIES[entry.status]
+                vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, entry.line_start - 1, 0, range)
             end
         end
     end

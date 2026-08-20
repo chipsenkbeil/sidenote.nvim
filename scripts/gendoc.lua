@@ -56,7 +56,20 @@ end
 ---@return string[]
 local function commands_block()
     local names = source.subcommands(root .. "/plugin/sidenote.lua")
-    return fenced("vim", { ":Sidenote " .. table.concat(names, " | ") })
+    -- Wrapped here: a code fence is indented four spaces in the help file and
+    -- never rewrapped, so one long line would overflow the page
+    local lines, line = {}, ":Sidenote"
+    for i, name in ipairs(names) do
+        local sep = i == 1 and " " or " | "
+        if #line + #sep + #name > 68 then
+            lines[#lines + 1] = line
+            line = "          | " .. name
+        else
+            line = line .. sep .. name
+        end
+    end
+    lines[#lines + 1] = line
+    return fenced("vim", lines)
 end
 
 ---@return string[]
