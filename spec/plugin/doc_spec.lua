@@ -68,6 +68,7 @@ describe("the generated help file", function()
             "sidenote-statusline",
             "sidenote-context-header",
             "sidenote-follow",
+            "sidenote-menu",
             "sidenote-live-tracking",
             "sidenote-export-gate",
             "sidenote-storage",

@@ -409,26 +409,6 @@ local function cycle_target(bufnr)
     return "state"
 end
 
----The values a field rotates through, in a stable order.
----
----A pen's ring opens with the placeholder, so cycling can put the pen back
----down; the configured names follow, sorted, since a table has no order.
----@param field "kind"|"state"|"pen"
----@param cfg sidenote.Config
----@return string[]
-local function ring_for(field, cfg)
-    if field == "kind" then
-        return record.KIND_NAMES
-    end
-    if field == "state" then
-        return record.STATE_NAMES
-    end
-    local names = vim.tbl_keys(cfg.pens or {})
-    table.sort(names)
-    table.insert(names, 1, render.NO_PEN)
-    return names
-end
-
 ---Rotate a row's `kind`, `state` or `pen` in place, the way org rotates a
 ---headline.
 ---
@@ -455,15 +435,7 @@ local function cycle(bufnr, offset)
     if not rec then
         return
     end
-    local names = ring_for(field, state.config)
-    local at = 1
-    for i, name in ipairs(names) do
-        if name == (rec[field] or render.NO_PEN) then
-            at = i
-        end
-    end
-    local turned = names[(at - 1 + offset) % #names + 1]
-    rec[field] = turned ~= render.NO_PEN and turned or nil
+    require("sidenote.cycle").turn(rec, { field = field, offset = offset, config = state.config })
 
     local ok, err = store.update(row.entry.root, rec)
     if not ok then

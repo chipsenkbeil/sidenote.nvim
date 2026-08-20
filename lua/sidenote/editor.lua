@@ -251,6 +251,18 @@ function M.redecorate(bufnr)
     return true
 end
 
+---Re-draw the header of whichever open note holds `id`, if any.
+---@param id string
+---@return boolean drawn
+function M.redecorate_note(id)
+    for bufnr, note in pairs(decorated) do
+        if note.id == id then
+            return M.redecorate(bufnr)
+        end
+    end
+    return false
+end
+
 ---Open a note, returning the window showing it.
 ---
 ---The `toggle` style behaves as `split`, except that asking for the note

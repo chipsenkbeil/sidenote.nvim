@@ -56,6 +56,7 @@ vim.keymap.set("n", "<Leader>sr", "<Plug>(SidenoteRefresh)")
 vim.keymap.set("n", "<Leader>sh", "<Plug>(SidenoteToggleHighlight)")
 vim.keymap.set("n", "<Leader>sf", "<Plug>(SidenoteFollow)")
 vim.keymap.set("n", "<Leader>sp", "<Plug>(SidenotePen)")
+vim.keymap.set("n", "<Leader>sm", "<Plug>(SidenoteMenu)")
 vim.keymap.set("n", "]n", "<Plug>(SidenoteViewNext)")
 vim.keymap.set("n", "[n", "<Plug>(SidenoteViewPrev)")
 ```
@@ -79,6 +80,12 @@ No default mappings are installed.
 | `<Plug>(SidenoteToggleHighlight)` | Toggle range highlights in this buffer |
 | `<Plug>(SidenoteFollow)` | Toggle the note editor following the cursor |
 | `<Plug>(SidenotePen)` | Rotate the active pen for new notes |
+| `<Plug>(SidenoteMenu)` | Open the menu for the note under the cursor |
+| `<Plug>(SidenoteCycleKind)` | Flip the note under the cursor between note and todo |
+| `<Plug>(SidenoteCycleState)` | Cycle the state of the note under the cursor |
+| `<Plug>(SidenoteCycleStateBack)` | Cycle the state of the note under the cursor, backward |
+| `<Plug>(SidenoteCyclePen)` | Cycle the pen of the note under the cursor |
+| `<Plug>(SidenoteCyclePenBack)` | Cycle the pen of the note under the cursor, backward |
 | `<Plug>(SidenoteView)` | Preview the annotation under the cursor |
 | `<Plug>(SidenoteOpen)` | Open the annotation under the cursor for writing |
 | `<Plug>(SidenoteViewNext)` | Jump to the next annotation and preview it |
@@ -284,6 +291,22 @@ store never lies to a reader outside the editor. Over unannotated code the
 panel holds the last note rather than blanking; the context header is what
 keeps a held-over note legible as such. Closing the panel turns following
 off.
+
+<!-- vimdoc:tag sidenote-menu -->
+
+### Changing a note where you stand
+
+`<Plug>(SidenoteMenu)` pops a small menu over the note under the cursor:
+every kind, state and pen it could take with the current ones marked, plus
+open, view and delete. Pick with `j`/`k` and `<CR>`, with the single keys
+the action rows name, or with the mouse. Picking a value writes it at once
+and keeps the menu up, so kind, state and pen can all be set in one visit;
+deleting confirms first, quoting the prose it would destroy.
+
+For single keystrokes instead, the cycle plugs rotate one field of the
+note under the cursor, org-style: `(SidenoteCycleKind)`,
+`(SidenoteCycleState)` and `(SidenoteCyclePen)`, the latter two with
+`…Back)` variants.
 
 <!-- vimdoc:tag sidenote-storage -->
 

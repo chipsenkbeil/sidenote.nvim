@@ -263,6 +263,30 @@ vim.keymap.set("n", "<Plug>(SidenotePen)", function()
     vim.notify("sidenote: pen " .. require("sidenote.pen").cycle())
 end, { desc = "Rotate the active pen for new notes" })
 
+vim.keymap.set("n", "<Plug>(SidenoteMenu)", function()
+    require("sidenote.menu").open()
+end, { desc = "Open the menu for the note under the cursor" })
+
+vim.keymap.set("n", "<Plug>(SidenoteCycleKind)", function()
+    require("sidenote.cycle").at_cursor("kind", 1)
+end, { desc = "Flip the note under the cursor between note and todo" })
+
+vim.keymap.set("n", "<Plug>(SidenoteCycleState)", function()
+    require("sidenote.cycle").at_cursor("state", 1)
+end, { desc = "Cycle the state of the note under the cursor" })
+
+vim.keymap.set("n", "<Plug>(SidenoteCycleStateBack)", function()
+    require("sidenote.cycle").at_cursor("state", -1)
+end, { desc = "Cycle the state of the note under the cursor, backward" })
+
+vim.keymap.set("n", "<Plug>(SidenoteCyclePen)", function()
+    require("sidenote.cycle").at_cursor("pen", 1)
+end, { desc = "Cycle the pen of the note under the cursor" })
+
+vim.keymap.set("n", "<Plug>(SidenoteCyclePenBack)", function()
+    require("sidenote.cycle").at_cursor("pen", -1)
+end, { desc = "Cycle the pen of the note under the cursor, backward" })
+
 vim.keymap.set("n", "<Plug>(SidenoteView)", function()
     require("sidenote").view()
 end, { desc = "Preview the annotation under the cursor" })
