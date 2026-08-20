@@ -87,8 +87,10 @@ Inside a browser buffer only:
 |---|---|
 | `<CR>` | open this note's prose for writing |
 | `gf` | jump to the code the note is about |
-| `t` | toggle note and todo, in place |
-| `>` `<` | cycle state forward and backward, in place |
+| `t` `T` | cycle state forward and back — or kind, on its column |
+| `fk` `fs` `fa` | filter by kind, state, or anchor status |
+| `ff` | filter by path substring |
+| `fc` | clear every filter |
 | `<Tab>` `<S-Tab>` | move between columns |
 | `-` | widen to every annotation in the project |
 | `?` | this table, as a float |
@@ -112,6 +114,7 @@ Fold verbs need no mapping. The folds are real.
 :Sidenote browse  kind=todo
 :Sidenote project status=orphaned
 :Sidenote project kind=todo state=open
+:Sidenote project path=lua/net
 ```
 
 `project` also takes a path, defaulting to the project holding the current
@@ -277,9 +280,11 @@ row there creates a note on whichever file its location names.
 
 ### Filtering
 
-Either listing narrows by `kind`, `state`, or anchor `status`. Filters combine,
-and re-filtering narrows the listing you have rather than opening another. `-`
-carries the filter with it.
+Either listing narrows by `kind`, `state`, anchor `status`, or a `path`
+substring. Filters combine, and re-filtering narrows the listing you have
+rather than opening another. `-` carries the filter with it. Inside a listing
+the `f` keys ask interactively — `fk`, `fs`, `fa`, `ff` — and `fc` widens all
+the way back out.
 
 A filtered-out row is absent, not hidden. Saving a filtered listing cannot
 touch an annotation it did not show you.

@@ -22,6 +22,7 @@ local window = require("sidenote.window")
 ---@field status? sidenote.Status keep only annotations the resolver put here
 ---@field kind? "note"|"todo" keep only notes or only requests to act
 ---@field state? string keep only one lifecycle position
+---@field path? string keep only paths containing this, literally
 
 ---@class sidenote.browser.State
 ---@field scope "file"|"project" how wide a set the listing covers
@@ -74,6 +75,7 @@ local function survives(entry, filter)
     return (filter.status == nil or entry.status == filter.status)
         and (filter.kind == nil or entry.record.kind == filter.kind)
         and (filter.state == nil or entry.record.state == filter.state)
+        and (filter.path == nil or entry.record.path:find(filter.path, 1, true) ~= nil)
 end
 
 ---Resolve whatever set the listing covers.
@@ -323,21 +325,35 @@ local function help(actions)
     end
 end
 
+---Which field a cycle at the cursor means: kind on its own column, else state.
+---@param bufnr integer
+---@return "kind"|"state"
+local function cycle_target(bufnr)
+    local lnum, col = unpack(vim.api.nvim_win_get_cursor(0))
+    local text = vim.api.nvim_buf_get_lines(bufnr, lnum - 1, lnum, false)[1] or ""
+    local row = parse.header(text)
+    if row and col + 1 >= row.fields.kind.first and col + 1 <= row.fields.kind.last then
+        return "kind"
+    end
+    return "state"
+end
+
 ---Rotate a row's `kind` or `state` in place, the way org rotates a headline.
 ---
----One deliberate keystroke is its own confirmation, so the record is written
----directly and the listing repainted; the batched `:w` dialog is for text
----edits. A listing holding unsaved edits is left alone: repainting it would
----eat them.
+---One pair of keys serves both: the column under the cursor decides, and
+---state is the default everywhere else on the row. One deliberate keystroke
+---is its own confirmation, so the record is written directly and the listing
+---repainted; the batched `:w` dialog is for text edits. A listing holding
+---unsaved edits is left alone: repainting it would eat them.
 ---@param bufnr integer
----@param field "kind"|"state"
 ---@param offset integer 1 forward, -1 backward
-local function cycle(bufnr, field, offset)
+local function cycle(bufnr, offset)
     local row = M.row_at(bufnr, vim.fn.line("."))
     local state = states[bufnr]
     if not row or not state then
         return
     end
+    local field = cycle_target(bufnr)
     if vim.bo[bufnr].modified then
         vim.notify("sidenote: apply or discard your edits first (:w)", vim.log.levels.WARN)
         return
@@ -364,6 +380,49 @@ local function cycle(bufnr, field, offset)
     local cursor = vim.api.nvim_win_get_cursor(0)
     paint(bufnr, state)
     pcall(vim.api.nvim_win_set_cursor, 0, cursor)
+end
+
+---Values each interactive filter key offers.
+local FILTERS = {
+    kind = record.KIND_NAMES,
+    state = record.STATE_NAMES,
+    status = require("sidenote.core.resolve").STATUS_NAMES,
+}
+
+---Re-show the listing through a changed filter, keeping the cursor near.
+---@param bufnr integer
+---@param key string|nil nil resets every filter at once
+---@param value string|nil nil widens the key back out
+local function refilter(bufnr, key, value)
+    local state = states[bufnr]
+    if not state then
+        return
+    end
+    if vim.bo[bufnr].modified then
+        vim.notify("sidenote: apply or discard your edits first (:w)", vim.log.levels.WARN)
+        return
+    end
+    if key then
+        state.filter[key] = value
+    else
+        state.filter = {}
+    end
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    paint(bufnr, state)
+    pcall(vim.api.nvim_win_set_cursor, 0, cursor)
+end
+
+---Offer one filter key's values, `(all)` first as the way back out.
+---@param bufnr integer
+---@param key "kind"|"state"|"status"
+local function ask_filter(bufnr, key)
+    local choices = { "(all)" }
+    vim.list_extend(choices, FILTERS[key])
+    vim.ui.select(choices, { prompt = "sidenote " .. key }, function(choice)
+        if choice then
+            refilter(bufnr, key, choice ~= "(all)" and choice or nil)
+        end
+    end)
 end
 
 ---Mappings that live only inside a browser buffer, kept as data first.
@@ -398,23 +457,54 @@ local function bind(bufnr)
         },
         {
             lhs = "t",
-            desc = "Toggle note and todo",
+            desc = "Cycle state forward; kind when on its column",
             fn = function()
-                cycle(bufnr, "kind", 1)
+                cycle(bufnr, 1)
             end,
         },
         {
-            lhs = ">",
-            desc = "Cycle state forward",
+            lhs = "T",
+            desc = "Cycle state backward; kind when on its column",
             fn = function()
-                cycle(bufnr, "state", 1)
+                cycle(bufnr, -1)
             end,
         },
         {
-            lhs = "<",
-            desc = "Cycle state backward",
+            lhs = "fk",
+            desc = "Filter by kind",
             fn = function()
-                cycle(bufnr, "state", -1)
+                ask_filter(bufnr, "kind")
+            end,
+        },
+        {
+            lhs = "fs",
+            desc = "Filter by state",
+            fn = function()
+                ask_filter(bufnr, "state")
+            end,
+        },
+        {
+            lhs = "fa",
+            desc = "Filter by anchor status",
+            fn = function()
+                ask_filter(bufnr, "status")
+            end,
+        },
+        {
+            lhs = "ff",
+            desc = "Filter by path substring",
+            fn = function()
+                local state = states[bufnr]
+                local answer = vim.fn.input("path contains: ", state and state.filter.path or "")
+                -- An empty answer widens back out
+                refilter(bufnr, "path", answer ~= "" and answer or nil)
+            end,
+        },
+        {
+            lhs = "fc",
+            desc = "Clear every filter",
+            fn = function()
+                refilter(bufnr, nil, nil)
             end,
         },
         {

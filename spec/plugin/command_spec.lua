@@ -149,6 +149,18 @@ describe("the :Sidenote command", function()
         assert.contains(table.concat(messages, "\n"), "banana")
     end)
 
+    it("narrows a project listing by path= from the command line", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("3")
+
+        vim.cmd("Sidenote project path=code")
+        assert.eq(#vim.api.nvim_buf_get_lines(0, 0, -1, false), 1)
+        vim.cmd("edit " .. root .. "/code.lua")
+        vim.cmd("Sidenote project path=elsewhere")
+        assert.eq_deep(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "" })
+    end)
+
     it("completes filter keys and their values", function()
         project()
         local keys = vim.fn.getcompletion("Sidenote browse st", "cmdline")

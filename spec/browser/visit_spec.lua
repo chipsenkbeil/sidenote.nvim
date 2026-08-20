@@ -234,32 +234,33 @@ end)
 describe("browser cycling", function()
     local store = require("sidenote.store")
 
-    it("toggles kind with t, in place, no dialog", function()
-        -- One deliberate keystroke is its own confirmation, the way org
-        -- rotates a headline; the :w dialog is for batched text edits
+    it("cycles the kind when the cursor sits on its column", function()
+        -- One pair of keys serves both fields: the column under the cursor
+        -- decides, the way org rotates whatever point is on
         local source = project_buffer()
         local result = annotate(source, 4)
         vim.api.nvim_set_current_buf(assert(browser.open(source, { config = opts() })))
         vim.api.nvim_win_set_cursor(0, { 1, 0 })
 
+        press("<Tab>")
         press("t")
         assert.eq(store.read(result.root, result.id).kind, "todo")
         assert.contains(vim.api.nvim_buf_get_lines(0, 0, 1, false)[1], "todo")
-        press("t")
+        press("T")
         assert.eq(store.read(result.root, result.id).kind, "note")
     end)
 
-    it("cycles state forward with > and backward with <, wrapping", function()
+    it("cycles the state everywhere else, wrapping at both ends", function()
         local source = project_buffer()
         local result = annotate(source, 4)
         vim.api.nvim_set_current_buf(assert(browser.open(source, { config = opts() })))
         vim.api.nvim_win_set_cursor(0, { 1, 0 })
 
-        press(">")
+        press("t")
         assert.eq(store.read(result.root, result.id).state, "resolved")
-        press("<")
+        press("T")
         assert.eq(store.read(result.root, result.id).state, "open")
-        press("<")
+        press("T")
         assert.eq(store.read(result.root, result.id).state, "archived")
     end)
 
@@ -281,6 +282,73 @@ describe("browser cycling", function()
         assert.eq(store.read(result.root, result.id).kind, "note")
         assert.truthy(vim.bo[listing].modified, "the edit must survive")
         assert.contains(table.concat(messages, "\n"), "edits")
+    end)
+end)
+
+describe("browser interactive filters", function()
+    ---Answer the next vim.ui.select with `choice`, then run `fn`.
+    ---@param choice string|nil
+    ---@param fn fun()
+    local function selecting(choice, fn)
+        local original = vim.ui.select
+        vim.ui.select = function(_, _, on_choice)
+            on_choice(choice)
+        end
+        fn()
+        vim.ui.select = original
+    end
+
+    it("narrows by kind from inside the listing, and widens back out", function()
+        local source = project_buffer()
+        annotate(source, 1)
+        local result = annotate(source, 4)
+        local rec = assert(require("sidenote.store").read(result.root, result.id))
+        rec.kind = "todo"
+        assert(require("sidenote.store").update(result.root, rec))
+
+        local listing = assert(browser.open(source, { config = opts() }))
+        vim.api.nvim_set_current_buf(listing)
+        assert.eq(#assert(browser.state(listing)).rows, 2)
+
+        selecting("todo", function()
+            press("fk")
+        end)
+        assert.eq(#assert(browser.state(listing)).rows, 1)
+        assert.eq(browser.state(listing).rows[1].entry.record.kind, "todo")
+
+        selecting("(all)", function()
+            press("fk")
+        end)
+        assert.eq(#assert(browser.state(listing)).rows, 2)
+    end)
+
+    it("clears every filter at once with fc", function()
+        local source = project_buffer()
+        annotate(source, 1)
+        local listing =
+            assert(browser.open(source, { config = opts(), filter = { kind = "todo" } }))
+        vim.api.nvim_set_current_buf(listing)
+        assert.eq(#assert(browser.state(listing)).rows, 0)
+
+        press("fc")
+        assert.eq(#assert(browser.state(listing)).rows, 1)
+    end)
+
+    it("narrows a project listing by path substring with ff", function()
+        local source = project_buffer()
+        annotate(source, 1)
+        local name = vim.api.nvim_buf_get_name(source)
+        local listing = assert(browser.open_project(name, { config = opts() }))
+        vim.api.nvim_set_current_buf(listing)
+
+        local original = vim.fn.input
+        vim.fn.input = function()
+            return "no-such-file"
+        end
+        press("ff")
+        vim.fn.input = original
+
+        assert.eq(#assert(browser.state(listing)).rows, 0)
     end)
 end)
 

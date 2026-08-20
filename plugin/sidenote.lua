@@ -16,18 +16,10 @@ end
 local function filter_values()
     local record = require("sidenote.core.record")
     local resolve = require("sidenote.core.resolve")
-    local function sorted(set)
-        local out = {}
-        for name in pairs(set) do
-            out[#out + 1] = name
-        end
-        table.sort(out)
-        return out
-    end
     return {
         status = resolve.STATUS_NAMES,
-        kind = sorted(record.KINDS),
-        state = sorted(record.STATES),
+        kind = record.KIND_NAMES,
+        state = record.STATE_NAMES,
     }
 end
 
@@ -48,8 +40,13 @@ local function listing_args(fargs)
         local key, value = fargs[i]:match("^(%w+)=(.+)$")
         if not key then
             path = fargs[i]
+        elseif key == "path" then
+            -- Free-form: any substring of a project-relative path is fair
+            filter.path = value
         elseif not values[key] then
-            return nil, nil, ("unknown filter %q; expected status=, kind= or state="):format(key)
+            return nil,
+                nil,
+                ("unknown filter %q; expected kind=, path=, state= or status="):format(key)
         elseif not vim.tbl_contains(values[key], value) then
             return nil,
                 nil,
@@ -179,7 +176,7 @@ end, {
                 return key .. "=" .. value
             end, values[key]))
         end
-        return matching({ "status=", "kind=", "state=" })
+        return matching({ "kind=", "path=", "state=", "status=" })
     end,
 })
 
