@@ -31,6 +31,22 @@ local function trimmed(line)
     return line:match("^%s*(.-)%s*$")
 end
 
+---Whether a field annotation's tail is a type alone, with no description.
+---
+---A type may carry spaces inside brackets — `table<string, boolean>` — so
+---balanced pairs are collapsed before looking for prose. A bare function
+---type's return annotation still reads as prose; the audit is a floor.
+---@param rest string everything after the field name
+---@return boolean
+local function undescribed(rest)
+    local collapsed = rest
+    repeat
+        local before = collapsed
+        collapsed = collapsed:gsub("%b<>", ""):gsub("%b()", ""):gsub("%b{}", "")
+    until collapsed == before
+    return collapsed:match("%s%S") == nil
+end
+
 ---Rules that read one line at a time
 ---@param file string
 ---@param lines string[]
@@ -44,13 +60,15 @@ local function check_lines(file, lines)
         end
 
         -- @field carrying a type but no description
-        local fname, ftype = line:match("^%s*%-%-%-@field%s+(%S+)%s+(%S+)%s*$")
-        if fname and fname ~= "private" then
-            report(file, n, "field-no-desc", ("%s %s"):format(fname, ftype))
-        end
-        local pname, ptype = line:match("^%s*%-%-%-@field%s+private%s+(%S+)%s+(%S+)%s*$")
-        if pname then
-            report(file, n, "field-no-desc", ("private %s %s"):format(pname, ptype))
+        local field = line:match("^%s*%-%-%-@field%s+(.*)$")
+        if field then
+            local label, rest = field:match("^(private%s+%S+)%s+(.-)%s*$")
+            if not label then
+                label, rest = field:match("^(%S+)%s+(.-)%s*$")
+            end
+            if label and rest and rest ~= "" and undescribed(rest) then
+                report(file, n, "field-no-desc", ("%s %s"):format(label, rest))
+            end
         end
 
         -- Inline table type with four or more fields must become a named type
@@ -211,3 +229,7 @@ for _, finding in ipairs(findings) do
     print(finding)
 end
 print(("\n%d findings"):format(#findings))
+
+-- Without this the gate is decorative: `make style` would print findings and
+-- pass anyway, locally and in CI alike
+os.exit(#findings == 0 and 0 or 1)
