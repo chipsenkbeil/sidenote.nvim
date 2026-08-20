@@ -65,6 +65,7 @@ describe("the generated help file", function()
             "vim.g.sidenote",
             "sidenote-browser",
             "sidenote-pens",
+            "sidenote-statusline",
             "sidenote-context-header",
             "sidenote-follow",
             "sidenote-live-tracking",

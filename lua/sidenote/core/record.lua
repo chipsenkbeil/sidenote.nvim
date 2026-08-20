@@ -42,6 +42,7 @@ local hash = require("sidenote.core.hash")
 ---@field col_start? integer defaults to 1 in range scope
 ---@field col_end? integer defaults to 1 in range scope
 ---@field kind? "note"|"todo" defaults to note
+---@field pen? string pen the note is inked with, none by default
 ---@field vcs? sidenote.Vcs provenance captured by the store
 
 ---@class sidenote.core.record
@@ -94,6 +95,7 @@ function M.capture(opts)
         id = opts.id,
         schema = M.SCHEMA,
         kind = opts.kind or "note",
+        pen = opts.pen,
         state = "open",
         project_key = opts.project_key,
         path = opts.path,

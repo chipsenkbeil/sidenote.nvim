@@ -239,6 +239,32 @@ function M.toggle_highlight()
     return shown
 end
 
+---The active pen's name, or nil when new notes start penless.
+---@return string|nil
+function M.pen()
+    return require("sidenote.pen").get(config())
+end
+
+---A statusline component: the active pen as a chip in its own ink, or "".
+---
+---```lua
+----- Somewhere in a statusline expression
+---vim.o.statusline = "%f %= %{%v:lua.require'sidenote'.statusline()%}"
+---```
+---@return string
+function M.statusline()
+    local cfg = config()
+    local name = require("sidenote.pen").get(cfg)
+    if not name then
+        return ""
+    end
+    local group = (cfg.pens or {})[name]
+    if not group then
+        return name
+    end
+    return ("%%#%s# %s %%*"):format(group, name)
+end
+
 ---Toggle the note editor following the cursor from note to note.
 ---@return boolean active
 function M.follow()

@@ -14,6 +14,13 @@ local SUBCOMMANDS = {
     "prev",
     "highlight",
     "follow",
+    "pen",
+}
+
+-- The state global statuslines read: plugin-owned output, seeded from the
+-- config without loading a single module
+vim.g.sidenote_state = {
+    pen = (type(vim.g.sidenote) == "table" and vim.g.sidenote.pen) or "",
 }
 
 ---@param err string
@@ -144,6 +151,25 @@ vim.api.nvim_create_user_command("Sidenote", function(cmd)
         end
     elseif subcommand == "follow" then
         require("sidenote").follow()
+    elseif subcommand == "pen" then
+        local pen = require("sidenote.pen")
+        local function tell()
+            vim.notify("sidenote: pen " .. (require("sidenote").pen() or "none"))
+        end
+        if cmd.fargs[2] then
+            local ok, err = pen.set(cmd.fargs[2])
+            if ok then
+                tell()
+            else
+                report(err or "no such pen")
+            end
+        else
+            vim.ui.select(pen.ring(), { prompt = "sidenote pen" }, function(choice)
+                if choice and pen.set(choice) then
+                    tell()
+                end
+            end)
+        end
     elseif subcommand == "view" or subcommand == "open" then
         if not require("sidenote")[subcommand]() then
             report("no annotation under the cursor")
@@ -175,6 +201,9 @@ end, {
         local subcommand = after:match("^(%S+)")
         if subcommand == "add" then
             return matching({ "scope=file" })
+        end
+        if subcommand == "pen" then
+            return matching(require("sidenote.pen").ring())
         end
         if subcommand ~= "browse" and subcommand ~= "project" then
             return {}
@@ -229,6 +258,10 @@ end, { desc = "Toggle range highlights in this buffer" })
 vim.keymap.set("n", "<Plug>(SidenoteFollow)", function()
     require("sidenote").follow()
 end, { desc = "Toggle the note editor following the cursor" })
+
+vim.keymap.set("n", "<Plug>(SidenotePen)", function()
+    vim.notify("sidenote: pen " .. require("sidenote.pen").cycle())
+end, { desc = "Rotate the active pen for new notes" })
 
 vim.keymap.set("n", "<Plug>(SidenoteView)", function()
     require("sidenote").view()

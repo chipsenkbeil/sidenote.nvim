@@ -27,6 +27,7 @@
 ---@field cache_dir string where scans cache resolutions, never inside a store
 ---@field template? fun(ctx: sidenote.template.Context): string[]|nil seeds a new note's buffer
 ---@field pens table<string, string> mapping of pen name -> highlight group its ink uses
+---@field pen? string pen freshly captured notes pick up, nil for none
 ---@field indicator sidenote.IndicatorConfig how annotations appear in a source buffer
 ---@field preview sidenote.PreviewConfig how a note is glanced at
 ---@field editor sidenote.EditorConfig how a note opens for writing
@@ -63,6 +64,9 @@ function M.defaults()
         -- Where scans cache resolutions; never inside a store, which may be
         -- committed
         cache_dir = vim.fn.stdpath("cache") .. "/sidenote",
+
+        -- The pen fresh notes pick up; `:Sidenote pen` changes it live
+        -- pen = "yellow",
 
         -- Pens a note can carry, each naming the highlight group its ink
         -- uses; custom entries merge over these
@@ -142,6 +146,9 @@ local function validate(cfg)
                 ("expected a highlight group name, got %s"):format(type(group))
             )
         end
+    end
+    if cfg.pen ~= nil and not cfg.pens[cfg.pen] then
+        return fail("pen", ("%s is not a configured pen"):format(tostring(cfg.pen)))
     end
 
     -- Checked before their styles are read: indexing a number would throw, and

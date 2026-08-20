@@ -94,6 +94,20 @@ describe("capture.run", function()
         assert.eq(store.read(todo.root, todo.id).kind, "todo")
     end)
 
+    it("inks a fresh note with the active pen", function()
+        local bufnr = project_buffer()
+        local cfg = opts()
+        cfg.pens = { coral = "SidenotePenCoral" }
+        cfg.pen = "coral"
+
+        local result = capture.run(bufnr, { scope = "file", config = cfg })
+        assert.eq(store.read(result.root, result.id).pen, "coral")
+
+        cfg.pen = nil
+        local bare = capture.run(bufnr, { scope = "file", config = cfg })
+        assert.is_nil(store.read(bare.root, bare.id).pen)
+    end)
+
     it("records vcs provenance as nil outside a repository", function()
         local bufnr = project_buffer()
         local result = capture.run(bufnr, { scope = "file", config = opts() })

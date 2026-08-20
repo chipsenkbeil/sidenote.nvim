@@ -59,6 +59,7 @@ function M.run(bufnr, opts)
         col_end = target.col_end,
         content = target.content,
         kind = opts.kind,
+        pen = require("sidenote.pen").get(cfg),
         vcs = vcs.probe(target.path),
         now = os.date("!%Y-%m-%dT%H:%M:%SZ"),
     })

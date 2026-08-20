@@ -55,6 +55,7 @@ vim.keymap.set("n", "<Leader>sB", "<Plug>(SidenoteBrowseProject)")
 vim.keymap.set("n", "<Leader>sr", "<Plug>(SidenoteRefresh)")
 vim.keymap.set("n", "<Leader>sh", "<Plug>(SidenoteToggleHighlight)")
 vim.keymap.set("n", "<Leader>sf", "<Plug>(SidenoteFollow)")
+vim.keymap.set("n", "<Leader>sp", "<Plug>(SidenotePen)")
 vim.keymap.set("n", "]n", "<Plug>(SidenoteViewNext)")
 vim.keymap.set("n", "[n", "<Plug>(SidenoteViewPrev)")
 ```
@@ -77,6 +78,7 @@ No default mappings are installed.
 | `<Plug>(SidenoteRefresh)` | Re-resolve and repaint annotations |
 | `<Plug>(SidenoteToggleHighlight)` | Toggle range highlights in this buffer |
 | `<Plug>(SidenoteFollow)` | Toggle the note editor following the cursor |
+| `<Plug>(SidenotePen)` | Rotate the active pen for new notes |
 | `<Plug>(SidenoteView)` | Preview the annotation under the cursor |
 | `<Plug>(SidenoteOpen)` | Open the annotation under the cursor for writing |
 | `<Plug>(SidenoteViewNext)` | Jump to the next annotation and preview it |
@@ -107,7 +109,7 @@ Fold verbs need no mapping. The folds are real.
 <!-- gen:commands -->
 ```vim
 :Sidenote add | browse | project | refresh | view | open | next
-          | prev | highlight | follow
+          | prev | highlight | follow | pen
 ```
 <!-- /gen:commands -->
 
@@ -141,6 +143,9 @@ vim.g.sidenote = {
     -- Where scans cache resolutions; never inside a store, which may be
     -- committed
     cache_dir = vim.fn.stdpath("cache") .. "/sidenote",
+
+    -- The pen fresh notes pick up; `:Sidenote pen` changes it live
+    -- pen = "yellow",
 
     -- Pens a note can carry, each naming the highlight group its ink
     -- uses; custom entries merge over these
@@ -204,6 +209,34 @@ and `T` on its column cycle through `-` (none) and every configured pen, or
 type the name and `:w`. A penless note keeps the status ink; anchor health
 stays on the sign either way, so a drifted note is visible whatever color it
 wears.
+
+New notes are inked with the **active pen**. It starts as `pen` in your
+config — unset starts penless — and `:Sidenote pen` changes it for the
+session: bare, it offers the ring; with a name (`:Sidenote pen coral`,
+`:Sidenote pen none`) it sets directly. `<Plug>(SidenotePen)` rotates
+through `none` and every configured pen.
+
+<!-- vimdoc:tag sidenote-statusline -->
+
+#### The pen in your statusline
+
+Live state is mirrored into `vim.g.sidenote_state`, a read-only table your
+statusline can consume without calling Lua:
+
+```vim
+set statusline+=%{get(get(g:,'sidenote_state',{}),'pen','')}
+```
+
+For a chip drawn in the pen's own ink, use the component:
+
+```lua
+vim.o.statusline = vim.o.statusline
+    .. "%{%v:lua.require'sidenote'.statusline()%}"
+```
+
+Config is input and state is output: `vim.g.sidenote.pen` is what a session
+starts with, `vim.g.sidenote_state.pen` is where it is now. The plugin
+never writes the former, and yours never needs to write the latter.
 
 A `template` function seeds the buffer a new note opens into:
 
@@ -416,6 +449,14 @@ Jump to the previous annotation and preview it.
 `sidenote.toggle_highlight()`
 
 Toggle this buffer's range highlights, the way spell is toggled.
+
+`sidenote.pen()`
+
+The active pen's name, or nil when new notes start penless.
+
+`sidenote.statusline()`
+
+A statusline component: the active pen as a chip in its own ink, or "".
 
 `sidenote.follow()`
 

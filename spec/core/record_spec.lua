@@ -37,6 +37,11 @@ describe("record.capture", function()
         assert.eq(capture().text, "function M.join(a, b)\n  return a .. b\nend")
     end)
 
+    it("carries the pen it was captured with", function()
+        assert.eq(capture({ pen = "blue" }).pen, "blue")
+        assert.is_nil(capture().pen)
+    end)
+
     it("defaults kind to note and state to open", function()
         local rec = capture()
         assert.eq(rec.kind, "note")
