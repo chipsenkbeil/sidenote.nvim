@@ -314,6 +314,58 @@ describe("the :Sidenote command", function()
         vim.cmd.cclose()
     end)
 
+    it("filters the list from inside it, browser-style", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,2")
+        vim.cmd("4,4Sidenote add kind=todo")
+        put_away()
+
+        vim.cmd("Sidenote qflist")
+        assert.eq(#vim.fn.getqflist(), 2)
+
+        local original = vim.ui.select
+        vim.ui.select = function(_, _, chosen)
+            chosen("todo")
+        end
+        vim.api.nvim_feedkeys("fk", "x", false)
+        vim.wait(200, function()
+            return #vim.fn.getqflist() == 1
+        end)
+        vim.ui.select = original
+        assert.eq(#vim.fn.getqflist(), 1)
+        assert.contains(vim.fn.getqflist()[1].text, "todo")
+
+        vim.api.nvim_feedkeys("fc", "x", false)
+        vim.wait(200, function()
+            return #vim.fn.getqflist() == 2
+        end)
+        assert.eq(#vim.fn.getqflist(), 2)
+        vim.cmd.cclose()
+    end)
+
+    it("flips between project and file scope on s", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,2")
+
+        vim.cmd("Sidenote qflist")
+        local messages = {}
+        local original = vim.notify
+        vim.notify = function(msg)
+            messages[#messages + 1] = tostring(msg)
+        end
+        vim.api.nvim_feedkeys("s", "x", false)
+        vim.wait(200, function()
+            return #messages > 0
+        end)
+        vim.notify = original
+
+        assert.contains(table.concat(messages, "\n"), "file scope")
+        assert.eq(#vim.fn.getqflist(), 1, "same one note, now file-scoped")
+        vim.cmd.cclose()
+    end)
+
     it("leaves a foreign quickfix list alone", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")

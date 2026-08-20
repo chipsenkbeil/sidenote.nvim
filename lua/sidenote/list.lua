@@ -127,23 +127,34 @@ function M.qflist(opts)
     return #items
 end
 
----What the cursor sits on when the current window shows a sidenote list.
----@return {id: string, root: string}|nil payload
----@return table|nil item the quickfix item itself
+---Which sidenote list the current window shows, if it shows one at all.
 ---@return "loclist"|"qflist"|nil shape
-local function under_cursor()
+---@return table|nil items every item the list holds
+local function ours()
     local win = vim.api.nvim_get_current_win()
     local info = vim.fn.getwininfo(win)[1]
     if not info or info.quickfix ~= 1 then
-        return nil, nil, nil
+        return nil, nil
     end
     local shape = info.loclist == 1 and "loclist" or "qflist"
     local list = shape == "loclist" and vim.fn.getloclist(win, { title = 0, items = 0 })
         or vim.fn.getqflist({ title = 0, items = 0 })
     if list.title ~= "sidenote" then
+        return nil, nil
+    end
+    return shape, list.items
+end
+
+---What the cursor sits on when the current window shows a sidenote list.
+---@return {id: string, root: string}|nil payload
+---@return table|nil item the quickfix item itself
+---@return "loclist"|"qflist"|nil shape
+local function under_cursor()
+    local shape, items = ours()
+    if not shape then
         return nil, nil, nil
     end
-    local item = list.items[vim.fn.line(".")]
+    local item = items[vim.fn.line(".")]
     local payload = item and item.user_data and item.user_data.sidenote
     return payload, item, shape
 end
@@ -267,6 +278,69 @@ local function delete_note()
     rebuild(shape)
 end
 
+---Values each interactive filter key offers, as in the browser.
+local FILTERS = {
+    kind = require("sidenote.core.record").KIND_NAMES,
+    state = require("sidenote.core.record").STATE_NAMES,
+    status = require("sidenote.core.resolve").STATUS_NAMES,
+}
+
+---Change one filter key and rebuild the list through it.
+---@param key "kind"|"state"|"status"|"path"|nil nil clears every filter
+local function refilter(key)
+    local shape = ours()
+    if not shape then
+        return
+    end
+    local opts = held[shape]
+    opts.filter = opts.filter or {}
+
+    if key == nil then
+        opts.filter = {}
+        rebuild(shape)
+    elseif key == "path" then
+        vim.ui.input({ prompt = "sidenote path contains: " }, function(answer)
+            if answer ~= nil then
+                opts.filter.path = answer ~= "" and answer or nil
+                rebuild(shape)
+            end
+        end)
+    else
+        local choices = { "(all)" }
+        vim.list_extend(choices, FILTERS[key])
+        vim.ui.select(choices, { prompt = "sidenote " .. key }, function(choice)
+            if choice then
+                opts.filter[key] = choice ~= "(all)" and choice or nil
+                rebuild(shape)
+            end
+        end)
+    end
+end
+
+---Flip the list between this buffer's notes and the whole project's.
+local function flip_scope()
+    local shape, items = ours()
+    if not shape then
+        return
+    end
+    local opts = held[shape]
+    if opts.scope == "project" then
+        -- Narrowing needs a file; the one under the cursor is the obvious
+        -- candidate, and the one the list opened from is the fallback
+        local item = items[vim.fn.line(".")]
+        local bufnr = item and loaded_source(item) or opts.bufnr
+        if not bufnr then
+            vim.notify("sidenote: no file here to narrow to", vim.log.levels.WARN)
+            return
+        end
+        opts.scope, opts.bufnr = "file", bufnr
+    else
+        opts.scope = "project"
+    end
+    rebuild(shape)
+    vim.notify("sidenote: " .. opts.scope .. " scope")
+end
+
 ---Bind the verbs into a quickfix buffer, guarded per keypress.
 ---
 ---One qf buffer serves every list a session ever shows, so the keys decide
@@ -278,7 +352,7 @@ function M.bind(bufnr)
     ---@param verb fun()
     local function on(lhs, verb)
         vim.keymap.set("n", lhs, function()
-            if not under_cursor() then
+            if not ours() then
                 return lhs
             end
             -- Scheduled: an expression mapping may not edit anything itself
@@ -295,6 +369,22 @@ function M.bind(bufnr)
     end)
     on("o", open_note)
     on("d", delete_note)
+    on("s", flip_scope)
+    on("fk", function()
+        refilter("kind")
+    end)
+    on("fs", function()
+        refilter("state")
+    end)
+    on("fa", function()
+        refilter("status")
+    end)
+    on("ff", function()
+        refilter("path")
+    end)
+    on("fc", function()
+        refilter(nil)
+    end)
 end
 
 return M

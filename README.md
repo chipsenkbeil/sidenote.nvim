@@ -160,10 +160,12 @@ every other list keeps its own. `t` and `T` cycle exactly as in the
 browser: the word under the cursor inside the `[kind state pen]` bracket
 decides which field turns, and anywhere else on the line means state. `o`
 opens the prose, `d` deletes after the quoting confirmation, and `<CR>`
-jumps as ever. Each write redraws the list in place, cursor held — so
-cycling a pen is pressing `t` on its word until the color is right. Items
-carry their identity in `user_data`, the idiom any other list-driven tool
-can borrow.
+jumps as ever. The browser's filter keys work here too — `fk`, `fs`, `fa`,
+`ff` and `fc` — and `s` flips the list between this buffer's notes and the
+whole project's without leaving it. Each change redraws the list in place,
+cursor held — so cycling a pen is pressing `t` on its word until the color
+is right. Items carry their identity in `user_data`, the idiom any other
+list-driven tool can borrow.
 
 `show` narrows what every buffer paints, all at once: `:Sidenote show
 kind=todo` leaves only the todos' marks, `state=resolved` flips you to
