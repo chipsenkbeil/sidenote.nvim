@@ -471,6 +471,23 @@ resolutions under `cache_dir`, keyed by file content and record together, so
 repeating one is cheap. The cache never lives inside a store, and deleting it
 costs a rescan and nothing else.
 
+<!-- vimdoc:tag sidenote-live-tracking -->
+
+### While you edit
+
+In an open buffer the ladder runs when the file is read and again after each
+save. Between the two, the marks it placed track your edits directly: typing
+inside a span grows it, deleting inside shrinks it, and edits above move it,
+exactly as the text moves. Saving writes that back — the record re-baselines
+to the span the mark tracked, so the note follows the content wherever your
+editing took it.
+
+Two things never re-baseline. A mark placed on a guess — a drifted note —
+stays a guess, so editing near it cannot launder the placement into truth.
+And typing over or deleting a whole span collapses its mark, sending the
+ladder back to the stored text to decide — which is what lets a line cut
+here be found again at the place you pasted it.
+
 <!-- vimdoc:tag sidenote-never-deleted -->
 
 ### Nothing is ever auto-deleted

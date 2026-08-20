@@ -115,3 +115,107 @@ describe("session.written", function()
         assert.neq(after.file_sha, "")
     end)
 end)
+
+describe("session.written from a live mark", function()
+    ---Capture a span and paint it, so a mark exists to track the edits.
+    ---@param bufnr integer
+    ---@param first integer
+    ---@param last integer
+    ---@return string root
+    ---@return sidenote.Annotation
+    local function painted(bufnr, first, last)
+        local result = assert(
+            capture.run(bufnr, { scope = "lines", range = { first, 0, last, 0 }, config = opts() })
+        )
+        session.refresh(bufnr, opts())
+        return result.root, assert(store.read(result.root, result.id))
+    end
+
+    it("grows the anchor over a line typed inside the span", function()
+        local bufnr = project_buffer()
+        local root, before = painted(bufnr, 3, 5)
+        vim.api.nvim_buf_set_lines(bufnr, 3, 3, false, { "  local extra = 2" })
+
+        assert.eq(session.written(bufnr, opts()), 1)
+        local after = assert(store.read(root, before.id))
+        assert.eq(after.line_start, 3)
+        assert.eq(after.line_end, 6)
+        assert.contains(after.text, "extra")
+    end)
+
+    it("shrinks the anchor when a line inside the span is deleted", function()
+        local bufnr = project_buffer()
+        local root, before = painted(bufnr, 3, 5)
+        vim.api.nvim_buf_set_lines(bufnr, 3, 4, false, {})
+
+        assert.eq(session.written(bufnr, opts()), 1)
+        local after = assert(store.read(root, before.id))
+        assert.eq(after.line_end, 4)
+        assert.falsy(after.text:find("return", 1, true))
+    end)
+
+    it("re-baselines an edit made in place inside the span", function()
+        -- The resolver alone refuses this save; the mark watched the user
+        -- make the edit, so it is an assertion rather than a guess
+        local bufnr = project_buffer()
+        local root, before = painted(bufnr, 4, 4)
+        vim.api.nvim_buf_set_text(bufnr, 3, 9, 3, 10, { "offset" })
+
+        assert.eq(session.written(bufnr, opts()), 1)
+        local after = assert(store.read(root, before.id))
+        assert.eq(after.text, "  return offset")
+        assert.eq(after.line_start, 4)
+    end)
+
+    it("refuses a span typed over wholesale, whose mark collapsed", function()
+        -- Replacing the entire text deletes everything the mark covered, and
+        -- what was typed at the crater is not provably the same note's code
+        local bufnr = project_buffer()
+        local root, before = painted(bufnr, 4, 4)
+        vim.api.nvim_buf_set_lines(bufnr, 3, 4, false, { "  yield_all(handles)" })
+
+        assert.eq(session.written(bufnr, opts()), 0)
+        assert.eq(assert(store.read(root, before.id)).text, before.text)
+    end)
+
+    it("leaves the record alone when the span was deleted outright", function()
+        -- Deleting is not editing: nothing asserts a new home, so nothing
+        -- is written and the note reports as stale instead
+        local bufnr = project_buffer()
+        local root, before = painted(bufnr, 3, 5)
+        vim.api.nvim_buf_set_lines(bufnr, 2, 5, false, {})
+
+        assert.eq(session.written(bufnr, opts()), 0)
+        local after = assert(store.read(root, before.id))
+        assert.eq(after.text, before.text)
+        assert.eq(after.verified, before.verified)
+    end)
+
+    it("follows a span cut here and pasted elsewhere in the file", function()
+        -- To the mark a cut is a delete, so the resolver takes over and
+        -- finds the text at its new home
+        local bufnr = project_buffer()
+        local root, before = painted(bufnr, 4, 4)
+        vim.api.nvim_buf_set_lines(bufnr, 3, 4, false, {})
+        vim.api.nvim_buf_set_lines(bufnr, -1, -1, false, { "  return 1" })
+
+        assert.eq(session.written(bufnr, opts()), 1)
+        assert.eq(assert(store.read(root, before.id)).line_start, 5)
+    end)
+
+    it("does not re-baseline from a mark placed on a guess", function()
+        -- A drifted placement is the resolver's best idea, not the user's
+        -- assertion; editing near it must not launder the guess into truth
+        local bufnr = project_buffer()
+        local root, before = painted(bufnr, 4, 4)
+
+        -- Rewrite the span from disk state, then re-paint: the resolver can
+        -- only guess now, and the mark inherits that
+        vim.api.nvim_buf_set_lines(bufnr, 3, 4, false, { "  return 1 + offset" })
+        session.refresh(bufnr, opts())
+        vim.api.nvim_buf_set_lines(bufnr, 3, 4, false, { "  return 2 + offset" })
+
+        assert.eq(session.written(bufnr, opts()), 0)
+        assert.eq(assert(store.read(root, before.id)).text, before.text)
+    end)
+end)

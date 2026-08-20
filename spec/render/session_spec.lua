@@ -99,6 +99,51 @@ describe("session.entries", function()
     end)
 end)
 
+describe("session.entries while the buffer is edited", function()
+    it("reports the span its mark tracked, not a fresh resolution", function()
+        -- Between paints the mark has followed every keystroke; resolving
+        -- the stored content again would fight the edit in progress
+        local bufnr = project_buffer()
+        capture.run(bufnr, { scope = "lines", range = { 3, 0, 5, 0 }, config = opts() })
+        session.refresh(bufnr, opts())
+        vim.api.nvim_buf_set_lines(bufnr, 3, 3, false, { "  local wedge = 0" })
+
+        local entries = session.entries(bufnr, opts())
+        assert.eq(entries[1].line_start, 3)
+        assert.eq(entries[1].line_end, 6)
+        assert.eq(entries[1].status, "attached")
+        assert.eq(entries[1].resolution.tier, "live")
+    end)
+
+    it("moves with edits above the span, without touching the store", function()
+        local bufnr = project_buffer()
+        capture.run(bufnr, { scope = "lines", range = { 4, 0, 4, 0 }, config = opts() })
+        session.refresh(bufnr, opts())
+        vim.api.nvim_buf_set_lines(bufnr, 0, 0, false, { "-- header" })
+
+        local entries = session.entries(bufnr, opts())
+        assert.eq(entries[1].line_start, 5)
+        assert.eq(entries[1].line_end, 5)
+    end)
+
+    it("falls back to the resolver for a span deleted outright", function()
+        local bufnr = project_buffer()
+        capture.run(bufnr, { scope = "lines", range = { 4, 0, 4, 0 }, config = opts() })
+        session.refresh(bufnr, opts())
+        vim.api.nvim_buf_set_lines(bufnr, 3, 4, false, {})
+
+        local entries = session.entries(bufnr, opts())
+        assert.eq(entries[1].status, "orphaned")
+    end)
+
+    it("resolves as before when nothing was ever painted", function()
+        local bufnr = project_buffer()
+        capture.run(bufnr, { scope = "lines", range = { 4, 0, 4, 0 }, config = opts() })
+        vim.api.nvim_buf_set_lines(bufnr, 0, 0, false, { "-- header" })
+        assert.eq(session.entries(bufnr, opts())[1].line_start, 5)
+    end)
+end)
+
 describe("session.refresh", function()
     it("paints a mark for each placed annotation", function()
         local bufnr = project_buffer()

@@ -255,38 +255,3 @@ vim.api.nvim_create_autocmd("ColorScheme", {
         require("sidenote.highlight").setup()
     end,
 })
-
----Debounce timers for edit-driven refreshes, one per buffer.
----@type table<integer, uv.uv_timer_t>
-local settling = {}
-
----Milliseconds of quiet after an edit before marks are re-derived.
-local SETTLE = 300
-
-vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
-    group = group,
-    desc = "Re-resolve once edits settle: a span stretches over inserted rows",
-    callback = function(event)
-        local timer = settling[event.buf]
-        if not timer then
-            timer = assert(vim.uv.new_timer())
-            settling[event.buf] = timer
-        end
-        timer:stop()
-        timer:start(
-            SETTLE,
-            0,
-            vim.schedule_wrap(function()
-                local held = settling[event.buf]
-                settling[event.buf] = nil
-                if held then
-                    held:stop()
-                    held:close()
-                end
-                if vim.api.nvim_buf_is_valid(event.buf) then
-                    pcall(require("sidenote").refresh, event.buf)
-                end
-            end)
-        )
-    end,
-})

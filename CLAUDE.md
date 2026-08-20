@@ -220,6 +220,15 @@ already happened once here. Check `jj st` after every absorb.
   placeholder can never diff. The parser checks only a pen's shape — whether
   it is configured is `apply`'s question, since only apply has the config.
   Pen ink colors the span; anchor health stays on the sign/underline channel.
+- **While a buffer is open, its marks are the truth** (2026-08-20). Every
+  paint places an invisible tracker per positioned note; once the buffer
+  changes, `session.entries` reads tracked extents (tier `live`) instead of
+  re-resolving, and `session.written` re-baselines an attached note to its
+  extent on save — grown, shrunk or moved, the span is the user's own edit.
+  A collapsed mark (span typed over, cut, or a whole-buffer format rewrite)
+  and a mark placed on a guess both fall back to the resolver, which is what
+  keeps `false_stale > wrong` intact. There is no edit-driven re-resolve;
+  do not reintroduce one — it fights the edit in progress.
 - **No required `setup()`.** Config is `vim.g.sidenote`, validated in
   `config.lua`, which returns defaults *alongside* any error so a bad config
   degrades rather than disabling the plugin.

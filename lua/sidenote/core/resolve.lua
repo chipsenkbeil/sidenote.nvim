@@ -13,6 +13,8 @@ local score = require("sidenote.core.score")
 ---@field status sidenote.Status what the resolver concluded
 ---@field line_start integer|nil first resolved line, absent when nothing was placed
 ---@field line_end integer|nil last resolved line, inclusive
+---@field col_start integer|nil first resolved byte column, when the tier knows one
+---@field col_end integer|nil last resolved byte column, inclusive
 ---@field confidence number 0..1, and 1 for the exact tiers
 ---@field tier string ladder rung that decided, or "-" when none ran
 ---@field candidates integer[]|nil competing start lines, when status is ambiguous
