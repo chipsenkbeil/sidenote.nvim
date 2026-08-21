@@ -111,10 +111,10 @@ describe("location.parse rejections", function()
         assert.is_type(err, "string")
     end)
 
-    it("rejects a non-string", function()
+    it("rejects a non-string, saying so rather than calling it empty", function()
         local loc, err = location.parse(nil)
         assert.is_nil(loc)
-        assert.is_type(err, "string")
+        assert.contains(err, "string")
     end)
 end)
 

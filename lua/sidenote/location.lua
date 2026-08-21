@@ -32,7 +32,10 @@ end
 ---@return sidenote.Location|nil
 ---@return string|nil err why text is not a location
 function M.parse(text)
-    if type(text) ~= "string" or text == "" then
+    if type(text) ~= "string" then
+        return nil, ("expected a location string, got %s"):format(type(text))
+    end
+    if text == "" then
         return nil, "empty location"
     end
 
