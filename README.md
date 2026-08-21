@@ -447,12 +447,12 @@ default fits badly. From its own split or float, the verbs that leave the
 listing — `gf`, `<CR>`, a create — land in the window you came from, the
 way a quickfix jump does: the split stays open, a float closes behind you.
 
-A note's header and summary are always visible, ordinary lines — edit them,
-move over them, search them. The body is a real fold beneath, standing in
-as one dim `⋯ +N lines` row while closed, so `za`, `zR`, `zM` and your own
-fold mappings all work on it; a note with no body has nothing folded. The
-prose sits verbatim at the margin with the summary as its first line,
-editable in place and copyable exactly as stored.
+A note's header is always a visible, ordinary line — edit it, move over
+it, search it. The prose beneath is one real fold that reads as its own
+summary while closed, the way org folds a headline; `za`, `zR`, `zM` and
+your own fold mappings all work on it. Expanded, the prose sits verbatim
+at the margin with the summary as its first line, editable in place and
+copyable exactly as stored.
 
 On `:w`:
 
@@ -465,8 +465,8 @@ On `:w`:
 | deleting a note's lines | deletes the note |
 
 Deleting a note means deleting all its lines. An operator motion over a
-closed fold includes the whole fold, so `d2j` on a header takes the header,
-the summary and however long a body in one stroke. Deleting just the header
+closed fold includes the whole fold, so `dj` on a header takes the header
+and however long a prose in one stroke. Deleting just the header
 cannot corrupt a neighbor: prose left behind reads as glued onto the note
 above, and the write is refused until those lines go too.
 
@@ -498,8 +498,10 @@ for writing.
 ### Filtering
 
 Either listing narrows by `kind`, `state`, anchor `status`, or a `path`
-substring. Filters combine, and re-filtering narrows the listing you have
-rather than opening another. `-` carries the filter with it. Inside a listing
+substring. A `change=` or `commit=` filter keeps only notes stamped with a
+matching version-control id prefix — every capture inside a jj repository
+records the working copy's change id. Filters combine, and re-filtering
+narrows the listing you have rather than opening another. `-` carries the filter with it. Inside a listing
 the `f` keys ask interactively — `fk`, `fs`, `fa`, `ff` — and `fc` widens all
 the way back out.
 
@@ -603,6 +605,29 @@ There is a ready-made agent skill in
 [skills/sidenote/SKILL.md](skills/sidenote/SKILL.md) covering all of this —
 how to read a store, what the gate means, and what an agent must never touch.
 Copy or symlink it into `~/.claude/skills/` (or your agent's equivalent).
+
+### Reviewing a change
+
+An offline review is annotation plus a filter. Check out the change, read
+it, and file todos where you would leave review comments; every capture
+inside a jj repository is stamped with the working copy's change id, which
+survives the rewrites a commit does not. One change's comments are then a
+work queue:
+
+```vim
+:Sidenote qflist change=zzo kind=todo state=open
+```
+
+An agent scopes itself the same way — `list <project> --change zzo` — does
+the work, appends a dated reply beneath your prose, and flips each todo to
+resolved, so you review *how* it was addressed rather than hunting for
+whether anything happened. In a committed store the comments travel with
+the working copy, landing inside the very change they review.
+
+In a plain git repository the stamp is the commit sha — `commit=` in the
+editor and `--commit` on the CLI filter the same way. Take the sha you
+started the review from as its key: git has no id that survives an amend,
+so comments made after you commit mid-review carry a different stamp.
 
 <!-- vimdoc:tag sidenote-export-gate -->
 

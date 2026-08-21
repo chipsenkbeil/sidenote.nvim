@@ -24,7 +24,8 @@ local USAGE = table.concat({
     "usage: nvim --headless -l cli/sidenote.lua <command> [project] [options]",
     "",
     "  export <project>                 the whole store as JSON",
-    "  list <project> [--status <s>]    one line per annotation",
+    "  list <project> [--status <s>] [--change <p>] [--commit <p>]",
+    "                                   one line per annotation",
     "",
     "A status is one of attached, drifted, ambiguous, orphaned, filegone.",
     "Anything but attached or drifted is reported without line numbers, on",
@@ -116,8 +117,20 @@ function M.main(argv, opts)
         return 0
     end
 
+    -- A prefix of the stamped id, the way jj and git themselves accept one;
+    -- an unstamped note belongs to no change and never matches
+    local function stamped(record)
+        for _, key in ipairs({ "change", "commit" }) do
+            local want = flags[key]
+            if want and (record[key] == nil or record[key]:sub(1, #want) ~= want) then
+                return false
+            end
+        end
+        return true
+    end
+
     for _, record in ipairs(doc.annotations) do
-        if not wanted or record.status == wanted then
+        if (not wanted or record.status == wanted) and stamped(record) then
             write(summarize(record))
         end
     end

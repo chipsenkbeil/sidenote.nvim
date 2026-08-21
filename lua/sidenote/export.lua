@@ -8,6 +8,8 @@ local store = require("sidenote.store")
 ---@field state string lifecycle position, human-owned
 ---@field path string annotated file, relative to the project root
 ---@field status sidenote.Status what the resolver concluded
+---@field change string|nil jj change id stamped at capture, absent outside jj
+---@field commit string|nil commit id stamped at capture, absent outside a repo
 ---@field confidence number 0..1, and 1 for the exact tiers
 ---@field code_no_longer_exists boolean true when no position is offered
 ---@field prose string the note itself, verbatim
@@ -59,6 +61,8 @@ function M.entry(entry, prose)
         state = rec.state,
         path = rec.path,
         status = entry.status,
+        change = rec.vcs and rec.vcs.change or nil,
+        commit = rec.vcs and rec.vcs.commit or nil,
         confidence = entry.resolution.confidence,
         -- Always present, so branching on it needs no nil check; `line_start`
         -- is the field that disappears

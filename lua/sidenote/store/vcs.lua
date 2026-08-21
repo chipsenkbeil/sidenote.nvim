@@ -39,6 +39,36 @@ local function find_up(path, marker)
     return nil
 end
 
+---The working copy's change id, the stable name a review filter keys on.
+---
+---A jj change id survives the rewrites that constantly replace the
+---working-copy commit, which is what makes it usable as "the change these
+---review comments belong to". Nil when jj is absent or the directory is no
+---real repository.
+---@param root string directory holding .jj
+---@return string|nil
+local function jj_change(root)
+    if vim.fn.executable("jj") == 0 then
+        return nil
+    end
+    local out = vim.fn.system({
+        "jj",
+        "-R",
+        root,
+        "--no-pager",
+        "log",
+        "--no-graph",
+        "-r",
+        "@",
+        "-T",
+        "change_id",
+    })
+    if vim.v.shell_error ~= 0 then
+        return nil
+    end
+    return (out:gsub("%s+$", ""))
+end
+
 ---@param path string
 ---@return sidenote.Vcs|nil
 function M.probe(path)
@@ -54,10 +84,12 @@ function M.probe(path)
         return nil
     end
 
+    local jj_root = find_up(path, ".jj")
     local status = run(git_root, { "status", "--porcelain", "--", path })
     return {
-        kind = find_up(path, ".jj") and "jj" or "git",
+        kind = jj_root and "jj" or "git",
         commit = commit,
+        change = jj_root and jj_change(jj_root) or nil,
         dirty = status ~= nil and status ~= "",
     }
 end

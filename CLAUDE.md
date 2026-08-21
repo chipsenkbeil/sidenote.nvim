@@ -211,10 +211,10 @@ already happened once here. Check `jj st` after every absorb.
   `/<id> ` marker is the grammar's only delimiter: ids are word characters, so
   prose mentioning `/etc/hosts` cannot read as a header, and everything
   unmarked is prose of the note above. Typed creates went with the old
-  indentation — creation is the browser's `a` mapping. Only the body folds
+  indentation — creation is the browser's `a` mapping. Only the prose folds
   (2026-08-21, after the header-in-fold model kept fighting the cursor):
-  header and summary are always real, navigable lines, and the fold starts
-  on the line after the summary, standing in as one dim `⋯ +N lines` row.
+  the header is always a real, navigable line, and the whole prose folds
+  beneath it, a closed fold reading as its own summary line, org-style.
   Location being the last column is what made a path holding two
   consecutive spaces legal in a listing again.
 - **A pen is a record field naming a configured highlight group** (added
@@ -265,6 +265,13 @@ already happened once here. Check `jj st` after every absorb.
   the human's prose, flip `state` to resolved/wontfix, touch nothing else.
   Invariant 3 is untouched — it binds the plugin's write paths, and an
   agent editing store files is a store consumer, not the plugin.
+- **An offline review is annotation plus a filter** (2026-08-21; this
+  replaces the user's terminal jj-review tool). Captures inside a jj repo
+  stamp the working copy's change id (`vcs.change` — the stable name;
+  the commit stays "a rough when"). `change=`/`commit=` prefix filters run
+  through every surface: listings, `:Sidenote show`, the CLI `--change`,
+  and the export record's `change` field. Reviewing = check out the
+  change, todo-annotate, agents work the filtered queue and resolve.
 - **Kind shows in the gutter only while the anchor is exact** (2026-08-20):
   a healthy todo signs `☐`, checked to `☑` once no longer open; notes keep
   `▍`; every hurt status keeps its own glyph — hurt is louder than kind.
@@ -304,7 +311,7 @@ already happened once here. Check `jj st` after every absorb.
   stays, current and tab stay put. A window already showing the listing is
   re-focused, and browsing from inside a listing replaces it in place,
   which is what keeps `-` from stacking surfaces.
-- **An operator motion over a closed fold includes the whole fold** (`d2j`
+- **An operator motion over a closed fold includes the whole fold** (`dj`
   on a header takes the whole note) — but a linewise Visual selection ending
   on the fold's first line does not extend to its end. Verified: `V2jd` left
   the body's last line behind; `d2j`, `3dd` and `VGd` all took everything.
@@ -312,8 +319,8 @@ already happened once here. Check `jj st` after every absorb.
   trails the note above refuses the whole write, because the grammar would
   otherwise read that prose as a rewrite of a neighbor nobody touched.
 - **`foldminlines` defaults to 1, which leaves a one-line fold open.** A
-  one-line body is exactly that, so the browser sets it to 0 to keep "every
-  body starts folded" true.
+  summary-only note is exactly that, so the browser sets it to 0 to keep
+  "every note starts folded" true.
 - **Set fold options only once the lines exist.** A fold created after
   `foldlevel` was last set opens regardless of it, so `browser.paint` re-closes
   after filling the buffer.
@@ -330,8 +337,9 @@ already happened once here. Check `jj st` after every absorb.
   the fold's first line — a motion over a closed fold otherwise parks the
   cursor invisibly in the hidden lines (verified: `w` lands on the fold's
   last line and sticks). Foldtext is a painting; no cursor can move within
-  it, which is why the fold covers only the body: the header and summary
-  stay real, navigable text however collapsed the note is.
+  it, which is why the header stays outside every fold: it is real,
+  navigable text however collapsed the note is, while a closed prose fold
+  reads as the note's own summary line.
   Two verified caveats: headless `nvim -l` never emits CursorMoved(I) — not
   even across `vim.wait` — so the spec simulates it with `nvim_exec_autocmds`
   and only the InsertEnter path tests end to end; and InsertEnter restores

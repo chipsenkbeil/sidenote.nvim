@@ -3,6 +3,7 @@ local hash = require("sidenote.core.hash")
 ---@class sidenote.Vcs
 ---@field kind "git"|"jj" version control the annotated file sits under
 ---@field commit string commit id at capture, as provenance only
+---@field change? string jj change id at capture, stable across rewrites
 ---@field dirty boolean whether the file had uncommitted changes at capture
 
 ---@class sidenote.Annotation

@@ -205,6 +205,13 @@ describe("record JSON round-trip", function()
         assert.eq_deep(record.decode(record.encode(rec)), rec)
     end)
 
+    it("round-trips a jj change id in the provenance", function()
+        local rec = capture({
+            vcs = { kind = "jj", commit = "abc123", dirty = false, change = "zzowxyzq" },
+        })
+        assert.eq_deep(record.decode(record.encode(rec)), rec)
+    end)
+
     it("round-trips multi-line anchor text with quotes and backslashes", function()
         local tricky = 'local s = "he said \\"hi\\""\nlocal t = [[\nraw\n]]'
         local rec = capture({ content = tricky, line_start = 1, line_end = 4 })

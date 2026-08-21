@@ -83,6 +83,36 @@ local function summaries(bufnr)
     return out
 end
 
+describe("filtering by provenance stamp", function()
+    local filter = require("sidenote.filter")
+
+    ---@param vcs sidenote.Vcs|nil
+    ---@return sidenote.session.Entry
+    local function stamped(vcs)
+        return {
+            status = "attached",
+            record = { kind = "note", state = "open", path = "m.lua", vcs = vcs },
+        }
+    end
+
+    it("keeps a note whose change id starts with the wanted prefix", function()
+        local entry =
+            stamped({ kind = "jj", commit = ("a"):rep(40), dirty = false, change = "zzowxyzq" })
+        assert.eq(filter.survives(entry, { change = "zzo" }), true)
+        assert.eq(filter.survives(entry, { change = "mn" }), false)
+    end)
+
+    it("drops an unstamped note when a change is wanted", function()
+        assert.eq(filter.survives(stamped(nil), { change = "zzo" }), false)
+    end)
+
+    it("matches a commit prefix the same way", function()
+        local entry = stamped({ kind = "git", commit = "abc123def", dirty = false })
+        assert.eq(filter.survives(entry, { commit = "abc12" }), true)
+        assert.eq(filter.survives(entry, { commit = "123" }), false)
+    end)
+end)
+
 describe("browser filtering", function()
     it("keeps only the kind asked for", function()
         local t = tree()

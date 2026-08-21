@@ -169,6 +169,21 @@ describe("the :Sidenote command", function()
 
         local values = vim.fn.getcompletion("Sidenote browse status=orph", "cmdline")
         assert.eq_deep(values, { "status=orphaned" })
+
+        local stamps = vim.fn.getcompletion("Sidenote browse c", "cmdline")
+        assert.contains(table.concat(stamps, " "), "change=")
+        assert.contains(table.concat(stamps, " "), "commit=")
+    end)
+
+    it("narrows by a change id prefix from the command line", function()
+        -- Notes captured outside any repository carry no stamp, so a change
+        -- filter leaves nothing — and errors nowhere
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("3")
+
+        vim.cmd("Sidenote browse change=zzz")
+        assert.eq_deep(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "" })
     end)
 
     it("captures the whole file with add scope=file", function()

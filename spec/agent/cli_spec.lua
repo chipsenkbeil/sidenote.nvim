@@ -191,6 +191,37 @@ describe("cli list", function()
         assert.neq(code, 0)
         assert.contains(table.concat(err, "\n"), "banana")
     end)
+
+    it("filters by a change id prefix, for reviewing one change's notes", function()
+        local root = project()
+        local reviewed = annotate(root, "alpha.lua", 4, { "in the change" })
+        annotate(root, "beta.lua", 2, { "unrelated" })
+
+        -- Stamped as a capture inside a jj repository would be
+        local rec = assert(store.read(root .. "/.sidenote", reviewed))
+        rec.vcs = { kind = "jj", commit = ("a"):rep(40), dirty = false, change = "zzowxyzq" }
+        assert(store.update(root .. "/.sidenote", rec))
+
+        local code, out = run({ "list", root, "--change", "zzo" })
+        assert.eq(code, 0)
+        assert.eq(#out, 1)
+        assert.contains(out[1], "in the change")
+    end)
+
+    it("filters by a commit prefix, for plain git repositories", function()
+        local root = project()
+        local reviewed = annotate(root, "alpha.lua", 4, { "on the branch" })
+        annotate(root, "beta.lua", 2, { "unrelated" })
+
+        local rec = assert(store.read(root .. "/.sidenote", reviewed))
+        rec.vcs = { kind = "git", commit = "abc123def456", dirty = false }
+        assert(store.update(root .. "/.sidenote", rec))
+
+        local code, out = run({ "list", root, "--commit", "abc123" })
+        assert.eq(code, 0)
+        assert.eq(#out, 1)
+        assert.contains(out[1], "on the branch")
+    end)
 end)
 
 describe("cli argument handling", function()

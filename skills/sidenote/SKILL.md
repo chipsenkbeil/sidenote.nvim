@@ -24,6 +24,7 @@ Prefer the headless CLI; it inherits the confidence gate:
 ```bash
 nvim --headless -l <plugin>/cli/sidenote.lua list   <project-root>
 nvim --headless -l <plugin>/cli/sidenote.lua list   <project-root> --status orphaned
+nvim --headless -l <plugin>/cli/sidenote.lua list   <project-root> --change <prefix>
 nvim --headless -l <plugin>/cli/sidenote.lua export <project-root>
 ```
 
@@ -49,6 +50,16 @@ prose files is also a supported interface.
   `code_no_longer_exists: true` has **no** line numbers on purpose — the code
   it described no longer exists as written. Search for its `anchor_text`
   instead; never act on whatever now occupies its old lines.
+
+## Reviewing a change
+
+When the user reviews a change (jj) offline, their review comments are
+`open` todos stamped with that change's id — the `change` field in
+`export` output, filterable with `list --change <prefix>`. Asked to
+address a review, work only that filtered queue and resolve each todo the
+standard way below; notes stamped with other changes, or with none, are
+not part of the review. In plain git the stamp is a commit sha instead —
+the `commit` field, filterable with `list --commit <prefix>`.
 
 ## Acting on a todo
 

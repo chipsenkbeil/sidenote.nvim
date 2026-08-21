@@ -65,10 +65,16 @@ local function listing_args(fargs)
         elseif key == "path" then
             -- Free-form: any substring of a project-relative path is fair
             filter.path = value
+        elseif key == "change" or key == "commit" then
+            -- Free-form: a prefix of the stamped id, the way jj and git
+            -- themselves accept one
+            filter[key] = value
         elseif not values[key] then
             return nil,
                 nil,
-                ("unknown filter %q; expected kind=, path=, state= or status="):format(key)
+                ("unknown filter %q; expected change=, commit=, kind=, path=, state= or status="):format(
+                    key
+                )
         elseif not vim.tbl_contains(values[key], value) then
             return nil,
                 nil,
@@ -266,7 +272,7 @@ end, {
                 return key .. "=" .. value
             end, values[key]))
         end
-        local keys = { "kind=", "path=", "state=", "status=" }
+        local keys = { "change=", "commit=", "kind=", "path=", "state=", "status=" }
         if subcommand == "loclist" or subcommand == "qflist" then
             keys[#keys + 1] = "scope=file"
             keys[#keys + 1] = "scope=project"

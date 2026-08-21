@@ -64,4 +64,26 @@ describe("vcs.probe", function()
         vim.fn.mkdir(dir .. "/.jj", "p")
         assert.eq(vcs.probe(dir .. "/f.txt").kind, "jj")
     end)
+
+    it("survives a .jj directory that is no real repository", function()
+        local dir = git_repo()
+        vim.fn.mkdir(dir .. "/.jj", "p")
+        assert.is_nil(vcs.probe(dir .. "/f.txt").change, "no id beats a guessed one")
+    end)
+
+    it("stamps the stable jj change id beside the commit", function()
+        -- The change id is what review filtering keys on: it survives the
+        -- rewrites that constantly replace a jj working-copy commit
+        if vim.fn.executable("jj") == 0 then
+            return
+        end
+        local dir = git_repo()
+        local out = vim.fn.system({ "jj", "git", "init", "--colocate", dir })
+        assert(vim.v.shell_error == 0, out)
+
+        local got = vcs.probe(dir .. "/f.txt")
+        assert.eq(got.kind, "jj")
+        assert.match(got.change, "^%w+$")
+        assert.gte(#got.change, 8)
+    end)
 end)
