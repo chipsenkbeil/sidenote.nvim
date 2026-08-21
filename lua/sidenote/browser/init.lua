@@ -287,10 +287,14 @@ end
 ---Repaint the loaded buffer of every file a listing edit touched.
 ---
 ---The edit changed records out from under any window showing the annotated
----code, so its marks follow now rather than at that buffer's next save.
+---code, so its marks follow now rather than at that buffer's next save. A
+---re-anchored note's tracker is forgotten first: the live tier would
+---otherwise outrank the explicit move, and that buffer's next save would
+---write the old span back over it.
 ---@param state sidenote.browser.State
 ---@param paths string[] project-relative or absolute paths whose buffers repaint
-local function repaint_sources(state, paths)
+---@param reanchored? string[] ids whose trackers must not outlive their re-anchor
+local function repaint_sources(state, paths, reanchored)
     local root = project.root(state.path)
     local seen = {}
     for _, given in ipairs(paths) do
@@ -302,6 +306,9 @@ local function repaint_sources(state, paths)
                 if vim.api.nvim_buf_is_loaded(buf) and not states[buf] then
                     local name = vim.api.nvim_buf_get_name(buf)
                     if (vim.uv.fs_realpath(name) or name) == wanted then
+                        for _, id in ipairs(reanchored or {}) do
+                            indicator.forget(buf, id)
+                        end
                         session.refresh(buf, state.config)
                     end
                 end
@@ -1081,9 +1088,16 @@ function M.write(bufnr, opts)
         end
     end
 
+    local reanchored = {}
+    for _, action in ipairs(actions) do
+        if action.kind == "move" or action.kind == "rescope" then
+            reanchored[#reanchored + 1] = action.id
+        end
+    end
+
     local applied, failures = apply.run(actions, state)
     M.rerender(bufnr)
-    repaint_sources(state, touched)
+    repaint_sources(state, touched, reanchored)
     return applied, failures
 end
 

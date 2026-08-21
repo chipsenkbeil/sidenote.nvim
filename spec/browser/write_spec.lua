@@ -37,6 +37,7 @@ end
 ---@param line integer
 ---@param prose string[]
 ---@return string id
+---@return string root
 local function annotate(source, line, prose)
     local cfg = opts()
     local result =
@@ -44,7 +45,7 @@ local function annotate(source, line, prose)
     local fh = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
     fh:write(table.concat(prose, "\n") .. "\n")
     fh:close()
-    return result.id
+    return result.id, result.root
 end
 
 ---@return boolean
@@ -75,6 +76,46 @@ describe("browser.write", function()
             vim.api.nvim_buf_get_extmarks(source, require("sidenote.render").NAMESPACE, 0, -1, {})
         assert.eq(#marks, 1)
         assert.eq(marks[1][2], 1, "the sign sits on the new line")
+    end)
+
+    it("repaints an applied move even while a mark tracks the old span", function()
+        -- An edit after the paint sends the session to its live tier; the
+        -- explicit move must still outrank the stale tracker
+        local source = project_buffer()
+        annotate(source, 4, { "the note" })
+        require("sidenote.session").refresh(source, opts())
+        vim.api.nvim_buf_set_lines(source, 5, 5, false, { "-- a scratch line" })
+        local bufnr = assert(browser.open(source, { config = opts() }))
+
+        local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+        lines[1] = lines[1]:gsub("m%.lua:4", "m.lua:3")
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+
+        assert.eq(browser.write(bufnr, { confirm = always_yes }), 1)
+        local marks =
+            vim.api.nvim_buf_get_extmarks(source, require("sidenote.render").NAMESPACE, 0, -1, {})
+        assert.gt(#marks, 0)
+        for _, mark in ipairs(marks) do
+            assert.eq(mark[2], 2, "a mark still sits on the old line")
+        end
+    end)
+
+    it("keeps the moved anchor through the source's next save", function()
+        -- Write-back re-baselines attached notes to their marks; a mark
+        -- left on the old span would write the move straight back out
+        local source = project_buffer()
+        local id, root = annotate(source, 4, { "the note" })
+        require("sidenote.session").refresh(source, opts())
+        vim.api.nvim_buf_set_lines(source, 5, 5, false, { "-- a scratch line" })
+        local bufnr = assert(browser.open(source, { config = opts() }))
+
+        local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+        lines[1] = lines[1]:gsub("m%.lua:4", "m.lua:3")
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+        assert.eq(browser.write(bufnr, { confirm = always_yes }), 1)
+
+        require("sidenote.session").written(source)
+        assert.eq(assert(store.read(root, id)).line_start, 3)
     end)
 
     it("applies nothing when the buffer was not edited", function()

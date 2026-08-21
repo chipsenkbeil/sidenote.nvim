@@ -254,6 +254,23 @@ local function track(bufnr, entry)
     }
 end
 
+---Drop the tracker for `id`, sending its next resolution to the resolver.
+---
+---For when the record was re-anchored out from under the mark: an applied
+---move must outrank the span the tracker was still following.
+---@param bufnr integer
+---@param id string
+function M.forget(bufnr, id)
+    local tracked = trackers[bufnr] and trackers[bufnr][id]
+    if not tracked then
+        return
+    end
+    trackers[bufnr][id] = nil
+    if vim.api.nvim_buf_is_valid(bufnr) then
+        vim.api.nvim_buf_del_extmark(bufnr, M.TRACK, tracked.mark)
+    end
+end
+
 ---What a placed annotation's mark covers right now, or nil when unplaced.
 ---
 ---Between one paint and the next the mark has followed every edit, so this

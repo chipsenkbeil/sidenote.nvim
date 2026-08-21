@@ -228,7 +228,11 @@ already happened once here. Check `jj st` after every absorb.
   A collapsed mark (span typed over, cut, or a whole-buffer format rewrite)
   and a mark placed on a guess both fall back to the resolver, which is what
   keeps `false_stale > wrong` intact. There is no edit-driven re-resolve;
-  do not reintroduce one — it fights the edit in progress.
+  do not reintroduce one — it fights the edit in progress. The one sanctioned
+  exception is `render.forget`: applying a move or rescope through the
+  browser drops the acted ids' trackers before the repaint, because a stale
+  tracker would outrank the explicit move and the buffer's next save would
+  write the old span back over it. Verified, both ways.
 - **The editor's context header is display-only extmarks** (2026-08-20,
   from the org-remark review): virtual lines above row 0 plus a winbar
   mirror of the location. Lines above row 0 are invisible at scroll-top
