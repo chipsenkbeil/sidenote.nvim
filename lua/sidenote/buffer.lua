@@ -35,6 +35,26 @@ function M.read(path)
     return table.concat(lines, "\n")
 end
 
+---Text of the file at `path`, a loaded buffer's text winning over disk.
+---
+---What an interactive caller sees is the buffer, unsaved edits included, so
+---anything anchoring against "the file" must read that same text. Headless,
+---no buffer exists and this is exactly `read`.
+---@param path string
+---@return string|nil content nil when neither a buffer nor the file exists
+function M.content(path)
+    local wanted = vim.uv.fs_realpath(path) or path
+    for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_loaded(bufnr) then
+            local name = vim.api.nvim_buf_get_name(bufnr)
+            if name ~= "" and (vim.uv.fs_realpath(name) or name) == wanted then
+                return table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
+            end
+        end
+    end
+    return M.read(wanted)
+end
+
 ---@param bufnr integer
 ---@param opts sidenote.buffer.TargetOpts
 ---@return sidenote.buffer.Target|nil

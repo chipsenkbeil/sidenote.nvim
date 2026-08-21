@@ -20,20 +20,6 @@ local strategy = require("sidenote.store.strategy")
 ---@class sidenote.scan
 local M = {}
 
----@param path string absolute path of a source file
----@return string|nil content nil when the file no longer exists
-local function content_of(path)
-    for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.api.nvim_buf_is_loaded(bufnr) then
-            local name = vim.api.nvim_buf_get_name(bufnr)
-            if name ~= "" and (vim.uv.fs_realpath(name) or name) == path then
-                return table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
-            end
-        end
-    end
-    return buffer.read(path)
-end
-
 ---Every record in the project's stores, with the root it came from.
 ---
 ---Earlier roots win on an id conflict, matching the read precedence a strategy
@@ -107,7 +93,7 @@ function M.project(opts)
         -- Each source file is read once however many notes target it
         if sources[rec.path] == nil then
             local absolute = root and (root .. "/" .. rec.path) or rec.path
-            sources[rec.path] = { content = content_of(absolute) }
+            sources[rec.path] = { content = buffer.content(absolute) }
         end
         local source = sources[rec.path]
 

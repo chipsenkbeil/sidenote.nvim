@@ -65,7 +65,9 @@ local function destination(action, state)
     if not wanted then
         return nil, parse_err
     end
-    local content = buffer.read(absolute(state, wanted.path))
+    -- The buffer-preferring read: the listing's positions are the loaded
+    -- buffer's, so the anchor must capture that same text
+    local content = buffer.content(absolute(state, wanted.path))
     local checked, err = location.validate(wanted, content)
     if not checked then
         return nil, err

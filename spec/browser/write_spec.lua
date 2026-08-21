@@ -118,6 +118,23 @@ describe("browser.write", function()
         assert.eq(assert(store.read(root, id)).line_start, 3)
     end)
 
+    it("anchors a move to the buffer's text, not the file on disk", function()
+        -- The listing's positions are the buffer's; capturing disk text
+        -- would anchor the note to a line the user was not even looking at
+        local source = project_buffer()
+        local id, root = annotate(source, 4, { "the note" })
+        require("sidenote.session").refresh(source, opts())
+        vim.api.nvim_buf_set_lines(source, 2, 3, false, { "function M.changed()" })
+        local bufnr = assert(browser.open(source, { config = opts() }))
+
+        local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+        lines[1] = lines[1]:gsub("m%.lua:4", "m.lua:3")
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+        assert.eq(browser.write(bufnr, { confirm = always_yes }), 1)
+
+        assert.eq(assert(store.read(root, id)).text, "function M.changed()")
+    end)
+
     it("applies nothing when the buffer was not edited", function()
         local source = project_buffer()
         annotate(source, 4, { "the note" })
