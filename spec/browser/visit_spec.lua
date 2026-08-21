@@ -12,6 +12,7 @@ local function opts()
         indicator = { style = "sign" },
         preview = { style = "float", max_lines = 20 },
         editor = { style = "split", position = "right", size = 60 },
+        browser = { style = "current" },
     }
 end
 

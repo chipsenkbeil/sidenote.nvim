@@ -33,6 +33,13 @@ describe("config.defaults", function()
             assert.eq(pens[name], group)
         end
     end)
+
+    it("opens the browser in a bottom split, sized to its rows", function()
+        local browser = config.defaults().browser
+        assert.eq(browser.style, "split")
+        assert.eq(browser.position, "bottom")
+        assert.is_nil(browser.size, "no fixed size means sized to content")
+    end)
 end)
 
 describe("config.resolve", function()
@@ -95,6 +102,14 @@ describe("config.resolve", function()
     it("names the offending path in the error, not just the field", function()
         local _, err = config.resolve({ editor = { style = "hologram" } })
         assert.contains(err, "vim.g.sidenote.editor.style")
+    end)
+
+    it("rejects a browser style or position the window module cannot open", function()
+        local _, err = config.resolve({ browser = { style = "hologram" } })
+        assert.contains(err, "vim.g.sidenote.browser.style")
+
+        _, err = config.resolve({ browser = { position = "sideways" } })
+        assert.contains(err, "vim.g.sidenote.browser.position")
     end)
 
     it("returns defaults alongside an error so a caller can degrade", function()

@@ -11,6 +11,11 @@
 ---@field position "left"|"right"|"top"|"bottom" side the split takes
 ---@field size integer columns for a vertical split, rows for a horizontal one
 
+---@class sidenote.BrowserConfig
+---@field style "split"|"float"|"current"|"tab" where a listing opens
+---@field position "left"|"right"|"top"|"bottom" side the split takes
+---@field size? integer columns or rows for the surface; sized to the listing's rows when omitted
+
 ---@class sidenote.template.Context
 ---@field path string annotated file, relative to the project root
 ---@field filetype string extension and filetype the note will use
@@ -31,6 +36,7 @@
 ---@field indicator sidenote.IndicatorConfig how annotations appear in a source buffer
 ---@field preview sidenote.PreviewConfig how a note is glanced at
 ---@field editor sidenote.EditorConfig how a note opens for writing
+---@field browser sidenote.BrowserConfig how a listing opens
 
 ---User configuration, resolved from `vim.g.sidenote`.
 ---@class sidenote.config
@@ -47,6 +53,7 @@ local INDICATOR_STYLES = {
 local HIGHLIGHT_MODES = { off = true, on = true, always = true, never = true }
 local PREVIEW_STYLES = { float = true, virt_lines = true, split = true, none = true }
 local EDITOR_STYLES = { split = true, float = true, toggle = true, current = true, tab = true }
+local BROWSER_STYLES = { split = true, float = true, current = true, tab = true }
 local POSITIONS = { left = true, right = true, top = true, bottom = true }
 local STRATEGIES = { project = true, global = true }
 
@@ -88,6 +95,10 @@ function M.defaults()
         -- Where a note opens for writing:
         -- split | float | toggle | current | tab
         editor = { style = "split", position = "right", size = 60 },
+
+        -- Where a listing opens: split | float | current | tab.
+        -- No size means sized to the listing's rows
+        browser = { style = "split", position = "bottom" },
     }
 end
 
@@ -172,7 +183,7 @@ local function validate(cfg)
 
     -- Checked before their styles are read: indexing a number would throw, and
     -- a validator that throws takes every entry point down with it
-    for _, section in ipairs({ "indicator", "preview", "editor" }) do
+    for _, section in ipairs({ "indicator", "preview", "editor", "browser" }) do
         if type(cfg[section]) ~= "table" then
             return fail(section, ("expected a table, got %s"):format(type(cfg[section])))
         end
@@ -197,6 +208,15 @@ local function validate(cfg)
         return fail(
             "editor.position",
             ("unknown position %s"):format(tostring(cfg.editor.position))
+        )
+    end
+    if not BROWSER_STYLES[cfg.browser.style] then
+        return fail("browser.style", ("unknown style %s"):format(tostring(cfg.browser.style)))
+    end
+    if not POSITIONS[cfg.browser.position] then
+        return fail(
+            "browser.position",
+            ("unknown position %s"):format(tostring(cfg.browser.position))
         )
     end
     return nil

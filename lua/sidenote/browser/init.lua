@@ -18,6 +18,7 @@ local scan = require("sidenote.scan")
 local session = require("sidenote.session")
 local store = require("sidenote.store")
 local strategy = require("sidenote.store.strategy")
+local window = require("sidenote.window")
 
 ---@alias sidenote.browser.Filter sidenote.Filter
 
@@ -31,6 +32,7 @@ local strategy = require("sidenote.store.strategy")
 ---@field headers integer[] buffer line of each row's header, in row order
 ---@field lines string[] exactly what was rendered, the clean baseline
 ---@field tick integer buffer tick at that render, the dirty check's fast path
+---@field origin? integer window a leaving verb lands in, absent for a takeover
 
 ---An oil-style editable listing of one file's annotations.
 ---@class sidenote.browser
@@ -347,10 +349,33 @@ local HELP_FOOTER = {
     "  dd on a closed row deletes the whole note",
 }
 
----Jump to the code a row's annotation is about, in this same window.
+---Step out of the listing surface before opening something else.
 ---
----The export gate's rule holds in the UI too: a note with no trusted position
----gets a message, never a guess at whatever now sits on its old lines.
+---A floating listing closes behind the jump; a split listing stays open the
+---way a quickfix window does, with the jump landing in the window the
+---listing was opened from; a takeover or tab listing is itself the place
+---to open in, so nothing moves.
+---@param bufnr integer
+local function landing(bufnr)
+    local state = states[bufnr]
+    local winid = vim.api.nvim_get_current_win()
+    if not state or vim.api.nvim_win_get_buf(winid) ~= bufnr then
+        return
+    end
+
+    if vim.api.nvim_win_get_config(winid).relative ~= "" then
+        vim.api.nvim_win_close(winid, true)
+    end
+    if state.origin and vim.api.nvim_win_is_valid(state.origin) then
+        vim.api.nvim_set_current_win(state.origin)
+    end
+end
+
+---Jump to the code a row's annotation is about.
+---
+---The jump lands where `landing` says a leaving verb lands. The export
+---gate's rule holds in the UI too: a note with no trusted position gets a
+---message, never a guess at whatever now sits on its old lines.
 ---@param bufnr integer
 local function visit(bufnr)
     local row = M.row_at(bufnr, vim.fn.line("."))
@@ -376,6 +401,7 @@ local function visit(bufnr)
         return
     end
 
+    landing(bufnr)
     vim.cmd.edit(vim.fn.fnameescape(path))
     if row.entry.line_start then
         vim.api.nvim_win_set_cursor(0, { row.entry.line_start, 0 })
@@ -527,6 +553,7 @@ local function create_note(bufnr)
     end
     paint(bufnr, state)
     local where = vim.tbl_extend("force", state.config.editor, { focus = true })
+    landing(bufnr)
     editor.open({ root = result.root, id = result.id }, where, state.config.filetype)
 end
 
@@ -555,6 +582,7 @@ local function bind(bufnr)
                     { source = state.source, config = state.config },
                     row.entry
                 )
+                landing(bufnr)
                 editor.open(note, where, state.config.filetype)
             end,
         },
@@ -691,7 +719,74 @@ local function name_for(state)
     return M.SCHEME .. state.path
 end
 
----Show a listing in the current window, reusing its buffer if one exists.
+---Rows a content-sized listing surface may take.
+local FIT_MIN, FIT_MAX = 3, 15
+
+---The window a listing shows in, honoring the browser config.
+---
+---Reuse comes first: a window already showing this listing is focused, and
+---opening a listing from inside another one replaces it in place, which is
+---what keeps a widen from stacking surfaces. Only then is a fresh surface
+---opened the configured way.
+---@param bufnr integer
+---@param cfg sidenote.Config
+---@return integer winid
+---@return integer|nil origin window a leaving verb lands in
+---@return boolean fresh whether a new surface was opened
+local function window_for(bufnr, cfg)
+    local came_from = vim.api.nvim_get_current_win()
+
+    for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if vim.api.nvim_win_get_buf(winid) == bufnr then
+            vim.api.nvim_set_current_win(winid)
+            local held = states[bufnr]
+            local origin = winid ~= came_from and came_from or (held and held.origin)
+            return winid, origin, false
+        end
+    end
+
+    local showing = states[vim.api.nvim_win_get_buf(came_from)]
+    if showing then
+        vim.api.nvim_win_set_buf(came_from, bufnr)
+        return came_from, showing.origin, false
+    end
+
+    if cfg.browser.style == "current" then
+        vim.api.nvim_win_set_buf(came_from, bufnr)
+        return came_from, nil, false
+    end
+
+    local winid = window.open(bufnr, {
+        style = cfg.browser.style,
+        position = cfg.browser.position,
+        size = cfg.browser.size,
+        focus = true,
+    })
+    -- A tab records no origin: everything it opens belongs in the tab
+    return winid, cfg.browser.style ~= "tab" and came_from or nil, true
+end
+
+---Size a fresh, content-sized surface to the rows it holds.
+---
+---Every row is a closed fold when a listing opens, so its display height is
+---its row count. A vertical split's width and a tab's shape are not
+---functions of that count and stay as opened.
+---@param winid integer
+---@param state sidenote.browser.State
+local function fit(winid, state)
+    local cfg = state.config.browser
+    if cfg.size then
+        return
+    end
+    local rows = math.min(math.max(#state.rows, FIT_MIN), FIT_MAX)
+    if cfg.style == "float" then
+        vim.api.nvim_win_set_config(winid, { height = rows })
+    elseif cfg.style == "split" and (cfg.position == "top" or cfg.position == "bottom") then
+        vim.api.nvim_win_set_height(winid, rows)
+    end
+end
+
+---Show a listing in the configured surface, reusing its buffer if one exists.
 ---
 ---A filter is not part of the name, so re-opening the same listing with a
 ---different one narrows the view you already have rather than making a second.
@@ -761,12 +856,15 @@ local function show(state)
         bind(bufnr)
     end
 
-    local winid = vim.api.nvim_get_current_win()
-    vim.api.nvim_win_set_buf(winid, bufnr)
+    local winid, origin, fresh = window_for(bufnr, state.config)
+    state.origin = origin
     vim.bo[bufnr].filetype = "sidenote"
     configure(winid)
 
     paint(bufnr, state)
+    if fresh then
+        fit(winid, state)
+    end
     return bufnr
 end
 
@@ -774,7 +872,7 @@ end
 ---@field config? sidenote.Config resolved configuration, read from vim.g when omitted
 ---@field filter? sidenote.browser.Filter which annotations survive into the listing
 
----Open the listing for one source buffer, in the current window.
+---Open the listing for one source buffer, in the configured surface.
 ---
 ---From inside a file's listing this goes back to the file instead, so one
 ---mapping toggles between the two. A project listing has no single file to
@@ -792,6 +890,7 @@ function M.open(source, opts)
         if state.scope ~= "file" then
             return nil, "this lists the whole project; gf jumps to a note's code"
         end
+        landing(source)
         vim.cmd.edit(vim.fn.fnameescape(state.path))
         return vim.api.nvim_get_current_buf(), nil
     end
@@ -815,7 +914,7 @@ function M.open(source, opts)
     })
 end
 
----Open the listing for a whole project, in the current window.
+---Open the listing for a whole project, in the configured surface.
 ---
 ---`path` may be any file inside the project; the root is found from it the same
 ---way the store's is.

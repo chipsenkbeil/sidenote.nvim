@@ -291,6 +291,13 @@ already happened once here. Check `jj st` after every absorb.
 - **`nvim_open_win` speaks `above`/`below`; the config speaks `top`/`bottom`.**
   `window.lua` maps between them so nvim's vocabulary never leaks into user
   config.
+- **The listing opens through `window.lua` like every other surface**
+  (`config.browser`, default a bottom split sized to its rows). Verbs that
+  leave a split or float listing — `gf`, `<CR>`, `a` — land in the window
+  the listing was opened from; a float closes behind the jump, a split
+  stays, current and tab stay put. A window already showing the listing is
+  re-focused, and browsing from inside a listing replaces it in place,
+  which is what keeps `-` from stacking surfaces.
 - **`foldtext` returns highlighted chunks on 0.10+**, which is how a closed
   row previews its columns and summary with real colors. The chunks are built
   from the buffer's own lines at draw time, so an edit made while the fold was

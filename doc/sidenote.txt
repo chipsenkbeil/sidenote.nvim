@@ -244,6 +244,10 @@ statusline.
         -- Where a note opens for writing:
         -- split | float | toggle | current | tab
         editor = { style = "split", position = "right", size = 60 },
+
+        -- Where a listing opens: split | float | current | tab.
+        -- No size means sized to the listing's rows
+        browser = { style = "split", position = "bottom" },
     }
 <
 
@@ -431,14 +435,21 @@ moving a store from global to in-repo is a `mv`.
 An editable listing, in the spirit of oil.nvim:
 
 >
-    ▍ note  open      yellow  lua/lobby.lua:42-57    race in lobby join
-    ▍ todo  open      -       lua/lobby.lua:88       move onto the new API
-    ! note  wontfix   -       lua/lobby.lua          the old retry loop
+    ▍ note  open     yellow  lua/lobby.lua:42-57    race in lobby join
+    ▍ todo  open     -       lua/lobby.lua:88       move onto the new API
+    ! note  wontfix  -       lua/lobby.lua          the old retry loop
 <
 
 Every column is yours to edit. Anchor status is the one thing the machine
 owns, and it lives in the gutter — silently while a note is healthy, as a
 status glyph the moment one is not.
+
+The listing opens in a short split beneath you, sized to its rows.
+`vim.g.sidenote.browser` picks another surface — a `float`, a `tab`, or
+`current` to take the window over — with `position` and `size` when the
+default fits badly. From its own split or float, the verbs that leave the
+listing — `gf`, `<CR>`, a create — land in the window you came from, the
+way a quickfix jump does: the split stays open, a float closes behind you.
 
 Each note is a real fold, so `za`, `zR`, `zM` and your own fold mappings work.
 A closed row previews the summary beside the note's columns; expanding it
