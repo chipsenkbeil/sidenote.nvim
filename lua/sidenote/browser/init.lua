@@ -41,12 +41,15 @@ local M = {}
 ---Prefix naming a browser buffer, followed by the absolute source path.
 M.SCHEME = "sidenote://"
 
----Fold expression making each annotation one fold, opened by its header.
+---Fold expression folding each note's body, its header and summary exempt.
 ---
 ---Structure is read back out of the text, so nothing has to be kept in step
----with the buffer as it is edited. The marker is matched fully, so a prose
----line mentioning /etc/hosts does not start a fold of its own.
-M.FOLDEXPR = [[getline(v:lnum) =~ '^/\w\+ ' ? '>1' : '1']]
+---with the buffer as it is edited. A header and the line under it (the
+---summary) sit at level zero, so no fold can ever swallow them; the body
+---starts its own fold on the line after the summary. The marker is matched
+---fully, so a prose line mentioning /etc/hosts does not start a fold.
+M.FOLDEXPR = [[getline(v:lnum) =~ '^/\w\+ ' || getline(v:lnum-1) =~ '^/\w\+ ' ? '0']]
+    .. [[ : getline(v:lnum-2) =~ '^/\w\+ ' ? '>1' : '1']]
 
 ---@type table<integer, sidenote.browser.State>
 local states = {}
@@ -142,12 +145,12 @@ local function configure(winid)
     set_local(winid, "concealcursor", "nvic")
     set_local(winid, "foldmethod", "expr")
     set_local(winid, "foldexpr", M.FOLDEXPR)
-    -- A closed fold renders as its header's columns plus a summary preview,
-    -- assembled as highlighted chunks; see M.foldtext
+    -- A closed body renders as one dim line saying how much it holds; see
+    -- M.foldtext
     set_local(winid, "foldtext", "v:lua.require'sidenote.browser'.foldtext()")
     set_local(winid, "foldenable", true)
-    -- A note with no body is a one-line fold, which vim leaves open at the
-    -- default of 1. Zero keeps "every annotation is a closed fold" true
+    -- A one-line body is a one-line fold, which vim leaves open at the
+    -- default of 1. Zero keeps "every body starts folded" true
     set_local(winid, "foldminlines", 0)
     set_local(
         winid,
@@ -159,62 +162,22 @@ local function configure(winid)
     set_local(winid, "wrap", false)
 end
 
----Most of a summary a closed fold will preview before cutting off.
-local PREVIEW_MAX = 80
-
----Render a closed row: its header's columns plus a preview of its summary.
----
----Built from the buffer lines, never from rendered state, so an edit made
----while the fold was open shows through the moment it closes. Display only:
----the preview may truncate, because nothing here can leak into a write.
----@return {[1]: string, [2]: string}[] chunks
+---One dim line standing in for a folded body. Display only.
+---@return string
 function M.foldtext()
-    local start = vim.v.foldstart
-    local header = vim.fn.getline(start)
-    local row = parse.header(header)
-    if not row then
-        return { { header, "Normal" } }
-    end
-
-    -- The header's own text, sliced by field so each column keeps its color;
-    -- the concealed id is simply not emitted
-    local groups = {
-        kind = "sidenoteKind",
-        state = "sidenoteState",
-        pen = "sidenotePen",
-        location = "sidenoteLocation",
-    }
-    local chunks = {}
-    local cursor = row.fields.kind.first
-    for _, name in ipairs({ "kind", "state", "pen", "location" }) do
-        local field = row.fields[name]
-        if field.first > cursor then
-            chunks[#chunks + 1] = { header:sub(cursor, field.first - 1), "Normal" }
-        end
-        chunks[#chunks + 1] = { header:sub(field.first, field.last), groups[name] }
-        cursor = field.last + 1
-    end
-
-    local summary = start < vim.v.foldend and vim.trim(vim.fn.getline(start + 1)) or ""
-    if summary ~= "" then
-        if #summary > PREVIEW_MAX then
-            summary = summary:sub(1, PREVIEW_MAX) .. "…"
-        end
-        chunks[#chunks + 1] = { "  ", "Normal" }
-        chunks[#chunks + 1] = { summary, "sidenoteProse" }
-    end
-    return chunks
+    local hidden = vim.v.foldend - vim.v.foldstart + 1
+    return ("⋯ +%d line%s"):format(hidden, hidden == 1 and "" or "s")
 end
 
----Collapse every annotation, then hand back the rows that were open.
+---Collapse every body, then hand back the rows whose bodies were open.
 ---
 ---A fold created after 'foldlevel' was last set opens regardless of it, so
 ---this runs once the lines are in place rather than alongside the other
 ---window options. Re-opening by id is what lets a repaint hold still: a
----cycle rewrites the listing, but the fold you were working in stays open.
+---cycle rewrites the listing, but the body you were reading stays open.
 ---@param bufnr integer
 ---@param state sidenote.browser.State
----@param keep table<string, boolean>|nil ids whose rows stay open
+---@param keep table<string, boolean>|nil ids whose bodies stay open
 local function refold(bufnr, state, keep)
     for _, winid in ipairs(vim.api.nvim_list_wins()) do
         if vim.api.nvim_win_get_buf(winid) == bufnr then
@@ -222,8 +185,8 @@ local function refold(bufnr, state, keep)
             if keep then
                 vim.api.nvim_win_call(winid, function()
                     for i, row in ipairs(state.rows) do
-                        if keep[row.entry.id] then
-                            pcall(vim.cmd, state.headers[i] .. "foldopen")
+                        if keep[row.entry.id] and #row.prose > 1 then
+                            pcall(vim.cmd, (state.headers[i] + 2) .. "foldopen")
                         end
                     end
                 end)
@@ -232,17 +195,18 @@ local function refold(bufnr, state, keep)
     end
 end
 
----Which rows are open right now, by id, for a repaint to hand back.
+---Which bodies are open right now, by id, for a repaint to hand back.
 ---
 ---Read from the current window, which is where every caller of a
----preserving repaint already sits.
+---preserving repaint already sits. The body fold starts two lines under
+---the header; a note with no body is trivially open.
 ---@param state sidenote.browser.State
 ---@return table<string, boolean>
 local function unfolded(state)
     local open = {}
     for i, row in ipairs(state.rows or {}) do
         local lnum = state.headers and state.headers[i]
-        if lnum and vim.fn.foldclosed(lnum) == -1 then
+        if lnum and vim.fn.foldclosed(lnum + 2) == -1 then
             open[row.entry.id] = true
         end
     end
@@ -328,19 +292,35 @@ local function report(applied, problems)
     end
 end
 
----Toggle the fold under the cursor, the way org's TAB cycles a headline.
-local function toggle_fold()
-    pcall(vim.cmd, "normal! za")
+---Toggle the note's body fold, the way org's TAB cycles a headline.
+---
+---From any of the note's lines: the body fold starts two lines under the
+---header, and a note with no body has nothing to toggle.
+---@param bufnr integer
+local function toggle_fold(bufnr)
+    for n = vim.fn.line("."), 1, -1 do
+        local text = vim.api.nvim_buf_get_lines(bufnr, n - 1, n, false)[1] or ""
+        if text:match("^/%S+ ") then
+            local fold = n + 2
+            if vim.fn.foldclosed(fold) == -1 then
+                pcall(vim.cmd, fold .. "foldclose")
+            else
+                pcall(vim.cmd, fold .. "foldopen")
+            end
+            return
+        end
+    end
 end
 
----Toggle every fold at once: overview when anything is open, else all open.
+---Toggle every body at once: overview when anything is open, else all open.
 ---
 ---Org's shift-TAB, translated: one key flips between the index and the
 ---full text, and which way it flips is read from the screen, not counted.
 ---@param state sidenote.browser.State
 local function toggle_all(state)
-    for _, lnum in ipairs(state.headers or {}) do
-        if vim.fn.foldclosed(lnum) == -1 then
+    for i, row in ipairs(state.rows or {}) do
+        local lnum = state.headers and state.headers[i]
+        if lnum and #row.prose > 1 and vim.fn.foldclosed(lnum + 2) == -1 then
             vim.cmd("normal! zM")
             return
         end
@@ -351,9 +331,9 @@ end
 ---What `g?` shows below the mappings themselves.
 local HELP_FOOTER = {
     "",
-    "  Folds are real: za, zR, zM and friends all work",
+    "  Folds are real: za, zR, zM and friends work on any body",
     "  Edit any column or prose line, then :w to apply",
-    "  dd on a closed row deletes the whole note",
+    "  Deleting a note is d2j on its header; a closed body counts once",
 }
 
 ---Step out of the listing surface before opening something else.
@@ -661,12 +641,14 @@ local function bind(bufnr)
         },
         {
             lhs = "<Tab>",
-            desc = "Toggle this note's fold, org-style",
-            fn = toggle_fold,
+            desc = "Toggle this note's body, org-style",
+            fn = function()
+                toggle_fold(bufnr)
+            end,
         },
         {
             lhs = "<S-Tab>",
-            desc = "Toggle every fold: the index, or all the prose",
+            desc = "Toggle every body: the index, or all the prose",
             fn = function()
                 local state = states[bufnr]
                 if state then
@@ -1057,6 +1039,11 @@ function M.write(bufnr, opts)
         -- so the listing reads clean again
         M.rerender(bufnr)
         return 0, {}
+    end
+
+    local glued = diff.orphans(state, actions)
+    if #glued > 0 then
+        return 0, reported(glued)
     end
 
     local impossible = apply.validate(actions, state)

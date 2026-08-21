@@ -211,10 +211,12 @@ already happened once here. Check `jj st` after every absorb.
   `/<id> ` marker is the grammar's only delimiter: ids are word characters, so
   prose mentioning `/etc/hosts` cannot read as a header, and everything
   unmarked is prose of the note above. Typed creates went with the old
-  indentation — creation is the browser's `a` mapping. A closed fold previews
-  the header's columns plus the summary via a chunked `foldtext`,
-  display-only. Location being the last column is what made a path holding
-  two consecutive spaces legal in a listing again.
+  indentation — creation is the browser's `a` mapping. Only the body folds
+  (2026-08-21, after the header-in-fold model kept fighting the cursor):
+  header and summary are always real, navigable lines, and the fold starts
+  on the line after the summary, standing in as one dim `⋯ +N lines` row.
+  Location being the last column is what made a path holding two
+  consecutive spaces legal in a listing again.
 - **A pen is a record field naming a configured highlight group** (added
   2026-08-20). `-` in the column means none; parse maps it to nil, so the
   placeholder can never diff. The parser checks only a pen's shape — whether
@@ -302,16 +304,16 @@ already happened once here. Check `jj st` after every absorb.
   stays, current and tab stay put. A window already showing the listing is
   re-focused, and browsing from inside a listing replaces it in place,
   which is what keeps `-` from stacking surfaces.
-- **`foldtext` returns highlighted chunks on 0.10+**, which is how a closed
-  row previews its columns and summary with real colors. The chunks are built
-  from the buffer's own lines at draw time, so an edit made while the fold was
-  open shows through the moment it closes.
-- **A vim operator applies to a whole closed fold**, so `dd` on a collapsed
-  browser row deletes the annotation and all its prose. The browser gets that
-  for free rather than implementing it.
-- **`foldminlines` defaults to 1, which leaves a one-line fold open.** A note
-  with no body is exactly that, so the browser sets it to 0 to keep "every
-  annotation is a closed fold" true.
+- **An operator motion over a closed fold includes the whole fold** (`d2j`
+  on a header takes the whole note) — but a linewise Visual selection ending
+  on the fold's first line does not extend to its end. Verified: `V2jd` left
+  the body's last line behind; `d2j`, `3dd` and `VGd` all took everything.
+  `diff.orphans` guards the half-delete: a deleted note whose prose still
+  trails the note above refuses the whole write, because the grammar would
+  otherwise read that prose as a rewrite of a neighbor nobody touched.
+- **`foldminlines` defaults to 1, which leaves a one-line fold open.** A
+  one-line body is exactly that, so the browser sets it to 0 to keep "every
+  body starts folded" true.
 - **Set fold options only once the lines exist.** A fold created after
   `foldlevel` was last set opens regardless of it, so `browser.paint` re-closes
   after filling the buffer.
@@ -324,11 +326,12 @@ already happened once here. Check `jj st` after every absorb.
   rendering bug rather than as a setting.
 - **Concealed text still owns its cursor columns**, so the browser clamps the
   cursor past the marker (CursorMoved/CursorMovedI/InsertEnter), oil-style.
-  The same autocmd snaps a cursor stranded inside a closed fold back onto the
-  fold's header — a horizontal motion over a closed row otherwise parks the
-  cursor invisibly in the hidden prose (verified: `w` lands on the fold's
+  The same autocmd snaps a cursor stranded inside a closed fold back onto
+  the fold's first line — a motion over a closed fold otherwise parks the
+  cursor invisibly in the hidden lines (verified: `w` lands on the fold's
   last line and sticks). Foldtext is a painting; no cursor can move within
-  it, so motion on a closed row is inert by design and `<Tab>` is the way in.
+  it, which is why the fold covers only the body: the header and summary
+  stay real, navigable text however collapsed the note is.
   Two verified caveats: headless `nvim -l` never emits CursorMoved(I) — not
   even across `vim.wait` — so the spec simulates it with `nvim_exec_autocmds`
   and only the InsertEnter path tests end to end; and InsertEnter restores

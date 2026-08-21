@@ -246,7 +246,7 @@ describe("browser gutter", function()
 end)
 
 describe("browser folding keys", function()
-    it("cycles one note's fold on tab, the cursor holding still", function()
+    it("cycles one note's body on tab, the cursor holding still", function()
         -- Org muscle memory: TAB on a headline folds and unfolds it, and
         -- moving the cursor is never part of the deal
         local source = project_buffer()
@@ -254,14 +254,16 @@ describe("browser folding keys", function()
         local listing = assert(browser.open(source, { config = opts() }))
         vim.api.nvim_set_current_buf(listing)
         vim.api.nvim_win_set_cursor(0, { 1, 2 })
-        assert.eq(vim.fn.foldclosed(1), 1)
+        assert.eq(vim.fn.foldclosed(1), -1, "the header is never folded")
+        assert.eq(vim.fn.foldclosed(2), -1, "the summary is never folded")
+        assert.eq(vim.fn.foldclosed(3), 3, "the body opens shut")
 
         press("<Tab>")
-        assert.eq(vim.fn.foldclosed(1), -1)
+        assert.eq(vim.fn.foldclosed(3), -1)
         assert.eq_deep(vim.api.nvim_win_get_cursor(0), { 1, 2 })
 
         press("<Tab>")
-        assert.eq(vim.fn.foldclosed(1), 1)
+        assert.eq(vim.fn.foldclosed(3), 3)
     end)
 
     it("flips between the index and everything on shift-tab", function()
@@ -272,9 +274,9 @@ describe("browser folding keys", function()
         vim.api.nvim_set_current_buf(listing)
 
         press("<S-Tab>")
-        assert.eq(vim.fn.foldclosed(1), -1, "everything opens from the index")
+        assert.eq(vim.fn.foldclosed(3), -1, "every body opens from the index")
         press("<S-Tab>")
-        assert.neq(vim.fn.foldclosed(1), -1, "and closes again from anything open")
+        assert.neq(vim.fn.foldclosed(3), -1, "and closes again from anything open")
     end)
 end)
 
@@ -329,12 +331,12 @@ describe("browser cycling", function()
         annotate(source, 4, { "summary", "a body line" })
         vim.api.nvim_set_current_buf(assert(browser.open(source, { config = opts() })))
         press("<Tab>")
-        assert.eq(vim.fn.foldclosed(1), -1)
+        assert.eq(vim.fn.foldclosed(3), -1)
         local at = { 1, column_of("kind") }
         vim.api.nvim_win_set_cursor(0, at)
 
         press("t")
-        assert.eq(vim.fn.foldclosed(1), -1, "the fold stays open")
+        assert.eq(vim.fn.foldclosed(3), -1, "the fold stays open")
         assert.eq_deep(vim.api.nvim_win_get_cursor(0), at, "the cursor stays put")
         press("t")
         assert.contains(
@@ -509,17 +511,16 @@ describe("browser cursor", function()
         assert.eq(assert(line:match("^/%w+ ()")) - 1, first)
     end)
 
-    it("snaps out of a closed fold's interior onto its header", function()
+    it("snaps out of a closed fold's interior onto its top line", function()
         local source = project_buffer()
-        annotate(source, 1, { "the summary", "the body" })
+        annotate(source, 1, { "the summary", "the body", "more body" })
         local listing = assert(browser.open(source, { config = opts() }))
-        local first = visible_start(listing)
 
         -- A word motion over a closed fold strands the cursor in the hidden
-        -- prose; the landing is simulated for the same reason as above
-        vim.api.nvim_win_set_cursor(0, { 3, 5 })
+        -- lines; the landing is simulated for the same reason as above
+        vim.api.nvim_win_set_cursor(0, { 4, 5 })
         vim.api.nvim_exec_autocmds("CursorMoved", { buffer = listing })
-        assert.eq_deep(vim.api.nvim_win_get_cursor(0), { 1, first })
+        assert.eq_deep(vim.api.nvim_win_get_cursor(0), { 3, 0 })
     end)
 
     it("leaves the cursor alone on prose lines", function()

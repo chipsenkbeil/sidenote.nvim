@@ -107,7 +107,7 @@ describe("browser.open", function()
         assert.eq(browser.open(source, { config = opts() }), first)
     end)
 
-    it("opens with every annotation folded shut, one visible row each", function()
+    it("opens with every body folded, headers and summaries in plain sight", function()
         -- Entries sort by line, so the note on line 1 renders first and the
         -- one on line 4 renders second, carrying its body with it
         local source = project_buffer()
@@ -115,19 +115,33 @@ describe("browser.open", function()
         annotate(source, 1, { "no body" })
 
         assert(browser.open(source, { config = opts() }))
-        assert.eq(vim.fn.foldclosed(1), 1)
-        assert.eq(vim.fn.foldclosedend(1), 2, "the summary belongs inside the fold")
-        assert.eq(vim.fn.foldclosed(3), 3)
-        assert.eq(vim.fn.foldclosedend(3), 5, "the body belongs inside the fold")
+        assert.eq(vim.fn.foldclosed(1), -1, "a header is never folded")
+        assert.eq(vim.fn.foldclosed(2), -1, "a summary is never folded")
+        assert.eq(vim.fn.foldclosed(3), -1)
+        assert.eq(vim.fn.foldclosed(4), -1)
+        assert.eq(vim.fn.foldclosed(5), 5, "the body folds shut")
+        assert.eq(vim.fn.foldclosedend(5), 5)
     end)
 
-    it("puts a note's whole body inside its fold, so dd on a closed row takes it all", function()
+    it("stands a folded body in with one dim line saying how much it holds", function()
+        local source = project_buffer()
+        annotate(source, 4, { "summary", "body one", "body two" })
+        assert(browser.open(source, { config = opts() }))
+
+        assert.eq(vim.fn.foldclosed(3), 3)
+        assert.eq(vim.fn.foldclosedend(3), 4)
+        assert.contains(vim.fn.foldtextresult(3), "2")
+    end)
+
+    it("takes a whole note with d2j, the closed body counting once", function()
+        -- An operator motion over a closed fold includes the whole fold, so
+        -- header, summary and however much body is three lines to d
         local source = project_buffer()
         annotate(source, 4, { "summary", "body one", "body two" })
         local bufnr = assert(browser.open(source, { config = opts() }))
 
         vim.api.nvim_win_set_cursor(0, { 1, 0 })
-        vim.cmd("normal! dd")
+        vim.cmd("normal! d2j")
         assert.eq_deep(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), { "" })
     end)
 

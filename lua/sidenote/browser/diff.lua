@@ -126,4 +126,50 @@ function M.compute(before, after)
     return actions
 end
 
+---Deleted notes whose prose was left behind, glued onto the note above.
+---
+---A header deleted on its own leaves its prose in place, and the grammar
+---hands every unmarked line to the previous note — so the diff reads it as
+---a rewrite of a neighbor nobody touched, beside the delete. The shape is
+---precise: a written note whose new prose is its own followed by the old
+---prose of the deleted notes that used to sit under it, in order.
+---@param before sidenote.browser.State what the browser rendered
+---@param actions sidenote.browser.Action[] what `compute` derived
+---@return sidenote.browser.ParseError[] errors one per note left behind
+function M.orphans(before, actions)
+    local writes, deleted = {}, {}
+    for _, action in ipairs(actions) do
+        if action.kind == "write" then
+            writes[action.id] = action
+        elseif action.kind == "delete" then
+            deleted[action.id] = true
+        end
+    end
+
+    local errors = {}
+    for i, row in ipairs(before.rows) do
+        local write = writes[row.entry.id]
+        if write then
+            local expected = vim.list_slice(row.prose)
+            for n = i + 1, #before.rows do
+                local dead = before.rows[n]
+                if not deleted[dead.entry.id] then
+                    break
+                end
+                vim.list_extend(expected, dead.prose)
+                if same_lines(write.prose, expected) then
+                    errors[#errors + 1] = {
+                        lnum = write.lnum or 0,
+                        message = ("%s was deleted but its prose remains here; delete those lines too"):format(
+                            dead.entry.id
+                        ),
+                    }
+                    break
+                end
+            end
+        end
+    end
+    return errors
+end
+
 return M

@@ -135,6 +135,22 @@ describe("browser.write", function()
         assert.eq(assert(store.read(root, id)).text, "function M.changed()")
     end)
 
+    it("refuses a write that leaves a deleted note's prose behind", function()
+        -- Deleting a header alone glues the dead note's prose onto the
+        -- note above; applying that would rewrite an untouched neighbor
+        local source = project_buffer()
+        annotate(source, 1, { "alpha" })
+        local id, root = annotate(source, 4, { "beta" })
+        local bufnr = assert(browser.open(source, { config = opts() }))
+
+        vim.api.nvim_buf_set_lines(bufnr, 2, 3, false, {})
+        local applied, problems = browser.write(bufnr, { confirm = always_yes })
+
+        assert.eq(applied, 0)
+        assert.contains(table.concat(problems, "\n"), id)
+        assert.not_nil(store.read(root, id), "nothing was applied")
+    end)
+
     it("applies nothing when the buffer was not edited", function()
         local source = project_buffer()
         annotate(source, 4, { "the note" })

@@ -117,8 +117,8 @@ Inside a browser buffer only:
 | `fk` `fs` `fa` | filter by kind, state, or anchor status |
 | `ff` | filter by path substring |
 | `fc` | clear every filter |
-| `<Tab>` | toggle this note's fold, org-style |
-| `<S-Tab>` | toggle every fold: the index, or all the prose |
+| `<Tab>` | toggle this note's body, org-style |
+| `<S-Tab>` | toggle every body: the index, or all the prose |
 | `-` | widen to every annotation in the project |
 | `g?` | this table, as a float |
 
@@ -447,10 +447,12 @@ default fits badly. From its own split or float, the verbs that leave the
 listing — `gf`, `<CR>`, a create — land in the window you came from, the
 way a quickfix jump does: the split stays open, a float closes behind you.
 
-Each note is a real fold, so `za`, `zR`, `zM` and your own fold mappings work.
-A closed row previews the summary beside the note's columns; expanding it
-reveals the prose itself, verbatim at the margin beneath the header with the
-summary as its first line, editable in place and copyable exactly as stored.
+A note's header and summary are always visible, ordinary lines — edit them,
+move over them, search them. The body is a real fold beneath, standing in
+as one dim `⋯ +N lines` row while closed, so `za`, `zR`, `zM` and your own
+fold mappings all work on it; a note with no body has nothing folded. The
+prose sits verbatim at the margin with the summary as its first line,
+editable in place and copyable exactly as stored.
 
 On `:w`:
 
@@ -460,10 +462,13 @@ On `:w`:
 | `kind`, `state` or the pen | updates the record |
 | the position in the location | re-scopes, re-anchored |
 | the path in the location | moves it, re-anchored |
-| deleting a row | deletes the note |
+| deleting a note's lines | deletes the note |
 
-`dd` on a collapsed row deletes the whole note, prose and all. A vim operator
-applies to an entire closed fold, so that comes free.
+Deleting a note means deleting all its lines. An operator motion over a
+closed fold includes the whole fold, so `d2j` on a header takes the header,
+the summary and however long a body in one stroke. Deleting just the header
+cannot corrupt a neighbor: prose left behind reads as glued onto the note
+above, and the write is refused until those lines go too.
 
 Only `:w` applies anything, and closing an edited listing simply discards:
 the listing is a projection of the store, not a document, so vim never asks

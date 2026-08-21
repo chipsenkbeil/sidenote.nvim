@@ -282,3 +282,41 @@ describe("browser.diff combined", function()
         assert.eq(find(actions, "delete").id, OTHER)
     end)
 end)
+
+describe("browser.diff orphans", function()
+    it("flags a deleted note whose prose was glued onto the note above", function()
+        -- Deleting a header alone leaves prose the grammar hands to the
+        -- previous note; applying that would rewrite an untouched neighbor
+        local state = before({
+            { id = ID, prose = { "alpha" } },
+            { id = OTHER, prose = { "beta", "beta body" } },
+        })
+        local edited = after({ { id = ID, prose = { "alpha", "beta", "beta body" } } })
+        local actions = diff.compute(state, edited)
+
+        local errors = diff.orphans(state, actions)
+        assert.eq(#errors, 1)
+        assert.contains(errors[1].message, OTHER)
+    end)
+
+    it("keeps quiet for a whole-note delete", function()
+        local state = before({
+            { id = ID, prose = { "alpha" } },
+            { id = OTHER, prose = { "beta" } },
+        })
+        local actions = diff.compute(state, after({ { id = ID, prose = { "alpha" } } }))
+        assert.eq_deep(diff.orphans(state, actions), {})
+    end)
+
+    it("keeps quiet when the neighboring prose merely changed", function()
+        -- Same shape as gluing — a write beside a delete — but the text is
+        -- the user's own edit, not the dead note's prose
+        local state = before({
+            { id = ID, prose = { "alpha" } },
+            { id = OTHER, prose = { "beta" } },
+        })
+        local actions =
+            diff.compute(state, after({ { id = ID, prose = { "alpha", "rewritten" } } }))
+        assert.eq_deep(diff.orphans(state, actions), {})
+    end)
+end)
