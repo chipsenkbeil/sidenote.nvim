@@ -22,7 +22,7 @@ local function tree(paths)
 end
 
 describe("project.MARKERS", function()
-    it("puts .sidenote first so a bare directory can opt in", function()
+    it("leads with .sidenote, the marker an error names first", function()
         assert.eq(project.MARKERS[1], ".sidenote")
     end)
 end)
@@ -55,6 +55,13 @@ describe("project.root", function()
 
     it("prefers the nearest root when nested", function()
         local outer = tree({ ".git/", "inner/.sidenote/", "inner/src/a.lua" })
+        assert.eq(project.root(outer .. "/inner/src/a.lua"), outer .. "/inner")
+    end)
+
+    it("prefers the nearest root even when a marker listed earlier sits above", function()
+        -- Any one marker is enough, so the list order chooses nothing here:
+        -- `.git` below wins over `.sidenote` above by being nearer
+        local outer = tree({ ".sidenote/", "inner/.git/", "inner/src/a.lua" })
         assert.eq(project.root(outer .. "/inner/src/a.lua"), outer .. "/inner")
     end)
 

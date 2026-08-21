@@ -2,11 +2,14 @@
 ---@class sidenote.store.project
 local M = {}
 
----Root markers in priority order.
+---Everything that marks a directory as a project root.
 ---
----`.sidenote` leads so that creating that directory is enough to declare a
----project, with no VCS and no configuration. `*.rockspec` is a glob rather than
----a name, since its version is part of the filename.
+---Any one of them is enough, so this order picks nothing between two markers:
+---the nearest ancestor carrying any of them wins. What the order does decide
+---is how they are named in the error a caller shows, which is why `.sidenote`
+---leads — creating that directory declares a project with no VCS and no
+---configuration. `*.rockspec` is a glob rather than a name, since its version
+---is part of the filename.
 M.MARKERS = {
     ".sidenote",
     ".git",
