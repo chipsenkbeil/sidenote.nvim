@@ -440,3 +440,11 @@ vim.api.nvim_create_autocmd("ColorScheme", {
         require("sidenote.highlight").setup()
     end,
 })
+vim.api.nvim_create_autocmd("OptionSet", {
+    group = group,
+    pattern = "background",
+    desc = "Re-ink the pen washes, the one styling that follows light or dark",
+    callback = function()
+        require("sidenote.highlight").rewash()
+    end,
+})

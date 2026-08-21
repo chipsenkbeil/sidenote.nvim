@@ -110,3 +110,41 @@ describe("highlight.setup", function()
         assert.is_nil(vim.api.nvim_get_hl(0, { name = highlight.GROUPS.drifted, link = true }).link)
     end)
 end)
+
+local WASH = "SidenotePenBlue"
+
+---Read the wash's background, nil while nothing has inked the group.
+---@return integer|nil
+local function washed()
+    return vim.api.nvim_get_hl(0, { name = WASH }).bg
+end
+
+describe("highlight.rewash", function()
+    it("re-inks a wash the background changed under", function()
+        local restore = vim.o.background
+        vim.api.nvim_set_hl(0, WASH, {})
+
+        vim.o.background = "dark"
+        highlight.setup()
+        local dark = washed()
+
+        -- A second setup cannot move it: the group exists, and a default
+        -- never overwrites one that does
+        vim.o.background = "light"
+        highlight.setup()
+        local unmoved = washed()
+
+        highlight.rewash()
+        local light = washed()
+        vim.o.background = restore
+
+        assert.eq(unmoved, dark)
+        assert.neq(light, dark)
+    end)
+
+    it("inks nothing while the wash is undefined", function()
+        vim.api.nvim_set_hl(0, WASH, {})
+        highlight.rewash()
+        assert.is_nil(washed())
+    end)
+end)

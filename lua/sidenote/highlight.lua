@@ -156,4 +156,22 @@ function M.setup()
     vim.api.nvim_set_hl(0, M.WINBAR, { link = "StatusLine", default = true })
 end
 
+---Re-ink every defined pen wash for the current 'background'.
+---
+---A wash carries a color of its own rather than a link, so it is the one
+---styling here that a colorscheme cannot re-decide: changing 'background'
+---clears nothing, and `setup` asks for defaults, which never overwrite a
+---group that exists. Without this the first shade would be the only one.
+---
+---A wash nothing has inked yet is left undefined, so a background change in
+---a session that never painted defines no groups.
+function M.rewash()
+    local shade = vim.o.background == "light" and "light" or "dark"
+    for group, wash in pairs(PEN_WASHES) do
+        if not vim.tbl_isempty(vim.api.nvim_get_hl(0, { name = group })) then
+            vim.api.nvim_set_hl(0, group, { bg = wash[shade] })
+        end
+    end
+end
+
 return M
