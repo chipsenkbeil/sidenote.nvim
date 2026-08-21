@@ -16,10 +16,10 @@ local function report_global_store(cfg)
 end
 
 ---@param cfg sidenote.Config
-local function report_project_store(cfg)
+---@param here string directory the report is about
+local function report_project_store(cfg, here)
     local WRITABLE_DIRECTORY = 2
 
-    local here = vim.fn.getcwd()
     local root = require("sidenote.store.project").root(here)
     if not root then
         vim.health.info(
@@ -39,19 +39,25 @@ local function report_project_store(cfg)
     end
 end
 
-local function report_vcs()
-    local found = {}
-    for _, tool in ipairs({ "git", "jj" }) do
-        if vim.fn.executable(tool) == 1 then
-            found[#found + 1] = tool
-        end
+---Report what a capture standing here would actually record.
+---
+---A probe, not a PATH lookup: provenance is read through git, so an installed
+---tool proves nothing about whether there is anything here for it to read.
+---@param here string directory the report is about
+local function report_vcs(here)
+    local NOTHING_TO_READ = "no .git at or above %s, so annotations record no provenance;"
+        .. " a jj repository with no colocated .git is the usual reason"
+
+    if vim.fn.executable("git") == 0 then
+        vim.health.info("git not found, so annotations record no provenance")
+        return
     end
-    if #found > 0 then
-        vim.health.ok(
-            ("%s found, so annotations record provenance"):format(table.concat(found, " and "))
-        )
+
+    local vcs = require("sidenote.store.vcs").probe(here)
+    if vcs then
+        vim.health.ok(("%s at %s, so annotations record provenance"):format(vcs.kind, here))
     else
-        vim.health.info("neither git nor jj found; annotations will record no provenance")
+        vim.health.info(NOTHING_TO_READ:format(here))
     end
 end
 
@@ -72,9 +78,10 @@ function M.check()
         vim.health.ok(("configuration valid, prose filetype %q"):format(cfg.filetype))
     end
 
+    local here = vim.fn.getcwd()
     report_global_store(cfg)
-    report_project_store(cfg)
-    report_vcs()
+    report_project_store(cfg, here)
+    report_vcs(here)
     report_prose(cfg)
 end
 

@@ -94,6 +94,42 @@ describe("health.check", function()
     end)
 end)
 
+---Build a git repository holding one committed file.
+---@return string root
+local function git_repo()
+    local dir = vim.fn.tempname()
+    vim.fn.mkdir(dir, "p")
+    local function sh(cmd)
+        local out =
+            vim.fn.system({ "sh", "-c", ("cd %s && %s"):format(vim.fn.shellescape(dir), cmd) })
+        assert(vim.v.shell_error == 0, out)
+    end
+    sh("git init -q && git config user.email t@t && git config user.name t")
+    sh("printf 'a\\n' > f.txt && git add f.txt && git commit -qm one")
+    return dir
+end
+
+describe("health.check provenance", function()
+    it("promises provenance where a capture would really record it", function()
+        within(git_repo(), function()
+            assert.truthy(mentions(captured(health.check).ok, "provenance"))
+        end)
+    end)
+
+    it("promises none in a jj repository with no colocated .git", function()
+        -- Finding the executable proves nothing: a probe reads `.git`, so a
+        -- non-colocated repository records no provenance however jj is installed
+        local root = vim.fn.tempname()
+        vim.fn.mkdir(root .. "/.jj", "p")
+
+        within(root, function()
+            local report = captured(health.check)
+            assert.falsy(mentions(report.ok, "provenance"))
+            assert.truthy(mentions(report.info, "provenance"))
+        end)
+    end)
+end)
+
 describe("health.check project store", function()
     it("counts the annotations in a project store it finds", function()
         local root = vim.fn.tempname()
