@@ -76,6 +76,119 @@ describe("project.root", function()
     end)
 end)
 
+---Run `fn` with `vim.g.sidenote` set to `cfg`, restoring it afterwards.
+---@param cfg table<string, any> what `vim.g.sidenote` holds while fn runs
+---@param fn fun()
+local function configured(cfg, fn)
+    local before = vim.g.sidenote
+    vim.g.sidenote = cfg
+    local ok, err = pcall(fn)
+    vim.g.sidenote = before
+    assert(ok, err)
+end
+
+describe("project.markers", function()
+    it("is the built-in list when nothing is configured", function()
+        configured({}, function()
+            assert.eq_deep(project.markers(), project.MARKERS)
+        end)
+    end)
+
+    it("replaces the built-ins with a configured list", function()
+        configured({ markers = { "WORKSPACE" } }, function()
+            assert.eq_deep(project.markers(), { ".sidenote", "WORKSPACE" })
+        end)
+    end)
+
+    it("keeps .sidenote a marker whatever the configuration leaves out", function()
+        configured({ markers = {} }, function()
+            assert.eq_deep(project.markers(), { ".sidenote" })
+        end)
+    end)
+
+    it("never lists .sidenote twice when it is configured too", function()
+        configured({ markers = { ".sidenote", ".git" } }, function()
+            assert.eq_deep(project.markers(), { ".sidenote", ".git" })
+        end)
+    end)
+
+    it("hands a configured function the built-ins, for adding to them", function()
+        local seen
+        configured({
+            markers = function(defaults)
+                seen = vim.list_extend({}, defaults)
+                return vim.list_extend(defaults, { "WORKSPACE" })
+            end,
+        }, function()
+            local names = project.markers()
+            assert.eq(#names, #project.MARKERS + 1)
+            assert.eq(names[#names], "WORKSPACE")
+        end)
+        assert.eq_deep(seen, project.MARKERS)
+    end)
+
+    it("leaves the built-in list itself alone", function()
+        configured({
+            markers = function(defaults)
+                return vim.list_extend(defaults, { "WORKSPACE" })
+            end,
+        }, function()
+            project.markers()
+        end)
+        assert.eq(#project.MARKERS, 9)
+    end)
+end)
+
+describe("project.root with a configured marker", function()
+    it("finds a root marked by a configured name", function()
+        local root = tree({ "WORKSPACE", "src/a.lua" })
+        configured({ markers = { "WORKSPACE" } }, function()
+            assert.eq(project.root(root .. "/src/a.lua"), root)
+        end)
+    end)
+
+    it("stops finding a built-in the configured list leaves out", function()
+        local root = tree({ ".git/", "src/a.lua" })
+        configured({ markers = { "WORKSPACE" } }, function()
+            assert.is_nil(project.root(root .. "/src/a.lua"))
+        end)
+    end)
+
+    it("finds .sidenote even when the configured list omits it", function()
+        local root = tree({ ".sidenote/", "src/a.lua" })
+        configured({ markers = { "WORKSPACE" } }, function()
+            assert.eq(project.root(root .. "/src/a.lua"), root)
+        end)
+    end)
+
+    it("accepts a function deciding a directory for itself", function()
+        local root = tree({ "marker.txt", "src/a.lua" })
+        configured({
+            markers = {
+                function(dir)
+                    return vim.uv.fs_stat(dir .. "/marker.txt") ~= nil
+                end,
+            },
+        }, function()
+            assert.eq(project.root(root .. "/src/a.lua"), root)
+        end)
+    end)
+
+    it("ignores a configured name that marks nothing here", function()
+        local root = tree({ "src/a.lua" })
+        configured({ markers = { "WORKSPACE" } }, function()
+            assert.is_nil(project.root(root .. "/src/a.lua"))
+        end)
+    end)
+
+    it("accepts a glob, the way the built-in rockspec entry is one", function()
+        local root = tree({ "thing.bzl", "src/a.lua" })
+        configured({ markers = { "*.bzl" } }, function()
+            assert.eq(project.root(root .. "/src/a.lua"), root)
+        end)
+    end)
+end)
+
 describe("project.root with a rockspec", function()
     ---Build a throwaway directory holding a file named `name` and a `lua/`
     ---subdirectory, and return its resolved root.

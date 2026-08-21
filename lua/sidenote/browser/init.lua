@@ -910,7 +910,7 @@ function M.open_project(path, opts)
         return nil,
             ("no project root at or above %s; expected one of %s"):format(
                 resolved,
-                table.concat(project.MARKERS, ", ")
+                table.concat(project.markers(), ", ")
             )
     end
 

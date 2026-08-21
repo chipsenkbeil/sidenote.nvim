@@ -49,7 +49,7 @@ local function no_store_error(source_path, entries)
     return ("no store resolved for %s; tried: %s. A 'project' strategy needs one of %s at or above the file."):format(
         source_path,
         table.concat(names, ", "),
-        table.concat(project.MARKERS, ", ")
+        table.concat(project.markers(), ", ")
     )
 end
 

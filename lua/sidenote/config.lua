@@ -29,6 +29,7 @@
 ---@field strategy sidenote.store.strategy.Entry|sidenote.store.strategy.Entry[] store roots, tried in order
 ---@field global_dir string root of the machine-wide store
 ---@field project_dir string directory name used for an in-project store
+---@field markers? sidenote.store.project.Markers what marks a project root, replacing the built-ins
 ---@field cache_dir string where scans cache resolutions, never inside a store
 ---@field template? fun(ctx: sidenote.template.Context): string[]|nil seeds a new note's buffer
 ---@field pens table<string, string> mapping of pen name -> highlight group its ink uses
@@ -70,6 +71,9 @@ function M.defaults()
         strategy = { "project", "global" },
         global_dir = vim.fn.stdpath("data") .. "/sidenote",
         project_dir = ".sidenote",
+
+        -- What marks a project root, replacing the built-in list
+        -- markers = { ".git", ".jj", "WORKSPACE" },
 
         -- Where scans cache resolutions; never inside a store, which may be
         -- committed
@@ -137,6 +141,24 @@ local function validate(cfg)
 
     if cfg.template ~= nil and type(cfg.template) ~= "function" then
         return fail("template", ("expected a function, got %s"):format(type(cfg.template)))
+    end
+
+    if cfg.markers ~= nil and type(cfg.markers) ~= "function" then
+        if not vim.islist(cfg.markers) then
+            return fail(
+                "markers",
+                ("expected a list or a function, got %s"):format(type(cfg.markers))
+            )
+        end
+        for i, marker in ipairs(cfg.markers) do
+            local named = type(marker) == "string" and marker ~= ""
+            if not named and type(marker) ~= "function" then
+                return fail(
+                    ("markers[%d]"):format(i),
+                    ("expected a non-empty name or a function, got %s"):format(tostring(marker))
+                )
+            end
+        end
     end
 
     if type(cfg.pens) ~= "table" then

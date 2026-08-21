@@ -193,6 +193,9 @@ vim.g.sidenote = {
     global_dir = vim.fn.stdpath("data") .. "/sidenote",
     project_dir = ".sidenote",
 
+    -- What marks a project root, replacing the built-in list
+    -- markers = { ".git", ".jj", "WORKSPACE" },
+
     -- Where scans cache resolutions; never inside a store, which may be
     -- committed
     cache_dir = vim.fn.stdpath("cache") .. "/sidenote",
@@ -399,9 +402,25 @@ notes. Write the fallback you want in the list.
 The list is also the read order. Reads union every store in it, earlier entries
 winning; writes go to the first that resolves.
 
-A project root is `.sidenote/` itself, then `.git` / `.jj` / `.hg`, then
-`Cargo.toml` / `package.json` / `go.mod` / `pyproject.toml` / `*.rockspec`. The
-first is what makes `mkdir .sidenote` enough, with no repo and no config.
+A project root is the **nearest** directory at or above the file holding a
+marker: `.sidenote/` itself, `.git` / `.jj` / `.hg`, or `Cargo.toml` /
+`package.json` / `go.mod` / `pyproject.toml` / `*.rockspec`. Any one of them is
+enough, so the list ranks nothing — a `.git` below your `.sidenote` is the
+nearer root, and takes the notes of the files beneath it.
+
+`markers` replaces that list. An entry is a name, a `*` glob, or a
+`fun(dir): boolean` that decides a directory for itself. To add to the
+built-ins rather than replace them, configure a function instead of a list: it
+is handed a copy of them and returns the set you want.
+
+    vim.g.sidenote = {
+        markers = function(defaults)
+            return vim.list_extend(defaults, { "WORKSPACE" })
+        end,
+    }
+
+`.sidenote/` marks a root whatever you configure, so `mkdir .sidenote` is
+always enough, with no repo and no config.
 
 In-repo notes are committed by default. The plugin writes files and nothing
 else.

@@ -179,3 +179,54 @@ describe("config.resolve", function()
         assert.contains(err, "vim.g.sidenote.pen.todo")
     end)
 end)
+
+describe("config.resolve markers", function()
+    it("is absent by default, which means the built-in list", function()
+        assert.is_nil(config.resolve({}).markers)
+    end)
+
+    it("accepts a list of names", function()
+        local resolved, err = config.resolve({ markers = { "WORKSPACE", "*.bzl" } })
+        assert.is_nil(err)
+        assert.eq_deep(resolved.markers, { "WORKSPACE", "*.bzl" })
+    end)
+
+    it("accepts a function, which is handed the built-ins", function()
+        local _, err = config.resolve({
+            markers = function(defaults)
+                return defaults
+            end,
+        })
+        assert.is_nil(err)
+    end)
+
+    it("accepts a function as a single entry", function()
+        local _, err = config.resolve({
+            markers = {
+                function()
+                    return true
+                end,
+            },
+        })
+        assert.is_nil(err)
+    end)
+
+    it("replaces rather than merges, the way strategy does", function()
+        assert.eq(#config.resolve({ markers = { "WORKSPACE" } }).markers, 1)
+    end)
+
+    it("rejects a marker that is neither a name nor a function", function()
+        local _, err = config.resolve({ markers = { 5 } })
+        assert.contains(err, "vim.g.sidenote.markers")
+    end)
+
+    it("rejects an empty marker, which would match every directory", function()
+        local _, err = config.resolve({ markers = { "" } })
+        assert.contains(err, "vim.g.sidenote.markers")
+    end)
+
+    it("rejects markers that are neither a list nor a function", function()
+        local _, err = config.resolve({ markers = "WORKSPACE" })
+        assert.contains(err, "vim.g.sidenote.markers")
+    end)
+end)
