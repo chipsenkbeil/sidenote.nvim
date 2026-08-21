@@ -187,6 +187,18 @@ describe("record.validate", function()
             assert.match(err, "pen")
         end
     end)
+
+    it("rejects a pen that is not a string, which the record promises it is", function()
+        -- A number or a boolean stringifies into something word-shaped, then
+        -- round-trips through JSON as the type it started as
+        for _, bad in ipairs({ 5, true }) do
+            local rec = capture()
+            rec.pen = bad
+            local ok, err = record.validate(rec)
+            assert.eq(ok, false, ("pen %s"):format(tostring(bad)))
+            assert.match(err, "pen")
+        end
+    end)
 end)
 
 describe("record JSON round-trip", function()

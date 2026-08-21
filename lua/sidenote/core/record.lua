@@ -190,7 +190,7 @@ function M.validate(rec)
 
     -- A pen is one word so it can sit in a space-delimited column, and a bare
     -- `-` is reserved for a penless row
-    if rec.pen ~= nil and not tostring(rec.pen):match("^%w[%w_-]*$") then
+    if rec.pen ~= nil and (type(rec.pen) ~= "string" or not rec.pen:match("^%w[%w_-]*$")) then
         return false, ("pen: expected a word, got %s"):format(tostring(rec.pen))
     end
     if type(rec.line_start) ~= "number" or type(rec.line_end) ~= "number" then
