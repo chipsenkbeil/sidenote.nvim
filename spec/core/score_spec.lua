@@ -20,8 +20,8 @@ describe("score.similarity", function()
     end)
 
     it("is between 0 and 1 for a near match", function()
-        local s = score.similarity("return a .. b", "return a .. c")
-        assert.truthy(s > 0.8 and s < 1)
+        local similarity = score.similarity("return a .. b", "return a .. c")
+        assert.truthy(similarity > 0.8 and similarity < 1)
     end)
 
     it("short-circuits wildly different lengths to a low score", function()
@@ -56,7 +56,8 @@ describe("score.best", function()
         "return M",
     }, "\n")
 
-    ---@param content string
+    ---Capture a range anchored on lines 3 to 5 of `content`.
+    ---@param content string file the annotation is captured against
     ---@return sidenote.Annotation
     local function rec_for(content)
         return record.capture({
@@ -89,8 +90,7 @@ describe("score.best", function()
     end)
 
     it("finds the block but scores it mid-band when context also changed", function()
-        -- Two independent edits, so landing between the guess and accept
-        -- thresholds is the designed outcome rather than a defect
+        -- Two independent edits land between the guess and accept thresholds
         local rec = rec_for(ORIGINAL)
         local moved = table.concat({
             "local M = {}",
@@ -109,8 +109,7 @@ describe("score.best", function()
     end)
 
     it("grades context rather than treating it as all-or-nothing", function()
-        -- Only the prefix differs, by one character versus entirely; a binary
-        -- context hash scores both as 0 and cannot tell them apart
+        -- A hashed prefix would score both of these 0 and rank them equal
         local rec = rec_for(ORIGINAL)
         local function with_prefix(first)
             return table.concat({

@@ -1,6 +1,4 @@
 ---Picks the next annotation worth jumping to.
----
----Pure over a list of entries, so it needs no buffer and no window.
 ---@class sidenote.navigate
 local M = {}
 
@@ -18,9 +16,9 @@ local function navigable(entry)
 end
 
 ---First navigable entry below `line`, wrapping to the top of the file.
----@param entries sidenote.session.Entry[]
----@param line integer
----@return sidenote.session.Entry|nil
+---@param entries sidenote.session.Entry[] annotations to move through, in line order
+---@param line integer line to move away from, 1-based
+---@return sidenote.session.Entry|nil entry nil when nothing is navigable
 function M.next(entries, line)
     local first
     for _, entry in ipairs(entries) do
@@ -35,9 +33,9 @@ function M.next(entries, line)
 end
 
 ---Last navigable entry above `line`, wrapping to the bottom of the file.
----@param entries sidenote.session.Entry[]
----@param line integer
----@return sidenote.session.Entry|nil
+---@param entries sidenote.session.Entry[] annotations to move through, in line order
+---@param line integer line to move away from, 1-based
+---@return sidenote.session.Entry|nil entry nil when nothing is navigable
 function M.prev(entries, line)
     local found, last
     for _, entry in ipairs(entries) do

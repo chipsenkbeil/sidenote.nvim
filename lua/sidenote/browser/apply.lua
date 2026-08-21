@@ -6,8 +6,7 @@ local store = require("sidenote.store")
 
 ---Executes confirmed browser edits against the store.
 ---
----The only module in the browser that writes anything, which is what keeps
----rendering, parsing and diffing testable without a store at all.
+---The only module in the browser that writes anything.
 ---@class sidenote.browser.apply
 local M = {}
 
@@ -16,10 +15,7 @@ local function now()
     return os.date("!%Y-%m-%dT%H:%M:%SZ")
 end
 
----Turn a location's path into something the filesystem understands.
----
----Locations are written project-relative for display, but the grammar accepts
----an absolute path too.
+---Make a location's path absolute, however the user wrote it.
 ---@param state sidenote.browser.State
 ---@param path string
 ---@return string
@@ -65,8 +61,8 @@ local function destination(action, state)
     if not wanted then
         return nil, parse_err
     end
-    -- The buffer-preferring read: the listing's positions are the loaded
-    -- buffer's, so the anchor must capture that same text
+    -- The listing's positions are the loaded buffer's, so the anchor must
+    -- capture that same text
     local content = buffer.content(absolute(state, wanted.path))
     local checked, err = location.validate(wanted, content)
     if not checked then
@@ -90,8 +86,7 @@ local function open_and_modified(path)
     return false
 end
 
----Checks that need the filesystem, which is why they live here rather than in
----the parser.
+---Checks that need more than a row's text: the config, and the files on disk.
 ---@type table<string, fun(action: sidenote.browser.Action, state: sidenote.browser.State): string|nil>
 local CHECKS = {}
 
@@ -103,10 +98,8 @@ end
 CHECKS.rescope = CHECKS.move
 
 CHECKS.change = function(action, state)
-    -- The parser checks only a pen's shape; whether it is configured is
-    -- answered here, where the config is
     if action.field == "pen" and action.to ~= nil then
-        local pens = state.config.pens or {}
+        local pens = state.config.pens
         if not pens[action.to] then
             local known = vim.tbl_keys(pens)
             table.sort(known)
@@ -122,7 +115,7 @@ end
 CHECKS.write = function(action, state)
     local row = row_for(state, action.id)
     if not row then
-        return ("no annotation %s in this browser"):format(tostring(action.id))
+        return ("no annotation %s in this listing"):format(tostring(action.id))
     end
     local path = store.prose_target(row.entry.root, action.id, state.config.filetype)
     if open_and_modified(path) then
@@ -210,11 +203,10 @@ end
 APPLIERS.move = reanchor
 APPLIERS.rescope = reanchor
 
----Everything that would stop an action being possible, gathered before any of
----them run.
+---Collect everything that would stop `actions` from being applied.
 ---
----Validation is separate from applying so that no confirmation dialog ever
----offers something impossible.
+---Writes nothing, so a confirmation built on the result never offers something
+---impossible.
 ---@param actions sidenote.browser.Action[]
 ---@param state sidenote.browser.State
 ---@return sidenote.browser.ParseError[]

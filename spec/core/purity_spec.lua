@@ -1,4 +1,6 @@
 describe("core modules", function()
+    -- `core/index.lua` is absent on purpose: it is the one core module that
+    -- touches disk, for the resolution cache
     local MODULES = { "hash", "record", "score", "resolve" }
 
     ---@param name string
@@ -11,8 +13,8 @@ describe("core modules", function()
         return src
     end
 
-    -- Editor state the core must never reach for. Anchor resolution has to run
-    -- headlessly for an agent, and be directly testable without a buffer
+    -- Editor state the core must never reach for: anchor resolution has to run
+    -- headlessly for an agent, and be testable without a buffer
     local FORBIDDEN = {
         { "orgmode", "requires orgmode" },
         { "nvim_buf_", "touches buffers" },
@@ -21,8 +23,8 @@ describe("core modules", function()
         { "vim.fs.root", "probes the filesystem for a project root" },
     }
 
-    -- Ways to shell out. Checked separately from the words "git" and "jj",
-    -- which legitimately appear in type annotations describing provenance
+    -- The bare words "git" and "jj" stay out: both appear legitimately in type
+    -- annotations describing provenance
     local SHELLS = { "vim.fn.system", "vim.system", "io.popen", "os.execute" }
 
     it("depend on nothing but the Neovim Lua API", function()
@@ -51,8 +53,6 @@ describe("core modules", function()
     end)
 
     it("never read or write files", function()
-        -- `core/index.lua` is deliberately absent from MODULES: it is the one
-        -- core module that touches disk, because the cache lives somewhere
         for _, name in ipairs(MODULES) do
             local src = source_of(name)
             assert.is_nil(src:find("io.open", 1, true), name .. " opens files")

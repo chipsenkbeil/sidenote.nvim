@@ -1,4 +1,4 @@
----@class sidenote.source.Fn
+---@class scripts.source.Fn
 ---@field name string function name, without the module prefix
 ---@field summary string one-line description from its doc comment
 ---@field params string[] `@param` lines, verbatim after the tag
@@ -21,7 +21,9 @@ local function lines_of(path)
     return out
 end
 
----Lines between two patterns, exclusive of both.
+---Read the lines between two patterns, exclusive of both.
+---
+---Errors when no such region is found, rather than returning nothing.
 ---@param path string
 ---@param first string pattern opening the region
 ---@param last string pattern closing it
@@ -40,12 +42,12 @@ function M.section(path, first, last)
     error(("no region matching %s in %s"):format(first, path))
 end
 
----Public functions of a module, in source order.
+---List a module's public functions, in source order.
 ---
 ---Only documented functions are reported: an undocumented one has nothing to
 ---say, and the style audit already refuses a half-documented signature.
 ---@param path string
----@return sidenote.source.Fn[]
+---@return scripts.source.Fn[]
 function M.functions(path)
     local lines = lines_of(path)
     local found = {}
@@ -81,7 +83,7 @@ function M.functions(path)
     return found
 end
 
----Subcommands the user command completes.
+---List the subcommands the user command completes.
 ---@param path string
 ---@return string[]
 function M.subcommands(path)
@@ -94,15 +96,14 @@ function M.subcommands(path)
     return out
 end
 
----`<Plug>` mappings and what each one does.
+---List the `<Plug>` mappings and what each one does.
 ---@param path string
 ---@return {name: string, desc: string}[]
 function M.mappings(path)
     local body = table.concat(lines_of(path), "\n")
     local out, pos = {}, 1
     while true do
-        -- The description trails a multi-line callback, so scan forward from
-        -- the name rather than trying to match across the body
+        -- The description trails a multi-line callback, so no one pattern spans it
         local _, stop, name = body:find('"(<Plug>%(Sidenote%w+%))"', pos)
         if not name then
             return out

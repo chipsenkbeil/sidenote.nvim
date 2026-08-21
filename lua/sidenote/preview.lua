@@ -21,22 +21,31 @@ M.NAMESPACE = vim.api.nvim_create_namespace("sidenote.preview")
 
 local PLACEHOLDER = "(empty note)"
 
+---Display columns the rule under a hanging glance's identity takes.
+local DIVIDER_WIDTH = 40
+
+---Display columns a glance's own window takes.
+local WINDOW_WIDTH = 60
+
+---Autocmd group holding the armed dismissal.
+local GROUP = "sidenote.preview.dismiss"
+
+---Window the glance sits in, closed by the next glance.
 ---@type integer|nil
 local current
 
+---Buffer a hanging glance is attached to.
 ---@type integer|nil
 local attached
 
----@return integer|nil winid
+---The glance's window, if it is still open.
+---@return integer|nil winid nil when nothing is showing, or when it hangs in the code
 function M.winid()
     if current and vim.api.nvim_win_is_valid(current) then
         return current
     end
     return nil
 end
-
----Autocmd group holding the armed dismissal, cleared alongside the preview.
-local GROUP = "sidenote.preview.dismiss"
 
 function M.hide()
     pcall(vim.api.nvim_del_augroup_by_name, GROUP)
@@ -51,9 +60,9 @@ end
 
 ---Hide the preview at the first sign of doing anything else.
 ---
----A glance is transient, the way a hover is. Armed against the position it
----was shown for: the motion that opened the preview can flush its own
----CursorMoved after the fact, and that one must not dismiss it.
+---Armed against the position it was shown for: the motion that opened the
+---preview can flush its own CursorMoved after the fact, and that one must
+---not dismiss it.
 local function dismiss_later()
     local armed = vim.api.nvim_win_get_cursor(0)
     vim.api.nvim_create_autocmd({ "CursorMoved", "InsertEnter", "BufLeave" }, {
@@ -68,6 +77,7 @@ local function dismiss_later()
     })
 end
 
+---A note's prose, trailing blanks dropped and cut to what a glance shows.
 ---@param entry sidenote.session.Entry
 ---@param filetype string
 ---@param max_lines integer
@@ -120,8 +130,7 @@ end
 ---@param virt {[1]: string, [2]: string}[][] chunk lines to hang
 ---@param bufnr integer
 local function attach(entry, virt, bufnr)
-    -- An unplaced or out-of-range annotation is skipped rather than clamped:
-    -- clamping is how a note ends up beside code it was never about
+    -- Clamping is how a note ends up beside code it was never about
     if not entry.line_end or entry.line_end > vim.api.nvim_buf_line_count(bufnr) then
         return
     end
@@ -148,7 +157,7 @@ function M.show(entry, opts)
         local virt = {}
         if entry.record then
             virt[#virt + 1] = identity(entry, opts.config)
-            virt[#virt + 1] = { { ("─"):rep(40), highlight.CONTEXT } }
+            virt[#virt + 1] = { { ("─"):rep(DIVIDER_WIDTH), highlight.CONTEXT } }
         end
         for _, line in ipairs(lines) do
             virt[#virt + 1] = { { line, "SidenoteProse" } }
@@ -172,10 +181,9 @@ function M.show(entry, opts)
     end
 
     local style = opts.style == "split" and "split" or "float"
-    current = window.open(bufnr, { style = style, position = "right", size = 60 })
+    current = window.open(bufnr, { style = style, position = "right", size = WINDOW_WIDTH })
     if entry.record then
-        -- The winbar needs a row of its own, which a float sized to its
-        -- content does not have yet
+        -- A float sized to its content has no row for the winbar yet
         local shape = vim.api.nvim_win_get_config(current)
         if shape.relative ~= "" then
             vim.api.nvim_win_set_config(current, { height = shape.height + 1 })

@@ -17,7 +17,7 @@ local NAMESPACE = vim.api.nvim_create_namespace("sidenote.menu")
 ---@class sidenote.menu.Row
 ---@field text string what the row shows
 ---@field field? "kind"|"state"|"pen" which field a value row sets
----@field value? string|nil what picking a value row writes, nil for no pen
+---@field value? string what picking a value row writes, absent for no pen
 ---@field act? "open"|"view"|"delete"|"close" what an action row does
 
 ---@class sidenote.menu.State
@@ -32,6 +32,15 @@ local NAMESPACE = vim.api.nvim_create_namespace("sidenote.menu")
 local current
 
 local RULE = { text = "  ────────────" }
+
+---The rows the menu ends with; their keys are bound from the same table.
+---@type {key: string, label: string, act: "open"|"view"|"delete"|"close"}[]
+local ACTIONS = {
+    { key = "o", label = "open the note", act = "open" },
+    { key = "v", label = "view", act = "view" },
+    { key = "d", label = "delete", act = "delete" },
+    { key = "q", label = "close", act = "close" },
+}
 
 ---@param entry sidenote.session.Entry
 ---@param cfg sidenote.Config
@@ -58,10 +67,12 @@ local function rows_for(entry, cfg)
     rows[#rows + 1] = RULE
     values("pen")
     rows[#rows + 1] = RULE
-    rows[#rows + 1] = { text = "  o  open the note", act = "open" }
-    rows[#rows + 1] = { text = "  v  view", act = "view" }
-    rows[#rows + 1] = { text = "  d  delete", act = "delete" }
-    rows[#rows + 1] = { text = "  q  close", act = "close" }
+    for _, action in ipairs(ACTIONS) do
+        rows[#rows + 1] = {
+            text = ("  %s  %s"):format(action.key, action.label),
+            act = action.act,
+        }
+    end
     return rows
 end
 
@@ -80,7 +91,7 @@ local function fill(buf, rows, cfg)
 
     vim.api.nvim_buf_clear_namespace(buf, NAMESPACE, 0, -1)
     for i, row in ipairs(rows) do
-        if row.field == "pen" and row.value and (cfg.pens or {})[row.value] then
+        if row.field == "pen" and row.value and cfg.pens[row.value] then
             local first = row.text:find(row.value, 1, true)
             if first then
                 vim.api.nvim_buf_set_extmark(buf, NAMESPACE, i - 1, first - 1, {
@@ -97,11 +108,55 @@ local function fill(buf, rows, cfg)
     end
 end
 
+---Dismiss the menu, if one is up.
 function M.close()
     if current and vim.api.nvim_win_is_valid(current.win) then
         vim.api.nvim_win_close(current.win, true)
     end
     current = nil
+end
+
+---Write the value `row` stands for, leaving the menu up and re-marked.
+---@param menu sidenote.menu.State
+---@param row sidenote.menu.Row
+local function pick(menu, row)
+    local wrote = cycle.set(menu.entry, {
+        field = row.field,
+        value = row.value,
+        config = menu.cfg,
+        bufnr = menu.source,
+    })
+    if wrote then
+        menu.rows = rows_for(menu.entry, menu.cfg)
+        fill(menu.buf, menu.rows, menu.cfg)
+    end
+end
+
+---Carry out `act` and dismiss the menu, unless its confirmation is declined.
+---@param menu sidenote.menu.State
+---@param act "open"|"view"|"delete"|"close"|nil what to do, nil on a rule row
+local function run(menu, act)
+    if act == "open" then
+        M.close()
+        local editor = vim.tbl_extend("force", menu.cfg.editor, { focus = true })
+        local note = vim.tbl_extend("keep", { source = menu.source, config = menu.cfg }, menu.entry)
+        require("sidenote.editor").open(note, editor, menu.cfg.filetype)
+    elseif act == "view" then
+        M.close()
+        vim.schedule(function()
+            require("sidenote").view()
+        end)
+    elseif act == "delete" then
+        local summary = store.summary(menu.entry.root, menu.entry.id, menu.cfg.filetype)
+        local asked = ('sidenote: delete "%s"?'):format(summary or "no prose")
+        if vim.fn.confirm(asked, "&Delete\n&Cancel", 2) == 1 then
+            store.delete(menu.entry.root, menu.entry.id, menu.cfg.filetype)
+            M.close()
+            require("sidenote.session").refresh(menu.source, menu.cfg)
+        end
+    else
+        M.close()
+    end
 end
 
 ---Carry out whatever the row under the menu's cursor stands for.
@@ -112,43 +167,10 @@ local function activate(lnum)
     if not menu or not row then
         return
     end
-
     if row.field then
-        local wrote = cycle.set(menu.entry, {
-            field = row.field,
-            value = row.value,
-            config = menu.cfg,
-            bufnr = menu.source,
-        })
-        if wrote then
-            menu.rows = rows_for(menu.entry, menu.cfg)
-            fill(menu.buf, menu.rows, menu.cfg)
-        end
-        return
-    end
-
-    if row.act == "open" then
-        M.close()
-        local editor = vim.tbl_extend("force", menu.cfg.editor, { focus = true })
-        local note = vim.tbl_extend("keep", { source = menu.source, config = menu.cfg }, menu.entry)
-        require("sidenote.editor").open(note, editor, menu.cfg.filetype)
-    elseif row.act == "view" then
-        M.close()
-        vim.schedule(function()
-            require("sidenote").view()
-        end)
-    elseif row.act == "delete" then
-        local summary = store.summary(menu.entry.root, menu.entry.id, menu.cfg.filetype)
-        local asked = ('sidenote: delete "%s"?'):format(summary or "no prose")
-        if vim.fn.confirm(asked, "&Delete\n&Cancel", 2) == 1 then
-            store.delete(menu.entry.root, menu.entry.id, menu.cfg.filetype)
-            local source = menu.source
-            local cfg = menu.cfg
-            M.close()
-            require("sidenote.session").refresh(source, cfg)
-        end
+        pick(menu, row)
     else
-        M.close()
+        run(menu, row.act)
     end
 end
 
@@ -193,22 +215,19 @@ function M.open()
     on("<LeftRelease>", function()
         activate(vim.fn.line("."))
     end)
-    on("q", M.close)
     on("<Esc>", M.close)
-    on("o", function()
-        activate(#rows - 3)
-    end)
-    on("v", function()
-        activate(#rows - 2)
-    end)
-    on("d", function()
-        activate(#rows - 1)
-    end)
+    for _, action in ipairs(ACTIONS) do
+        on(action.key, function()
+            if current then
+                run(current, action.act)
+            end
+        end)
+    end
 
     vim.api.nvim_create_autocmd("BufLeave", {
         buffer = buf,
         once = true,
-        desc = "A menu left behind is a menu dismissed",
+        desc = "Dismiss the menu once it loses focus",
         callback = M.close,
     })
     return win

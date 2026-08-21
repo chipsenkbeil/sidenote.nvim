@@ -75,7 +75,7 @@ describe("scan.project caching", function()
     end)
 
     it("ignores the cache once the record itself has changed", function()
-        -- The browser edits records in place; a key carrying only the file
+        -- Records are edited in place, so a key carrying only the file
         -- hash would serve yesterday's answer for today's annotation
         local cache_dir = vim.fn.tempname()
         local root, id = project()

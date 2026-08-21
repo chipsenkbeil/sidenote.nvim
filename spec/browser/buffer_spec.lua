@@ -19,7 +19,7 @@ end
 local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
 
 ---Build a project with one source file open in a buffer.
----@return integer
+---@return integer bufnr
 local function project_buffer()
     local root = vim.fn.tempname()
     vim.fn.mkdir(root .. "/.sidenote", "p")
@@ -197,8 +197,7 @@ describe("browser window options", function()
         vim.cmd.enew()
         vim.wo[winid].foldmethod = "indent"
 
-        -- Visit the listing, step out to a real file, and come back, the way
-        -- a browse session actually goes, so several buffers are in play
+        -- Put several buffers in play, the way a browse session actually goes
         local source = project_buffer()
         assert(browser.open(source, { config = opts() }))
         vim.cmd.edit(vim.api.nvim_buf_get_name(source))

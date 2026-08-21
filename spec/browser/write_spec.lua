@@ -1,5 +1,7 @@
 local browser = require("sidenote.browser")
 local capture = require("sidenote.capture")
+local render = require("sidenote.render")
+local session = require("sidenote.session")
 local store = require("sidenote.store")
 
 ---@return sidenote.Config
@@ -18,6 +20,7 @@ end
 
 local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
 
+---Build a project with one source file open in a buffer.
 ---@return integer source
 local function project_buffer()
     local root = vim.fn.tempname()
@@ -60,11 +63,11 @@ end
 
 describe("browser.write", function()
     it("repaints the source buffer of a rescoped annotation", function()
-        -- The write moved the record's anchor; the code window's mark moves
-        -- with it now, not at that buffer's next save
+        -- The code window's mark moves with the record's anchor at write
+        -- time, not at that buffer's next save
         local source = project_buffer()
         annotate(source, 4, { "the note" })
-        require("sidenote.session").refresh(source, opts())
+        session.refresh(source, opts())
         local bufnr = assert(browser.open(source, { config = opts() }))
 
         local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -72,8 +75,7 @@ describe("browser.write", function()
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
 
         assert.eq(browser.write(bufnr, { confirm = always_yes }), 1)
-        local marks =
-            vim.api.nvim_buf_get_extmarks(source, require("sidenote.render").NAMESPACE, 0, -1, {})
+        local marks = vim.api.nvim_buf_get_extmarks(source, render.NAMESPACE, 0, -1, {})
         assert.eq(#marks, 1)
         assert.eq(marks[1][2], 1, "the sign sits on the new line")
     end)
@@ -83,7 +85,7 @@ describe("browser.write", function()
         -- explicit move must still outrank the stale tracker
         local source = project_buffer()
         annotate(source, 4, { "the note" })
-        require("sidenote.session").refresh(source, opts())
+        session.refresh(source, opts())
         vim.api.nvim_buf_set_lines(source, 5, 5, false, { "-- a scratch line" })
         local bufnr = assert(browser.open(source, { config = opts() }))
 
@@ -92,8 +94,7 @@ describe("browser.write", function()
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
 
         assert.eq(browser.write(bufnr, { confirm = always_yes }), 1)
-        local marks =
-            vim.api.nvim_buf_get_extmarks(source, require("sidenote.render").NAMESPACE, 0, -1, {})
+        local marks = vim.api.nvim_buf_get_extmarks(source, render.NAMESPACE, 0, -1, {})
         assert.gt(#marks, 0)
         for _, mark in ipairs(marks) do
             assert.eq(mark[2], 2, "a mark still sits on the old line")
@@ -105,7 +106,7 @@ describe("browser.write", function()
         -- left on the old span would write the move straight back out
         local source = project_buffer()
         local id, root = annotate(source, 4, { "the note" })
-        require("sidenote.session").refresh(source, opts())
+        session.refresh(source, opts())
         vim.api.nvim_buf_set_lines(source, 5, 5, false, { "-- a scratch line" })
         local bufnr = assert(browser.open(source, { config = opts() }))
 
@@ -114,7 +115,7 @@ describe("browser.write", function()
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
         assert.eq(browser.write(bufnr, { confirm = always_yes }), 1)
 
-        require("sidenote.session").written(source)
+        session.written(source)
         assert.eq(assert(store.read(root, id)).line_start, 3)
     end)
 
@@ -123,7 +124,7 @@ describe("browser.write", function()
         -- would anchor the note to a line the user was not even looking at
         local source = project_buffer()
         local id, root = annotate(source, 4, { "the note" })
-        require("sidenote.session").refresh(source, opts())
+        session.refresh(source, opts())
         vim.api.nvim_buf_set_lines(source, 2, 3, false, { "function M.changed()" })
         local bufnr = assert(browser.open(source, { config = opts() }))
 
@@ -179,10 +180,11 @@ describe("browser.write", function()
         }
 
         local source = project_buffer()
-        -- Any text-bearing line will do; capture refuses the blank one
-        local lines = { 1, 3, 4, 5 }
+
+        -- Capture refuses SOURCE's blank line
+        local text_lines = { 1, 3, 4, 5 }
         for i, prose in ipairs(shapes) do
-            annotate(source, lines[math.min(i, #lines)], prose)
+            annotate(source, text_lines[math.min(i, #text_lines)], prose)
         end
 
         local bufnr = assert(browser.open(source, { config = opts() }))
@@ -245,6 +247,7 @@ describe("browser.write", function()
 
         local applied, problems = browser.write(bufnr, { confirm = always_yes })
         assert.eq(applied, 0)
+
         -- Two reports: the bad header, and the prose it orphaned beneath it
         assert.eq(#problems, 2)
         assert.contains(problems[1], "1")
@@ -286,7 +289,7 @@ describe("browser.write", function()
 
     it("round-trips a path holding consecutive spaces", function()
         -- The location is the last column, so a run of spaces inside a path
-        -- cannot read as a boundary; the old refusal went with its reason
+        -- cannot read as a column boundary
         local root = vim.fn.tempname()
         vim.fn.mkdir(root .. "/.sidenote", "p")
         local path = root .. "/two  spaces.lua"

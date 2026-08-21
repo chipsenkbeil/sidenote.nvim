@@ -6,8 +6,6 @@ local confirm = require("sidenote.browser.confirm")
 local diff = require("sidenote.browser.diff")
 local editor = require("sidenote.editor")
 local hash = require("sidenote.core.hash")
--- `sidenote.render` paints status indicators, which is what it is doing here;
--- the browser's own renderer already owns the name
 local indicator = require("sidenote.render")
 local location = require("sidenote.location")
 local parse = require("sidenote.browser.parse")
@@ -18,6 +16,7 @@ local scan = require("sidenote.scan")
 local session = require("sidenote.session")
 local store = require("sidenote.store")
 local strategy = require("sidenote.store.strategy")
+local survives = require("sidenote.filter").survives
 local window = require("sidenote.window")
 
 ---@alias sidenote.browser.Filter sidenote.Filter
@@ -34,7 +33,7 @@ local window = require("sidenote.window")
 ---@field tick integer buffer tick at that render, the dirty check's fast path
 ---@field origin? integer window a leaving verb lands in, absent for a takeover
 
----An oil-style editable listing of one file's annotations.
+---An oil-style editable listing of a file's or a project's annotations.
 ---@class sidenote.browser
 local M = {}
 
@@ -98,8 +97,6 @@ local function prose_of(entry, filetype)
     return render.normalize(text and hash.split(text) or {})
 end
 
-local survives = require("sidenote.filter").survives
-
 ---Resolve whatever set the listing covers.
 ---
 ---A file listing resolves against its buffer, so unsaved edits count; a project
@@ -136,7 +133,7 @@ local function set_local(winid, option, value)
     vim.api.nvim_set_option_value(option, value, { win = winid, scope = "local" })
 end
 
----Conceal and fold settings, all of which are window-local.
+---Set the listing's conceal and fold options, every one window-local.
 ---
 ---Setting them on the buffer instead would silently do nothing and leave every
 ---id on screen.
@@ -146,8 +143,6 @@ local function configure(winid)
     set_local(winid, "concealcursor", "nvic")
     set_local(winid, "foldmethod", "expr")
     set_local(winid, "foldexpr", M.FOLDEXPR)
-    -- A closed note renders as its own summary line, org-style; see
-    -- M.foldtext
     set_local(winid, "foldtext", "v:lua.require'sidenote.browser'.foldtext()")
     set_local(winid, "foldenable", true)
     -- A summary-only note is a one-line fold, which vim leaves open at the
@@ -163,19 +158,16 @@ local function configure(winid)
     set_local(winid, "wrap", false)
 end
 
----A folded note stands in as its own summary line, the way org folds a
----headline.
+---Draw a folded note as its own summary line, the way org folds a headline.
 ---
----Read from the buffer at draw time, so an edit made while the fold was
----open shows through the moment it closes. Display only: nothing here can
----leak into a write.
+---Display only: nothing here can leak into a write.
 ---@return string
 function M.foldtext()
     local summary = vim.trim(vim.fn.getline(vim.v.foldstart))
     return summary == "" and "⋯" or (summary .. " ⋯")
 end
 
----Collapse every body, then hand back the rows whose bodies were open.
+---Collapse every body, then re-open the ones `keep` names.
 ---
 ---A fold created after 'foldlevel' was last set opens regardless of it, so
 ---this runs once the lines are in place rather than alongside the other
@@ -210,9 +202,8 @@ end
 ---@return table<string, boolean>
 local function unfolded(state)
     local open = {}
-    for i, row in ipairs(state.rows or {}) do
-        local lnum = state.headers and state.headers[i]
-        if lnum and vim.fn.foldclosed(lnum + 1) == -1 then
+    for i, row in ipairs(state.rows) do
+        if vim.fn.foldclosed(state.headers[i] + 1) == -1 then
             open[row.entry.id] = true
         end
     end
@@ -324,9 +315,8 @@ end
 ---full text, and which way it flips is read from the screen, not counted.
 ---@param state sidenote.browser.State
 local function toggle_all(state)
-    for i, row in ipairs(state.rows or {}) do
-        local lnum = state.headers and state.headers[i]
-        if lnum and #row.prose > 0 and vim.fn.foldclosed(lnum + 1) == -1 then
+    for i, row in ipairs(state.rows) do
+        if #row.prose > 0 and vim.fn.foldclosed(state.headers[i] + 1) == -1 then
             vim.cmd("normal! zM")
             return
         end
@@ -366,9 +356,8 @@ end
 
 ---Jump to the code a row's annotation is about.
 ---
----The jump lands where `landing` says a leaving verb lands. The export
----gate's rule holds in the UI too: a note with no trusted position gets a
----message, never a guess at whatever now sits on its old lines.
+---The export gate's rule holds in the UI too: a note with no trusted position
+---gets a message, never a guess at whatever now sits on its old lines.
 ---@param bufnr integer
 local function visit(bufnr)
     local row = M.row_at(bufnr, vim.fn.line("."))
@@ -509,8 +498,7 @@ end
 ---Create a file-wide note and open it for writing.
 ---
 ---A file listing already names its file; a project listing asks, suggesting
----the file of the row under the cursor. Typed creates left the grammar when
----the indentation did: a plain line is prose now, never an instruction.
+---the file of the row under the cursor.
 ---@param bufnr integer
 local function create_note(bufnr)
     local state = states[bufnr]
@@ -550,12 +538,12 @@ local function create_note(bufnr)
     editor.open({ root = result.root, id = result.id }, where, state.config.filetype)
 end
 
----Mappings that live only inside a browser buffer, kept as data first.
+---Map the keys that live only inside a browser buffer.
 ---
----One list serves twice — the keymaps are built from it and `?` renders it —
----so the help can never drift from what the keys do. Fold verbs are
----deliberately absent: expansion is real folds, so `za`, `zR` and the user's
----own fold mappings already do the right thing.
+---One list serves twice — the keymaps are built from it and `g?` renders it —
+---so the help can never drift from what the keys do. Fold verbs stay out of
+---it: a body is a real fold, so `za`, `zR` and the user's own fold mappings
+---already do the right thing.
 ---@param bufnr integer
 local function bind(bufnr)
     ---@type {lhs: string, desc: string, fn: fun()}[]
@@ -634,7 +622,6 @@ local function bind(bufnr)
             fn = function()
                 local state = states[bufnr]
                 local answer = vim.fn.input("path contains: ", state and state.filter.path or "")
-                -- An empty answer widens back out
                 refilter(bufnr, "path", answer ~= "" and answer or nil)
             end,
         },
@@ -663,8 +650,6 @@ local function bind(bufnr)
             end,
         },
         {
-            -- Likely taken by oil in a source buffer, but free in here, and it
-            -- means what it means there: go up
             lhs = "-",
             desc = "Widen to every annotation in the project",
             fn = function()
@@ -810,8 +795,8 @@ local function show(state)
                 report(M.write(bufnr))
             end,
         })
-        -- The flag cannot be suppressed at the moment vim sets it, so it is
-        -- swept back off after every edit and once more before a quit
+        -- Swept at the moments vim reads the flag, since BufModifiedSet never
+        -- fires for the API edits a repaint makes
         vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "QuitPre" }, {
             buffer = bufnr,
             desc = "A listing is a projection, so no edit of it ever needs saving",
@@ -819,8 +804,6 @@ local function show(state)
                 vim.bo[bufnr].modified = false
             end,
         })
-        -- Concealed, not gone: the id's columns are real, so motions into
-        -- them would strand the cursor short of anything visible
         vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI", "InsertEnter" }, {
             buffer = bufnr,
             desc = "Clamp the cursor past the concealed id, the way oil does",
@@ -1062,8 +1045,7 @@ function M.write(bufnr, opts)
         return 0, {}
     end
 
-    -- Gathered before the repaint replaces the rows: the files of every row
-    -- acted on, plus each move's destination
+    -- Gathered before the repaint replaces the rows
     local acted = {}
     for _, action in ipairs(actions) do
         acted[action.id] = true

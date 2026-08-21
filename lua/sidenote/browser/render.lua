@@ -17,18 +17,15 @@ local M = {}
 
 ---Columns in the order they are written, every one owned by the user.
 ---
----Anchor status is deliberately not among them: it is recomputed on every
----render and persisted nowhere, so a text column for it would be a field you
----can type into that is overwritten a moment later. It goes in the sign
----column. Neither is the summary: it is prose line one, indented below its
----header, and a closed fold previews it instead.
+---Anchor status is not among them: recomputed on every render and persisted
+---nowhere, a text column for it would be a field you can type into that is
+---overwritten a moment later, so it lives in the sign column instead. Nor is
+---the summary, which stays with the prose it opens.
 ---@type sidenote.browser.Column[]
 M.COLUMNS = {
     { name = "kind", width = 4 },
-    -- Sized to content, so a listing of nothing but open notes carries no
-    -- dead pad; a longer state widens every row together
+    -- Content-sized so a listing of nothing but open notes carries no dead pad
     { name = "state", width = 0 },
-    -- Sized to content: pen names are user-configured, so no width is safe
     { name = "pen", width = 0 },
     { name = "location", width = 0 },
 }
@@ -42,16 +39,17 @@ M.NO_PEN = "-"
 ---space inside a path is not.
 M.GAP = 2
 
----The canonical form of a note's prose: what rendering can reproduce exactly.
+---Reduce `prose` to the canonical form a render reproduces exactly.
 ---
----Three rules. Trailing blank lines go; a whitespace-only line inside a block
----is canonically empty, since a trim-on-save hook would empty it anyway; and
----the summary line loses the whitespace at either end of it — it is what a
----closed fold previews, and the preview trims. Every other line is verbatim.
+---1. Trailing blank lines go.
+---2. A whitespace-only line inside the prose is empty, since a trim-on-save
+---   hook would empty it anyway.
+---3. The summary line loses the whitespace at either end of it, because a
+---   closed fold previews it and the preview trims.
 ---
----Exported because the browser keeps the result as its diff baseline. A
----baseline normalized differently from what was rendered would report an edit
----nobody made, and then apply it.
+---Every other line is verbatim. The caller diffs an edited buffer against
+---this form, so a baseline normalized any other way reports an edit nobody
+---made, and then applies it.
 ---@param prose string[]
 ---@return string[]
 function M.normalize(prose)
@@ -78,7 +76,7 @@ local function cells(row)
     return { rec.kind, rec.state, rec.pen or M.NO_PEN, location.format(rec) }
 end
 
----Width of each column, taking the widest cell where the column is not fixed.
+---Measure each column, widening the unfixed ones to their widest cell.
 ---@param all string[][] cells for every row
 ---@return integer[]
 local function widths(all)
@@ -102,8 +100,6 @@ local function header(id, cell, width)
     local parts = { ("/%s "):format(id) }
     for i, text in ipairs(cell) do
         parts[#parts + 1] = text
-        -- The final column is never padded; anything after it would be
-        -- trailing whitespace for a save hook to strip back off
         if i < #cell then
             local pad = width[i] - vim.fn.strdisplaywidth(text) + M.GAP
             parts[#parts + 1] = (" "):rep(math.max(pad, M.GAP))
@@ -112,10 +108,7 @@ local function header(id, cell, width)
     return (table.concat(parts):gsub("%s+$", ""))
 end
 
----Render every row as one header line plus its indented prose.
----
----The second return is the buffer line each row's header landed on, which is
----where a caller places that annotation's status sign.
+---Render every row as one header line followed by its prose.
 ---@param rows sidenote.browser.Row[]
 ---@return string[] lines
 ---@return integer[] headers one line number per row, in the same order
@@ -132,8 +125,7 @@ function M.rows(rows)
         lines[#lines + 1] = header(row.entry.id, all[i], width)
         headers[i] = #lines
         for n = 1, #prose[i] do
-            -- Verbatim, at the margin: prose needs no marker of its own,
-            -- because a header line is the only marked thing in the buffer
+            -- At the margin: a header's concealed id is the grammar's only marker
             lines[#lines + 1] = prose[i][n]
         end
     end

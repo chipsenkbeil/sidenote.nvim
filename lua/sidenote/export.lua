@@ -5,7 +5,7 @@ local store = require("sidenote.store")
 ---@class sidenote.export.Record
 ---@field id string ULID of the annotation
 ---@field kind "note"|"todo" whether the note is information or a request to act
----@field state string lifecycle position, human-owned
+---@field state "open"|"resolved"|"wontfix"|"archived" lifecycle position, human-owned
 ---@field path string annotated file, relative to the project root
 ---@field status sidenote.Status what the resolver concluded
 ---@field change string|nil jj change id stamped at capture, absent outside jj
@@ -29,8 +29,6 @@ local store = require("sidenote.store")
 ---@field now? string ISO-8601 stamp for the document, defaults to the clock
 
 ---What an agent is allowed to read, and on what terms.
----
----The gate is here rather than in the CLI so that every consumer inherits it.
 ---@class sidenote.export
 local M = {}
 
@@ -64,8 +62,6 @@ function M.entry(entry, prose)
         change = rec.vcs and rec.vcs.change or nil,
         commit = rec.vcs and rec.vcs.commit or nil,
         confidence = entry.resolution.confidence,
-        -- Always present, so branching on it needs no nil check; `line_start`
-        -- is the field that disappears
         code_no_longer_exists = not placed,
         prose = prose,
         anchor_text = rec.text,
@@ -74,6 +70,7 @@ function M.entry(entry, prose)
     }
 end
 
+---The note's prose, trailing blank lines dropped, or empty when it has none.
 ---@param entry sidenote.session.Entry
 ---@param filetype string
 ---@return string

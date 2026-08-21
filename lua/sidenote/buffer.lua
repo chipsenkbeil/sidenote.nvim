@@ -9,7 +9,7 @@
 
 ---@class sidenote.buffer.TargetOpts
 ---@field scope "file"|"lines"|"range" what to capture
----@field range? integer[] line_start, col_start, line_end, col_end, with 1-indexed lines
+---@field range? integer[] line_start, col_start, line_end, col_end, lines 1-indexed; required outside file scope
 
 ---Reads a buffer into the shape the record layer wants.
 ---@class sidenote.buffer
@@ -17,10 +17,9 @@ local M = {}
 
 ---Read a file's content the way a buffer would show it.
 ---
----A buffer holds lines, so its text carries no trailing newline; every anchor
----and file hash is captured in that flavor. Reading raw bytes instead makes
----the same file hash differently from disk than from a buffer, and the
----whole-file fast path never fires for a headless run.
+---A buffer holds lines, so its text carries no trailing newline, the flavor
+---every anchor and file hash is captured in. Raw bytes would hash the same
+---file differently from disk than from a buffer.
 ---@param path string
 ---@return string|nil content nil when the file does not exist
 function M.read(path)
@@ -35,11 +34,10 @@ function M.read(path)
     return table.concat(lines, "\n")
 end
 
----Text of the file at `path`, a loaded buffer's text winning over disk.
+---Read the file at `path`, a loaded buffer's text winning over disk.
 ---
 ---What an interactive caller sees is the buffer, unsaved edits included, so
----anything anchoring against "the file" must read that same text. Headless,
----no buffer exists and this is exactly `read`.
+---anything anchoring against "the file" must read that same text.
 ---@param path string
 ---@return string|nil content nil when neither a buffer nor the file exists
 function M.content(path)
@@ -55,9 +53,10 @@ function M.content(path)
     return M.read(wanted)
 end
 
+---Read the selection `opts` describes out of `bufnr`.
 ---@param bufnr integer
 ---@param opts sidenote.buffer.TargetOpts
----@return sidenote.buffer.Target|nil
+---@return sidenote.buffer.Target|nil target nil when the selection cannot be anchored
 ---@return string|nil err
 function M.target(bufnr, opts)
     local path = vim.api.nvim_buf_get_name(bufnr)

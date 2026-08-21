@@ -3,19 +3,24 @@ local record = require("sidenote.core.record")
 
 ---Weighted fuzzy relocation scoring.
 ---
----Weights and thresholds follow Hypothes.is' anchoring implementation, which a
----ground-truth measurement over real git history validated for source code: at
----an accept threshold of 0.80 this trades a small number of false stales for a
----large reduction in wrong placements.
+---The weights are Hypothes.is' anchoring weights, kept because a ground-truth
+---measurement over real repository history validated them for source code.
 ---@class sidenote.core.score
 local M = {}
 
----@type table<string, number>
+---@class sidenote.core.score.Weights
+---@field quote number weight of the anchor text's own similarity
+---@field prefix number weight of the similarity of the lines above
+---@field suffix number weight of the similarity of the lines below
+---@field pos number weight of closeness to the stored line hint
+
+---Relative contribution of each similarity component to a candidate's score.
+---@type sidenote.core.score.Weights
 M.WEIGHTS = { quote = 50, prefix = 20, suffix = 20, pos = 2 }
 
-local TOTAL = M.WEIGHTS.quote + M.WEIGHTS.prefix + M.WEIGHTS.suffix + M.WEIGHTS.pos
+local TOTAL_WEIGHT = M.WEIGHTS.quote + M.WEIGHTS.prefix + M.WEIGHTS.suffix + M.WEIGHTS.pos
 
----Longest input considered by the Levenshtein pass. Bounds the O(n*m) loop.
+---Longest input the Levenshtein pass compares, bounding its quadratic cost.
 local MAX_COMPARE = 512
 
 ---Candidate lines kept for full scoring after the cheap prefilter.
@@ -59,18 +64,12 @@ local function levenshtein(a, b)
     return prev[lb]
 end
 
----@param s string
----@return string
-local function trim(s)
-    return (s:match("^%s*(.-)%s*$"))
-end
-
 ---Normalized similarity in [0,1] on whitespace-trimmed text.
 ---@param a string
 ---@param b string
 ---@return number
 function M.similarity(a, b)
-    a, b = trim(a):sub(1, MAX_COMPARE), trim(b):sub(1, MAX_COMPARE)
+    a, b = hash.trim(a):sub(1, MAX_COMPARE), hash.trim(b):sub(1, MAX_COMPARE)
     local la, lb = #a, #b
     local longest = math.max(la, lb)
     if longest == 0 then
@@ -94,19 +93,19 @@ end
 ---@param parts sidenote.core.score.Parts
 ---@return number
 function M.candidate(parts)
-    local w = M.WEIGHTS
+    local weights = M.WEIGHTS
     return (
-        w.quote * parts.quote
-        + w.prefix * parts.prefix
-        + w.suffix * parts.suffix
-        + w.pos * parts.pos
-    ) / TOTAL
+        weights.quote * parts.quote
+        + weights.prefix * parts.prefix
+        + weights.suffix * parts.suffix
+        + weights.pos * parts.pos
+    ) / TOTAL_WEIGHT
 end
 
 ---Find the best-scoring placement for a record's anchor within `lines`.
 ---@param lines string[]
 ---@param rec sidenote.Annotation
----@return sidenote.Placement|nil
+---@return sidenote.Placement|nil placement nil when the anchor is empty or nothing resembles it
 function M.best(lines, rec)
     if rec.text == "" then
         return nil
@@ -120,8 +119,6 @@ function M.best(lines, rec)
         return nil
     end
 
-    -- Cheap prefilter: score only lines whose first line is plausibly the
-    -- anchor's, so the expensive pass runs on a bounded candidate set
     local candidates = {}
     for n = 1, last_start do
         local seed = M.similarity(lines[n], first)

@@ -21,14 +21,19 @@ local SNIPPET_MAX = 60
 ---Most snippet lines the header shows.
 local SNIPPET_LINES = 3
 
+---Display columns the rule closing a header takes.
+local DIVIDER_WIDTH = 48
+
+---Window an open note sits in, reused by the note opened after it.
 ---@type integer|nil
 local current
 
----Notes decorated per prose buffer, which is what live refresh re-draws.
+---Mapping of prose buffer -> the note its header draws.
 ---@type table<integer, sidenote.editor.Note>
 local decorated = {}
 
----@return integer|nil winid
+---The editor's window, if it is still open.
+---@return integer|nil winid nil when no note is open
 function M.winid()
     if current and vim.api.nvim_win_is_valid(current) then
         return current
@@ -41,11 +46,11 @@ end
 ---@field id string annotation whose prose to open
 ---@field record? sidenote.Annotation full record, which is what earns a context header
 ---@field resolution? sidenote.Resolution where the note sits now
----@field status? sidenote.Status anchor status at the last resolution
+---@field status? sidenote.Status anchor status at the last resolution, attached when absent
 ---@field line_start? integer first line the note covers now
 ---@field line_end? integer last line, inclusive
 ---@field source? integer loaded buffer of the annotated file, for the snippet
----@field config? sidenote.Config configuration, for pens and the ink style
+---@field config? sidenote.Config pens and ink style, from `vim.g.sidenote` when absent
 
 ---Trim a snippet line and clip it to the header's width.
 ---@param text string
@@ -60,11 +65,10 @@ end
 
 ---A note's identity as chunks: location, kind, state, swatch and status.
 ---
----A nil group means "the surface's own base color" — the winbar maps it to
----its background, a preview to the context group — while the swatch keeps
----the note's actual ink (the pen's wash, the status mark for a penless
----note, a squiggle when the style is `underline`) and a short-of-exact
----status keeps its status color, with confidence when it is graded.
+---A chunk with no group takes the caller's own base color. The swatch
+---carries the note's ink — the pen's wash, the status mark for a penless
+---note, a squiggle under the `underline` style — and a short-of-exact
+---status keeps its status color, with its confidence when graded.
 ---@param entry sidenote.editor.Note
 ---@return {[1]: string, [2]: string|nil}[] chunks
 function M.identity(entry)
@@ -82,7 +86,7 @@ function M.identity(entry)
     if cfg.indicator.style == "underline" then
         chunks[#chunks + 1] = { "~~~", highlight.UNDERLINES[status] }
     else
-        local ink = rec.pen and (cfg.pens or {})[rec.pen] or highlight.MARKS[status]
+        local ink = rec.pen and cfg.pens[rec.pen] or highlight.MARKS[status]
         chunks[#chunks + 1] = { "■", ink }
     end
 
@@ -159,7 +163,7 @@ function M.header(entry, source)
             { clipped(vim.split(rec.text, "\n")[1]), highlight.CONTEXT },
         }
     end
-    lines[#lines + 1] = { { ("─"):rep(48), highlight.CONTEXT } }
+    lines[#lines + 1] = { { ("─"):rep(DIVIDER_WIDTH), highlight.CONTEXT } }
     return lines
 end
 
@@ -227,6 +231,7 @@ local function decorate(bufnr, winid, entry)
         vim.api.nvim_win_set_config(winid, { height = shape.height + 1 })
     end
     vim.api.nvim_set_option_value("winbar", M.headline(entry), { win = winid, scope = "local" })
+
     -- Reveal the header only while the view sits at the top; a re-draw must
     -- never scroll a note the user has moved down into
     vim.api.nvim_win_call(winid, function()
@@ -234,6 +239,7 @@ local function decorate(bufnr, winid, entry)
             vim.fn.winrestview({ topline = 1, topfill = #lines })
         end
     end)
+
     decorated[bufnr] = entry
     watch(bufnr, entry)
 end
@@ -241,8 +247,8 @@ end
 ---Re-draw a prose buffer's header from the note's current truth.
 ---
 ---The extent comes from the live mark when the source is painted, and the
----record is re-read, so an edit beside the code or a cycle in the browser
----shows through without reopening the note.
+---record is re-read from the store, so an edit beside the code or a change
+---to the note itself shows through without reopening it.
 ---@param bufnr integer prose buffer
 ---@return boolean drawn
 function M.redecorate(bufnr)
@@ -283,12 +289,15 @@ function M.redecorate_note(id)
     return false
 end
 
+---@class sidenote.editor.Opts: sidenote.EditorConfig
+---@field focus? boolean take the cursor into the note, leaving it put when absent
+
 ---Open a note, returning the window showing it.
 ---
 ---The `toggle` style behaves as `split`, except that asking for the note
 ---already on show puts it away instead and returns nil.
 ---@param entry sidenote.editor.Note
----@param opts sidenote.EditorConfig
+---@param opts sidenote.editor.Opts
 ---@param filetype string
 ---@return integer|nil winid nil when a toggle closed the note
 function M.open(entry, opts, filetype)
@@ -309,7 +318,8 @@ function M.open(entry, opts, filetype)
     -- From the file, not the parameter: a note written under an earlier
     -- `filetype` setting keeps the highlighting its extension names
     vim.bo[bufnr].filetype = vim.fn.fnamemodify(path, ":e")
-    -- What DWIM commands and live refresh read back
+
+    -- What a reader of the prose buffer follows back to the annotation
     vim.b[bufnr].sidenote = { id = entry.id, root = entry.root, source = entry.source }
 
     local winid = M.winid()

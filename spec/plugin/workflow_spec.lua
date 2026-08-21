@@ -13,6 +13,7 @@ local function read(path)
     return body
 end
 
+---Split `text` into sorted words, dropping a trailing slash so `lua/` matches `lua`.
 ---@param text string
 ---@return string[]
 local function sorted_words(text)
@@ -24,20 +25,22 @@ local function sorted_words(text)
     return out
 end
 
----Directories the Makefile points every check at.
+---List the directories the Makefile points every check at.
 ---@return string[]
 local function lua_dirs()
     return sorted_words(assert(read("Makefile"):match("LUA_DIRS%s*:=%s*([^\n]+)")))
 end
 
+---Return the matrix's version list, without the keys around it.
+---@return string
+local function matrix_block()
+    return assert(read(WORKFLOW):match("version:%s*\n(.-)\n%s*os:"))
+end
+
 ---Iterate the pinned releases in the test matrix, in the order written.
----
----Reads the block between `version:` and the key after it, so the matrix can be
----a YAML block list without this needing to know which form it took.
 ---@return fun(): string|nil
 local function matrix_versions()
-    local block = assert(read(WORKFLOW):match("version:%s*\n(.-)\n%s*os:"))
-    return block:gmatch("(v%d+%.%d+%.%d+)")
+    return matrix_block():gmatch("(v%d+%.%d+%.%d+)")
 end
 
 describe("the tests workflow", function()
@@ -46,19 +49,19 @@ describe("the tests workflow", function()
     end)
 
     it("formats exactly the directories the Makefile checks", function()
-        -- Targets reach stylua as arguments, so the workflow cannot read
-        -- LUA_DIRS itself; drift would silently stop formatting a directory
+        -- Drift here silently stops formatting a directory
         local args = assert(read(WORKFLOW):match("args:%s*%-%-check%s+([^\n]+)"))
         assert.eq_deep(sorted_words(args), lua_dirs())
     end)
 
     it("watches every directory the suite reads from", function()
-        -- A path filter that misses one means a change there runs no CI at all.
-        -- `doc/` matters because the vimdoc tests read the help file
+        -- A path filter that misses one means a change there runs no CI at all
         local body = read(WORKFLOW)
         for _, dir in ipairs(lua_dirs()) do
             assert.contains(body, ('"%s/**"'):format(dir), "unwatched directory: " .. dir)
         end
+
+        -- `doc/` earns its place because the vimdoc tests read the help file
         for _, path in ipairs({ '"syntax/**"', '"doc/**"', '"Makefile"', '"stylua.toml"' }) do
             assert.contains(body, path, "unwatched path: " .. path)
         end
@@ -75,13 +78,11 @@ describe("the tests workflow", function()
     end)
 
     it("uses no YAML anchors, which GitHub Actions does not support", function()
-        -- Which is why the two path lists are written out twice
         assert.falsy(read(WORKFLOW):find("\n%s*[%w_]+:%s*&"))
     end)
 
     it("pins every version it claims to be green on, and never a range", function()
-        -- `stable` would stay green while the floor claim quietly went stale,
-        -- which is how the 0.10 claim in the docs survived as long as it did
+        -- `stable` would stay green while the floor claim quietly went stale
         local pinned = {}
         for version in matrix_versions() do
             pinned[#pinned + 1] = version
@@ -89,10 +90,8 @@ describe("the tests workflow", function()
         assert.gt(#pinned, 1, "no pinned versions found, so this test proved nothing")
         assert.contains(table.concat(pinned, " "), "v0.11.0", "the floor is not in the matrix")
 
-        -- Only the matrix is checked; the comment above it names `stable` in
-        -- order to say why the matrix does not use it
-        local block = assert(read(WORKFLOW):match("version:%s*\n(.-)\n%s*os:"))
-        assert.falsy(block:find("stable", 1, true), "a moving target is not a pin")
+        -- Only the matrix: the workflow's own prose names `stable` too
+        assert.falsy(matrix_block():find("stable", 1, true), "a moving target is not a pin")
     end)
 
     it("leaves no gap between the floor and the newest release it pins", function()

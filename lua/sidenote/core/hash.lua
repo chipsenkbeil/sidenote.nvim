@@ -1,19 +1,19 @@
 ---Hashing and text-normalization helpers.
----
----Pure: depends only on `vim.fn.sha256` and Lua 5.1 string functions.
 ---@class sidenote.core.hash
 local M = {}
 
----@param s string
+---Hash `text` with SHA-256.
+---@param text string
 ---@return string sha 64-char lowercase hex
-function M.sha256(s)
-    return vim.fn.sha256(s)
+function M.sha256(text)
+    return vim.fn.sha256(text)
 end
 
 ---Split `content` into lines.
 ---
 ---A single trailing newline does not produce a final empty element; interior
----blank lines are preserved.
+---blank lines are preserved. An empty string yields one empty line, never an
+---empty list.
 ---@param content string
 ---@return string[]
 function M.split(content)
@@ -34,17 +34,24 @@ function M.split(content)
     return lines
 end
 
+---Strip leading and trailing whitespace from `text`.
+---@param text string
+---@return string
+function M.trim(text)
+    return (text:match("^%s*(.-)%s*$"))
+end
+
 ---Collapse whitespace runs to a single space and trim each line, then rejoin.
 ---
----Makes reindented and reflowed code compare equal while keeping line
+---Makes reindented and respaced code compare equal while keeping line
 ---structure, so a reformat does not read as a different anchor.
----@param s string
+---@param text string
 ---@return string
-function M.normalize(s)
+function M.normalize(text)
     local out = {}
-    for _, line in ipairs(M.split(s)) do
+    for _, line in ipairs(M.split(text)) do
         local collapsed = line:gsub("%s+", " ")
-        out[#out + 1] = collapsed:match("^%s*(.-)%s*$")
+        out[#out + 1] = M.trim(collapsed)
     end
     return table.concat(out, "\n")
 end

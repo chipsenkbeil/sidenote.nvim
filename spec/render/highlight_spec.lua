@@ -41,8 +41,6 @@ describe("highlight.SIGNS", function()
     end)
 
     it("gives every status its own glyph", function()
-        -- The browser lists annotations away from their source, so the sign is
-        -- the only thing carrying status; sharing one would erase the difference
         local seen = {}
         for _, status in ipairs(STATUSES) do
             local sign = highlight.SIGNS[status]
@@ -61,8 +59,6 @@ describe("highlight.MARKS", function()
     end)
 
     it("marks a healthy note like a highlighter pen, with a background", function()
-        -- Ink over words: the sign groups color a glyph, so reusing them here
-        -- tinted the text instead of marking it
         highlight.setup()
         local hl = vim.api.nvim_get_hl(0, { name = highlight.MARKS.attached, link = true })
         assert.not_nil(hl.link)
@@ -109,7 +105,6 @@ describe("highlight.setup", function()
     end)
 
     it("defers to a colorscheme that already defined a group", function()
-        -- `default = true` means our link never overrides a user's choice
         vim.api.nvim_set_hl(0, highlight.GROUPS.drifted, { fg = "#ff0000" })
         highlight.setup()
         assert.is_nil(vim.api.nvim_get_hl(0, { name = highlight.GROUPS.drifted, link = true }).link)

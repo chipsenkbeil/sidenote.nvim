@@ -31,7 +31,7 @@ local hash = require("sidenote.core.hash")
 ---@field captured string ISO-8601 instant the annotation was written
 ---@field verified string ISO-8601 instant the anchor last resolved exactly
 
----@class sidenote.core.record.Opts
+---@class sidenote.core.record.CaptureOpts
 ---@field id string ULID for the new annotation
 ---@field project_key string identity of the project the path is relative to
 ---@field path string annotated file, relative to the project root
@@ -58,9 +58,6 @@ M.CONTEXT = 3
 local SCOPES = { file = true, lines = true, range = true }
 
 ---Whether the note is information or a request to act, in cycling order.
----
----Exported so the browser validates and rotates the column it renders against
----the same set this module writes.
 ---@type string[]
 M.KIND_NAMES = { "note", "todo" }
 
@@ -80,7 +77,7 @@ for _, name in ipairs(M.STATE_NAMES) do
     M.STATES[name] = true
 end
 
----@param opts sidenote.core.record.Opts
+---@param opts sidenote.core.record.CaptureOpts
 ---@return sidenote.Annotation
 function M.capture(opts)
     local lines = hash.split(opts.content)
@@ -103,13 +100,13 @@ function M.capture(opts)
         scope = scope,
         line_start = line_start,
         line_end = line_end,
-        -- Columns belong to `range` scope alone: the grammar derives scope from
-        -- their absence, so a 1 here would render `lines` as a range
+        -- Columns belong to `range` scope alone, since their presence is what
+        -- tells a `lines` annotation apart from a range
         col_start = scope == "range" and (opts.col_start or 1) or 0,
         col_end = scope == "range" and (opts.col_end or 1) or 0,
         text = text,
-        -- Kept verbatim, not only as a hash: the fuzzy tier grades context by
-        -- similarity, and a hash can only answer same-or-different
+        -- Kept verbatim, not only as a hash: context is scored by similarity,
+        -- and a hash answers only same-or-different
         prefix = prefix,
         suffix = suffix,
         text_sha = hash.sha256(text),
@@ -140,8 +137,9 @@ end
 ---which beats any inference the resolver could make. That is what makes this
 ---the manual repair for a cross-file move.
 ---
----Identity and everything the user owns survive — `id`, `kind`, `state` and
----`captured`. The anchor, its context, every hash and `verified` are refreshed.
+---Identity and everything the user owns survive — `id`, `kind`, `state`, `pen`
+---and `captured`. The anchor, its context, every hash and `verified` are
+---refreshed.
 ---@param rec sidenote.Annotation
 ---@param opts sidenote.core.record.ReanchorOpts
 ---@return sidenote.Annotation
@@ -189,8 +187,9 @@ function M.validate(rec)
         return false,
             ("state: expected open|resolved|wontfix|archived, got %s"):format(tostring(rec.state))
     end
-    -- Word characters with interior - or _: anything else could not sit in a
-    -- browser column, where `-` alone is the placeholder a penless row renders
+
+    -- A pen is one word so it can sit in a space-delimited column, and a bare
+    -- `-` is reserved for a penless row
     if rec.pen ~= nil and not tostring(rec.pen):match("^%w[%w_-]*$") then
         return false, ("pen: expected a word, got %s"):format(tostring(rec.pen))
     end

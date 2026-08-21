@@ -1,13 +1,13 @@
 ---@class sidenote.window.Opts
 ---@field style "split"|"float"|"current"|"tab" surface to open the buffer in
----@field position? "left"|"right"|"top"|"bottom" side a split takes
----@field size? integer columns for a vertical split, rows for a horizontal one
+---@field position? "left"|"right"|"top"|"bottom" side a split takes, right by default
+---@field size? integer columns for a float or vertical split, rows for a horizontal one
 ---@field focus? boolean whether the cursor moves into the new window
 
 ---Opens buffers in whichever surface the user configured.
 ---
----Every window the plugin creates comes through here, so preview and editor
----cannot drift apart on placement.
+---Every window the plugin creates comes through here, so no two surfaces can
+---drift apart on placement.
 ---@class sidenote.window
 local M = {}
 
@@ -18,16 +18,20 @@ local SPLIT_DIRECTION = { left = "left", right = "right", top = "above", bottom 
 ---@type table<string, boolean>
 local VERTICAL = { left = true, right = true }
 
-local DEFAULT_WIDTH = 60
+---Display columns a float takes when the caller names no size.
+local FLOAT_WIDTH = 60
+
+---Rows a float leaves clear, for its border and the lines below it.
+local FLOAT_MARGIN = 4
 
 ---@param bufnr integer
----@param focus boolean
----@param size integer|nil
+---@param opts sidenote.window.Opts
 ---@return integer winid
-local function open_float(bufnr, focus, size)
-    local width = size or DEFAULT_WIDTH
-    local height = math.max(1, math.min(vim.o.lines - 4, vim.api.nvim_buf_line_count(bufnr)))
-    return vim.api.nvim_open_win(bufnr, focus, {
+local function open_float(bufnr, opts)
+    local width = opts.size or FLOAT_WIDTH
+    local rows = vim.api.nvim_buf_line_count(bufnr)
+    local height = math.max(1, math.min(vim.o.lines - FLOAT_MARGIN, rows))
+    return vim.api.nvim_open_win(bufnr, opts.focus == true, {
         relative = "editor",
         row = math.max(0, math.floor((vim.o.lines - height) / 2)),
         col = math.max(0, math.floor((vim.o.columns - width) / 2)),
@@ -38,12 +42,13 @@ local function open_float(bufnr, focus, size)
     })
 end
 
+---Open `bufnr` in the surface `opts` describes.
+---
+---`current` and `tab` land the cursor on the buffer whatever `focus` says.
 ---@param bufnr integer
 ---@param opts sidenote.window.Opts
 ---@return integer winid
 function M.open(bufnr, opts)
-    local focus = opts.focus == true
-
     if opts.style == "current" then
         vim.api.nvim_win_set_buf(0, bufnr)
         return vim.api.nvim_get_current_win()
@@ -57,7 +62,7 @@ function M.open(bufnr, opts)
     end
 
     if opts.style == "float" then
-        return open_float(bufnr, focus, opts.size)
+        return open_float(bufnr, opts)
     end
 
     local position = opts.position or "right"
@@ -67,9 +72,10 @@ function M.open(bufnr, opts)
     else
         config.height = opts.size
     end
-    return vim.api.nvim_open_win(bufnr, focus, config)
+    return vim.api.nvim_open_win(bufnr, opts.focus == true, config)
 end
 
+---Close `winid` if it is still open.
 ---@param winid integer|nil
 function M.close(winid)
     if winid and vim.api.nvim_win_is_valid(winid) then

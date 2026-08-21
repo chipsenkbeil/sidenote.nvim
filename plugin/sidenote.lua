@@ -20,8 +20,9 @@ local SUBCOMMANDS = {
     "show",
 }
 
--- The state global statuslines read: plugin-owned output, seeded from the
--- config without loading a single module
+local FILTER_KEYS = { "change=", "commit=", "kind=", "path=", "state=", "status=" }
+
+-- Plugin-owned output for statuslines, seeded without loading a module
 local seeded = type(vim.g.sidenote) == "table" and vim.g.sidenote.pen or ""
 vim.g.sidenote_state = {
     pen = type(seeded) == "string" and seeded or "",
@@ -33,8 +34,8 @@ local function report(err)
     vim.notify("sidenote: " .. err, vim.log.levels.ERROR)
 end
 
----Values each filter key accepts, required lazily to keep loading lazy.
----@return table<string, string[]>
+---List the values each filter key accepts.
+---@return table<string, string[]> mapping of filter key -> accepted values
 local function filter_values()
     local record = require("sidenote.core.record")
     local resolve = require("sidenote.core.resolve")
@@ -47,14 +48,13 @@ end
 
 ---Split a listing subcommand's arguments into a path and a validated filter.
 ---
----`status=`, `kind=` and `state=` narrow the listing, the way `:set` and
----`:Telescope` take options; anything else positional is the project path.
----A bad key or value is an error, since a filter nothing reads would silently
----match everything.
+---A `key=value` token narrows the listing; anything else is the project path.
+---An unknown key or value is refused rather than ignored, since a filter
+---nothing reads matches everything.
 ---@param fargs string[]
----@return string|nil path
+---@return string|nil path nil when no path was given
 ---@return sidenote.browser.Filter|nil filter nil when a filter was invalid
----@return string|nil err
+---@return string|nil err message naming the bad key or value
 local function listing_args(fargs)
     local values = filter_values()
     local path, filter = nil, {}
@@ -66,14 +66,14 @@ local function listing_args(fargs)
             -- Free-form: any substring of a project-relative path is fair
             filter.path = value
         elseif key == "change" or key == "commit" then
-            -- Free-form: a prefix of the stamped id, the way jj and git
-            -- themselves accept one
+            -- Free-form: a prefix of the stamped id, as jj and git accept one
             filter[key] = value
         elseif not values[key] then
             return nil,
                 nil,
-                ("unknown filter %q; expected change=, commit=, kind=, path=, state= or status="):format(
-                    key
+                ("unknown filter %q; expected one of %s"):format(
+                    key,
+                    table.concat(FILTER_KEYS, ", ")
                 )
         elseif not vim.tbl_contains(values[key], value) then
             return nil,
@@ -90,19 +90,37 @@ local function listing_args(fargs)
     return path, filter, nil
 end
 
+---Take a `scope=` token out of a list subcommand's arguments.
+---@param fargs string[]
+---@return "file"|"project"|nil scope nil when none was given
+---@return string[] rest the other arguments, subcommand still first
+local function split_scope(fargs)
+    local scope, rest = nil, { fargs[1] }
+    for i = 2, #fargs do
+        local arg = fargs[i]
+        if arg == "scope=file" or arg == "scope=project" then
+            scope = arg:sub(7)
+        else
+            rest[#rest + 1] = arg
+        end
+    end
+    return scope, rest
+end
+
 ---Capture `first` through `last` as a lines-scope annotation.
 ---
 ---Always lines, never range: neither the command nor the mapping carries
 ---column information, and columns belong to range scope alone.
 ---@param first integer
 ---@param last integer
----@param kind? "note"|"todo" defaults to note
-local function add(first, last, kind)
+---@param opts? { kind?: "note"|"todo" } kind defaults to note
+local function add(first, last, opts)
+    opts = opts or {}
     local sidenote = require("sidenote")
-    -- Held before the capture: composing focuses the new note's window, so
-    -- "current buffer" no longer names the annotated one afterwards
+    -- Capture focuses the new note's window, so hold the annotated buffer first
     local bufnr = vim.api.nvim_get_current_buf()
-    local _, err = sidenote.add({ scope = "lines", range = { first, 0, last, 0 }, kind = kind })
+    local _, err =
+        sidenote.add({ scope = "lines", range = { first, 0, last, 0 }, kind = opts.kind })
     if err then
         report(err)
         return
@@ -111,11 +129,12 @@ local function add(first, last, kind)
 end
 
 ---Capture the whole current file as one annotation.
----@param kind? "note"|"todo" defaults to note
-local function add_file(kind)
+---@param opts? { kind?: "note"|"todo" } kind defaults to note
+local function add_file(opts)
+    opts = opts or {}
     local sidenote = require("sidenote")
     local bufnr = vim.api.nvim_get_current_buf()
-    local _, err = sidenote.add({ scope = "file", kind = kind })
+    local _, err = sidenote.add({ scope = "file", kind = opts.kind })
     if err then
         report(err)
         return
@@ -140,9 +159,9 @@ vim.api.nvim_create_user_command("Sidenote", function(cmd)
         if bad then
             report(("add takes scope=file and kind=todo, not %q"):format(bad))
         elseif scope == "file" then
-            add_file(kind)
+            add_file({ kind = kind })
         else
-            add(cmd.line1, cmd.line2, kind)
+            add(cmd.line1, cmd.line2, { kind = kind })
         end
     elseif subcommand == "browse" then
         local path, filter, filter_err = listing_args(cmd.fargs)
@@ -187,17 +206,7 @@ vim.api.nvim_create_user_command("Sidenote", function(cmd)
             vim.notify("sidenote: showing " .. (showing ~= "" and showing or "everything"))
         end
     elseif subcommand == "loclist" or subcommand == "qflist" then
-        -- The scope token is pulled out first; everything else is filters
-        local scope
-        local rest = { cmd.fargs[1] }
-        for i = 2, #cmd.fargs do
-            local arg = cmd.fargs[i]
-            if arg == "scope=file" or arg == "scope=project" then
-                scope = arg:sub(7)
-            else
-                rest[#rest + 1] = arg
-            end
-        end
+        local scope, rest = split_scope(cmd.fargs)
         local path, filter, filter_err = listing_args(rest)
         if filter_err then
             report(filter_err)
@@ -258,13 +267,12 @@ end, {
         if subcommand == "pen" then
             return matching(require("sidenote.pen").ring())
         end
-        local filtered =
+        local takes_filters =
             { browse = true, project = true, loclist = true, qflist = true, show = true }
-        if not filtered[subcommand] then
+        if not takes_filters[subcommand] then
             return {}
         end
 
-        -- Filters: values for a known key, else the keys themselves
         local values = filter_values()
         local key = arg_lead:match("^(%w+)=")
         if key and values[key] then
@@ -272,7 +280,7 @@ end, {
                 return key .. "=" .. value
             end, values[key]))
         end
-        local keys = { "change=", "commit=", "kind=", "path=", "state=", "status=" }
+        local keys = vim.list_extend({}, FILTER_KEYS)
         if subcommand == "loclist" or subcommand == "qflist" then
             keys[#keys + 1] = "scope=file"
             keys[#keys + 1] = "scope=project"
@@ -298,7 +306,7 @@ vim.keymap.set({ "n", "x" }, "<Plug>(SidenoteAddTodo)", function()
     if first > last then
         first, last = last, first
     end
-    add(first, last, "todo")
+    add(first, last, { kind = "todo" })
 end, { desc = "File a todo on the current line or selection" })
 
 vim.keymap.set("n", "<Plug>(SidenoteBrowse)", function()

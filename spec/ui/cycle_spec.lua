@@ -113,8 +113,10 @@ describe("sidenote.delete", function()
         vim.fn.confirm = function()
             return 2
         end
-        assert.falsy(require("sidenote").delete())
+        local deleted = require("sidenote").delete()
         vim.fn.confirm = original
+
+        assert.falsy(deleted)
         assert.truthy(vim.uv.fs_stat(store.meta_path(result.root, result.id)))
     end)
 end)

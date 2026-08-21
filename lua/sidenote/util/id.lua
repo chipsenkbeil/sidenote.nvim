@@ -2,7 +2,7 @@
 ---
 ---A ULID is a 48-bit millisecond timestamp followed by 80 bits of randomness,
 ---rendered in Crockford base32. The encoding sorts lexicographically by
----creation time, so a directory listing of the store reads chronologically.
+---creation time, so any listing of ids reads chronologically.
 ---@class sidenote.util.id
 local M = {}
 
@@ -12,27 +12,25 @@ M.ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 local TIME_CHARS = 10
 local RANDOM_CHARS = 16
 
----Unix epoch milliseconds.
+---Return the current time as Unix epoch milliseconds.
 ---
----`vim.uv.now()` is loop time, which would only sort correctly within a single
----session.
+---`vim.uv.now()` is loop time, which only sorts correctly within one session.
 ---@return integer
 local function now_ms()
     local seconds, microseconds = vim.uv.gettimeofday()
     return seconds * 1000 + math.floor(microseconds / 1000)
 end
 
----Draw one uniform digit in the range 0 to `n`, exclusive.
+---Draw one uniform digit below `n`.
 ---
----Drawn from uv.random rather than math.random, which repeats its sequence
----every process without an explicit seed. A single byte is unbiased here
----because 256 is a whole multiple of the 32-symbol alphabet.
----@param n integer
+---Unseeded `math.random` repeats the same sequence in every process.
+---@param n integer exclusive upper bound, uniform only for a divisor of 256
 ---@return integer
 local function default_rand(n)
     return vim.uv.random(1):byte(1) % n
 end
 
+---Encode `value` as exactly `width` base32 digits, most significant first.
 ---@param value integer
 ---@param width integer
 ---@return string
@@ -46,7 +44,12 @@ local function encode_int(value, width)
     return table.concat(out)
 end
 
----@param opts? {now_ms: integer, rand: fun(n: integer): integer}
+---@class sidenote.util.id.Opts
+---@field now_ms? integer Unix epoch millisecond to stamp, defaults to the current time
+---@field rand? fun(n: integer): integer called once per random digit to return a value below n
+
+---Mint a new ULID.
+---@param opts? sidenote.util.id.Opts
 ---@return string ulid
 function M.new(opts)
     opts = opts or {}

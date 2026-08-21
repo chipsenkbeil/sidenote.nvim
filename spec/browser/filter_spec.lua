@@ -44,7 +44,7 @@ end
 ---@field line integer line to anchor on
 ---@field prose string[] the note itself
 ---@field kind? "note"|"todo" defaults to note
----@field state? string lifecycle position to set afterwards
+---@field state? "open"|"resolved"|"wontfix"|"archived" defaults to open
 
 ---@param root string
 ---@param note spec.browser.NoteOpts
@@ -61,9 +61,9 @@ local function annotate(root, note)
         config = cfg,
     }))
 
-    local prose = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
-    prose:write(table.concat(note.prose, "\n") .. "\n")
-    prose:close()
+    local fh = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
+    fh:write(table.concat(note.prose, "\n") .. "\n")
+    fh:close()
 
     if note.state then
         local rec = assert(store.read(result.root, result.id))
@@ -81,6 +81,11 @@ local function summaries(bufnr)
         out[#out + 1] = row.prose[1]
     end
     return out
+end
+
+---@return boolean
+local function always_yes()
+    return true
 end
 
 describe("filtering by provenance stamp", function()
@@ -221,14 +226,7 @@ describe("browser filtering and the write path", function()
         local root = assert(browser.state(bufnr)).rows[1].entry.root
 
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
-        assert.eq(
-            browser.write(bufnr, {
-                confirm = function()
-                    return true
-                end,
-            }),
-            1
-        )
+        assert.eq(browser.write(bufnr, { confirm = always_yes }), 1)
 
         assert.truthy(vim.uv.fs_stat(store.meta_path(root, hidden)), "the hidden note survived")
     end)
@@ -243,11 +241,7 @@ describe("browser filtering and the write path", function()
         lines[2] = lines[2]:gsub("a todo$", "an edited todo")
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
 
-        browser.write(bufnr, {
-            confirm = function()
-                return true
-            end,
-        })
+        browser.write(bufnr, { confirm = always_yes })
         assert.eq_deep(summaries(bufnr), { "an edited todo" })
     end)
 end)

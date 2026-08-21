@@ -40,8 +40,8 @@ local function is_root(dir)
     return false
 end
 
----Nearest project root at or above a path, or nil when nothing marks one.
----@param path string
+---Nearest project root at or above `path`, or nil when nothing marks one.
+---@param path string a file or a directory
 ---@return string|nil
 function M.root(path)
     local start = vim.fn.isdirectory(path) == 1 and path or vim.fn.fnamemodify(path, ":h")
@@ -56,8 +56,10 @@ function M.root(path)
     return nil
 end
 
----Stable identity for a project: a readable basename plus a hash of its
----absolute path, so two projects sharing a name never collide.
+---Stable identity for a project.
+---
+---A readable basename plus a hash of the absolute path, so two projects
+---sharing a name never collide.
 ---@param root string
 ---@return string
 function M.key(root)
@@ -66,6 +68,7 @@ function M.key(root)
     return ("%s-%s"):format(name, vim.fn.sha256(absolute):sub(1, 6))
 end
 
+---Restate `path` relative to `root`, or unchanged when it lies outside.
 ---@param root string
 ---@param path string
 ---@return string

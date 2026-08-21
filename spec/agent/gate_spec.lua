@@ -7,10 +7,10 @@ local ANCHOR = "function M.join(id)\n  return rooms[id]"
 ---@field status? sidenote.Status what the resolver concluded, defaults to attached
 ---@field confidence? number 0..1, defaults to 1
 ---@field line_start? integer first resolved line, defaults to 42 when placed
----@field line_end? integer last resolved line, inclusive
+---@field line_end? integer last resolved line inclusive, defaults to line_start
 ---@field guess? sidenote.Placement best rejected placement the resolver held back
 ---@field kind? "note"|"todo" defaults to note
----@field state? string defaults to open
+---@field state? "open"|"resolved"|"wontfix"|"archived" defaults to open
 ---@field scope? "file"|"lines"|"range" defaults to lines
 
 ---Build a resolved entry without a store, which is what the gate reads.
@@ -21,11 +21,12 @@ local function entry(opts)
     local status = opts.status or "attached"
     local placed = status == "attached" or status == "drifted"
     local line_start = placed and (opts.line_start or 42) or nil
+    local line_end = placed and (opts.line_end or line_start) or nil
     return {
         id = ID,
         status = status,
         line_start = line_start,
-        line_end = placed and (opts.line_end or line_start) or nil,
+        line_end = line_end,
         root = "/store",
         record = {
             id = ID,
@@ -42,7 +43,7 @@ local function entry(opts)
         resolution = {
             status = status,
             line_start = line_start,
-            line_end = placed and (opts.line_end or line_start) or nil,
+            line_end = line_end,
             confidence = opts.confidence or (placed and 1 or 0),
             tier = "L1",
             guess = opts.guess,
@@ -70,7 +71,6 @@ describe("export.entry placed", function()
     end)
 
     it("exports a drifted annotation with the confidence the resolver measured", function()
-        -- So an agent can weigh it rather than treat it as certain
         local drifted = entry({ status = "drifted", confidence = 0.86, line_start = 91 })
         local record = export.entry(drifted, "the note")
         assert.eq(record.status, "drifted")
@@ -110,8 +110,7 @@ describe("export.entry withheld", function()
         end)
 
         it(("still gives a %s annotation its original anchor text"):format(status), function()
-            -- The agent can search for it; what it must not get is a guess
-            -- dressed up as a location
+            -- The agent can search for it
             assert.eq(export.entry(entry({ status = status }), "x").anchor_text, ANCHOR)
         end)
     end

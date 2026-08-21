@@ -1,6 +1,6 @@
 local window = require("sidenote.window")
 
----@return integer
+---@return integer bufnr
 local function scratch()
     local bufnr = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "note text" })
@@ -34,7 +34,6 @@ describe("window.open split", function()
     end)
 
     it("maps the config's top and bottom onto the API's above and below", function()
-        -- Users configure top/bottom; nvim_open_win speaks above/below
         local winid = window.open(scratch(), { style = "split", position = "top", size = 6 })
         assert.eq(vim.api.nvim_win_get_config(winid).split, "above")
         window.close(winid)

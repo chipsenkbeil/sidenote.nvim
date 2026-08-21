@@ -12,6 +12,20 @@ local DUPES = table.concat({
     "end", -- 8
 }, "\n")
 
+-- Padded so neither copy lands on the stored hint lines; without this
+-- L1 matches the first copy outright and L2/L3 never run
+local AMBIGUOUS_DUPES = table.concat({
+    "-- pad", -- 1
+    "-- zeta", -- 2
+    "function f()", -- 3
+    "  return 1", -- 4
+    "end", -- 5
+    "-- zeta", -- 6
+    "function f()", -- 7
+    "  return 1", -- 8
+    "end", -- 9
+}, "\n")
+
 ---Capture the first of the two identical copies.
 ---
 ---Both context sides are non-empty on purpose: an empty suffix at end-of-file
@@ -42,40 +56,14 @@ describe("resolve L3 context disambiguation", function()
     end)
 
     it("reports ambiguous when no candidate's context matches", function()
-        -- Padded so neither copy lands on the stored hint lines; without this
-        -- L1 matches the first copy outright and L2/L3 never run
-        local rewritten = table.concat({
-            "-- pad",
-            "-- zeta",
-            "function f()",
-            "  return 1",
-            "end",
-            "-- zeta",
-            "function f()",
-            "  return 1",
-            "end",
-        }, "\n")
-        local r = resolve.resolve(first_copy(DUPES), rewritten)
+        local r = resolve.resolve(first_copy(DUPES), AMBIGUOUS_DUPES)
         assert.eq(r.status, "ambiguous")
         assert.gte(#r.candidates, 2)
         assert.is_nil(r.line_start)
     end)
 
     it("orders ambiguous candidates nearest to the stored hint first", function()
-        -- Padded so neither copy lands on the stored hint lines; without this
-        -- L1 matches the first copy outright and L2/L3 never run
-        local rewritten = table.concat({
-            "-- pad",
-            "-- zeta",
-            "function f()",
-            "  return 1",
-            "end",
-            "-- zeta",
-            "function f()",
-            "  return 1",
-            "end",
-        }, "\n")
-        local r = resolve.resolve(first_copy(DUPES), rewritten)
+        local r = resolve.resolve(first_copy(DUPES), AMBIGUOUS_DUPES)
         assert.eq(r.candidates[1], 3)
     end)
 end)

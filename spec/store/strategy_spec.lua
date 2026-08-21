@@ -3,21 +3,22 @@ local project = require("sidenote.store.project")
 
 local GLOBAL = "/tmp/sidenote-global"
 
----@param paths string[]
----@return string
-local function tree(paths)
+---Build a throwaway tree of empty directories and return its root.
+---@param dirs string[] directories to create under the root
+---@return string root
+local function tree(dirs)
     local root = vim.fn.tempname()
-    for _, rel in ipairs(paths) do
+    for _, rel in ipairs(dirs) do
         vim.fn.mkdir(root .. "/" .. rel, "p")
     end
     return root
 end
 
----@param over? table<string, any> fields overriding the fixture defaults
+---@param overrides? table<string, any> fields overriding the fixture defaults
 ---@return sidenote.store.strategy.Opts
-local function opts(over)
+local function opts(overrides)
     local base = { strategy = "global", global_dir = GLOBAL, project_dir = ".sidenote" }
-    for key, value in pairs(over or {}) do
+    for key, value in pairs(overrides or {}) do
         base[key] = value
     end
     return base

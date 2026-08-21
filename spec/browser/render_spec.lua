@@ -6,7 +6,7 @@ local OTHER = "01J9F3K2X7Q4V8M2ZC5T0BQWF"
 ---@class spec.browser.RowOpts
 ---@field id? string annotation id the row stands for, defaults to a stub ULID
 ---@field kind? "note"|"todo" defaults to note
----@field state? string lifecycle position, defaults to open
+---@field state? "open"|"resolved"|"wontfix"|"archived" lifecycle position, defaults to open
 ---@field scope? "file"|"lines"|"range" defaults to lines
 ---@field path? string project-relative path, defaults to lua/lobby.lua
 ---@field line_start? integer defaults to 42
@@ -17,7 +17,7 @@ local OTHER = "01J9F3K2X7Q4V8M2ZC5T0BQWF"
 ---@field pen? string pen name, defaults to none
 ---@field prose? string[] defaults to one summary line
 
----Build a row without touching a store, which is the point of a pure renderer.
+---Build a row without touching a store.
 ---@param opts? spec.browser.RowOpts
 ---@return sidenote.browser.Row
 local function row(opts)
@@ -59,8 +59,6 @@ end
 
 describe("browser.render columns", function()
     it("names four columns, in the order they are written", function()
-        -- The summary is not among them: it is prose line one, sitting below
-        -- its header with the rest of the body
         local names = {}
         for _, column in ipairs(render.COLUMNS) do
             names[#names + 1] = column.name
@@ -79,8 +77,6 @@ describe("browser.render columns", function()
     end)
 
     it("sizes the state column to its content, like the pen column", function()
-        -- A fixed width of eight left dead space after "open" in any
-        -- listing that held no longer state
         local rest = without_id(render.rows({ row() })[1])
         assert.match(rest, "^note  open  %-  ")
     end)
@@ -100,8 +96,6 @@ describe("browser.render columns", function()
     end)
 
     it("keeps a path holding consecutive spaces, since nothing follows it", function()
-        -- The location is the last column now, so a run of spaces inside it
-        -- can no longer read as a column boundary
         local line = render.rows({ row({ path = "odd  name.lua" }) })[1]
         assert.match(line, "odd  name%.lua:42$")
     end)
@@ -117,8 +111,7 @@ describe("browser syntax", function()
     end
 
     it("conceals the id prefix with the grammar's word class", function()
-        -- Ids are word characters, so prose opening with a path such as
-        -- /etc/hosts never conceals as a header; \w still spans a whole ULID
+        -- A hex class would stop short of the letters a ULID also uses
         local src = syntax_source()
         assert.contains(src, [[syn match sidenoteId /^\/\w\+ / conceal]])
         for line in src:gmatch("[^\n]+") do
@@ -129,7 +122,7 @@ describe("browser syntax", function()
     end)
 
     it("styles prose as every line without the marker", function()
-        -- The old rule keyed on indentation, which margin prose no longer has
+        -- Prose sits at the margin, so no rule may key on indentation
         local src = syntax_source()
         assert.contains(src, [[syn match sidenoteProse /^\(\/\w\+ \)\@!.*$/]])
         assert.falsy(src:find([[/^\s.*$/]], 1, true))
@@ -150,8 +143,6 @@ end)
 
 describe("browser.render prose", function()
     it("renders every prose line at the margin, verbatim", function()
-        -- The header's concealed marker is what distinguishes it, so prose
-        -- needs no indentation and copies out exactly as stored
         local lines = render.rows({ row({ prose = { "one", "two", "three" } }) })
         assert.eq(#lines, 4)
         assert.eq(lines[2], "one")
@@ -173,8 +164,7 @@ describe("browser.render prose", function()
     end)
 
     it("renders a blank prose line as an empty line, never as bare indentation", function()
-        -- A trim-trailing-whitespace autocmd would strip an indent-only line,
-        -- so the renderer never writes one in the first place
+        -- A trim-trailing-whitespace autocmd would strip an indent-only line
         local lines = render.rows({ row({ prose = { "one", "", "three" } }) })
         assert.eq(lines[3], "")
     end)

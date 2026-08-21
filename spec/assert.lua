@@ -1,8 +1,7 @@
 ---Assertions for the test suite.
 ---
 ---Ported from doug-game's `testing/assert.lua` so the vocabulary is the same
----across projects. The only adaptation is `fmt`, which renders tables through
----`vim.inspect` rather than `tostring`.
+---across projects.
 ---@class spec.Assert
 local M = {}
 
@@ -19,8 +18,8 @@ local function fmt(v)
     return tostring(v)
 end
 
----Compose the error message: optional caller-supplied context, followed by the
----structured `detail` produced by the assertion.
+---Compose an error message from the caller's optional `msg` and the
+---assertion's `detail`.
 ---@param msg? string
 ---@param detail string
 ---@return string
@@ -31,33 +30,35 @@ local function compose(msg, detail)
     return detail
 end
 
+-- Error level that blames the test body, two frames above the raise
+local TEST_BODY_LEVEL = 3
+
 ---Raise on failure.
----
----The `error(msg, 3)` level skips two frames, this `check` and the public
----assertion that called it, so the reported source line is the test-body line
----rather than anything inside this file.
 ---@param ok boolean
 ---@param msg string
 local function check(ok, msg)
     if not ok then
-        error(msg, 3)
+        error(msg, TEST_BODY_LEVEL)
     end
 end
 
----Assert two values are equal.
----@param a any
----@param b any
+---Assert `actual` equals `expected`.
+---@param actual any
+---@param expected any
 ---@param msg? string
-function M.eq(a, b, msg)
-    check(a == b, compose(msg, "got " .. fmt(a) .. ", expected " .. fmt(b)))
+function M.eq(actual, expected, msg)
+    check(actual == expected, compose(msg, "got " .. fmt(actual) .. ", expected " .. fmt(expected)))
 end
 
----Assert two values are not equal.
----@param a any
----@param b any
+---Assert `actual` does not equal `expected`.
+---@param actual any
+---@param expected any
 ---@param msg? string
-function M.neq(a, b, msg)
-    check(a ~= b, compose(msg, "got " .. fmt(a) .. ", expected ~= " .. fmt(b)))
+function M.neq(actual, expected, msg)
+    check(
+        actual ~= expected,
+        compose(msg, "got " .. fmt(actual) .. ", expected ~= " .. fmt(expected))
+    )
 end
 
 ---Assert value is truthy.
@@ -107,7 +108,7 @@ function M.lte(a, b, msg)
 end
 
 ---Assert string contains substring (literal, no patterns).
----@param str string
+---@param str string?
 ---@param sub string
 ---@param msg? string
 function M.contains(str, sub, msg)
@@ -149,7 +150,7 @@ function M.not_nil(v, msg)
 end
 
 ---Assert calling `fn` raises an error.
----@param fn function
+---@param fn fun()
 ---@param msg? string
 function M.throws(fn, msg)
     local ok = pcall(fn)
@@ -167,7 +168,7 @@ function M.is_type(v, expected_type, msg)
     )
 end
 
----Deep structural equality, including matching entry counts.
+---Compare `a` and `b` structurally, including their entry counts.
 ---@param a any
 ---@param b any
 ---@return boolean
@@ -192,12 +193,15 @@ local function deep_equal(a, b)
     return count_a == count_b
 end
 
----Assert deep structural equality between two values.
----@param a any
----@param b any
+---Assert `actual` is structurally equal to `expected`, entry counts included.
+---@param actual any
+---@param expected any
 ---@param msg? string
-function M.eq_deep(a, b, msg)
-    check(deep_equal(a, b), compose(msg, "got " .. fmt(a) .. ", expected " .. fmt(b)))
+function M.eq_deep(actual, expected, msg)
+    check(
+        deep_equal(actual, expected),
+        compose(msg, "got " .. fmt(actual) .. ", expected " .. fmt(expected))
+    )
 end
 
 -- Callable, so Lua's builtin form still works inside a spec:

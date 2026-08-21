@@ -2,30 +2,36 @@ local config = require("sidenote.config")
 local cycle = require("sidenote.cycle")
 local filter = require("sidenote.filter")
 local project = require("sidenote.store.project")
+local record = require("sidenote.core.record")
+local resolve = require("sidenote.core.resolve")
 local store = require("sidenote.store")
 
 ---Annotations as quickfix and location lists.
 ---
 ---The vim-native way to sweep a set of notes: populate, open, jump with
 ---the machinery every other tool already feeds. Sidenote-titled lists
----carry verbs of their own — cycle, open, delete — each item holding its
----identity in `user_data`, so the keys survive any reordering.
+---carry verbs of their own — cycle, open, delete.
 ---@class sidenote.list
 local M = {}
+
+---The bracketed fields, in the order they render and the cursor reads them back.
+local FIELDS = { "kind", "state", "pen" }
+
+---What a note with no pen shows in the pen column.
+local NO_PEN = "-"
 
 ---The resolved options behind the last list of each shape, for rebuilds.
 ---@type table<"loclist"|"qflist", sidenote.list.Opts>
 local held = {}
 
 ---One list line: bracketed metadata, the summary, and a hurt status.
----
----The bracket always holds kind, state and pen in that order — `-` for no
----pen — because the verbs read which field the cursor sits on from it.
 ---@param entry sidenote.session.Entry
 ---@return string
 local function label(entry)
-    local rec = entry.record
-    local parts = { rec.kind, rec.state, rec.pen or "-" }
+    local parts = {}
+    for i, field in ipairs(FIELDS) do
+        parts[i] = entry.record[field] or NO_PEN
+    end
     local text = "[" .. table.concat(parts, " ") .. "]"
     if entry.summary then
         text = text .. " " .. entry.summary
@@ -42,10 +48,22 @@ end
 ---@field bufnr? integer buffer a file-scoped list covers, defaulting to current
 ---@field path? string any file inside the project a project-scoped list covers
 
----The items a list of `opts`'s scope holds, and the opts made rebuildable.
+---One line of a list: where the note is, what it reads as, and which note it is.
+---@class sidenote.list.Item
+---@field bufnr? integer buffer the annotated file is loaded in
+---@field filename? string path to the annotated file, for an item with no buffer
+---@field lnum integer line the note anchors to, 1 when it has no position
+---@field col integer column the note anchors to
+---@field text string the rendered line
+---@field user_data {sidenote: {id: string, root: string}} identity, surviving any reordering
+
+---The items a list of `opts`'s scope holds.
+---
+---Fills in the buffer or path the scope resolved to, so a rebuild from the
+---same opts lists the same set.
 ---@param opts sidenote.list.Opts
 ---@param cfg sidenote.Config
----@return table[] items
+---@return sidenote.list.Item[] items
 local function items_for(opts, cfg)
     local items = {}
     if opts.scope == "project" then
@@ -129,7 +147,7 @@ end
 
 ---Which sidenote list the current window shows, if it shows one at all.
 ---@return "loclist"|"qflist"|nil shape
----@return table|nil items every item the list holds
+---@return sidenote.list.Item[]|nil items every item the list holds
 local function ours()
     local win = vim.api.nvim_get_current_win()
     local info = vim.fn.getwininfo(win)[1]
@@ -147,7 +165,7 @@ end
 
 ---What the cursor sits on when the current window shows a sidenote list.
 ---@return {id: string, root: string}|nil payload
----@return table|nil item the quickfix item itself
+---@return sidenote.list.Item|nil item the item itself
 ---@return "loclist"|"qflist"|nil shape
 local function under_cursor()
     local shape, items = ours()
@@ -175,7 +193,7 @@ local function rebuild(shape)
 end
 
 ---The buffer an item's annotated file is loaded in, for repaints.
----@param item {bufnr?: integer} quickfix item as `getqflist` returns it
+---@param item sidenote.list.Item
 ---@return integer|nil
 local function loaded_source(item)
     if item.bufnr and item.bufnr > 0 and vim.api.nvim_buf_is_loaded(item.bufnr) then
@@ -186,10 +204,9 @@ end
 
 ---Which field the cursor sits on, read from the rendered line's bracket.
 ---
----The same idiom as the browser's `t`: the word under the cursor decides,
----and anywhere else on the line means state. Read from the rendered text
----rather than the item, so it survives a custom 'quickfixtextfunc' as long
----as the bracket does.
+---The word under the cursor decides, and anywhere else on the line means
+---state. Reading the rendered text rather than the item survives a custom
+---'quickfixtextfunc', as long as the bracket does.
 ---@return "kind"|"state"|"pen"
 local function field_under_cursor()
     local line = vim.api.nvim_get_current_line()
@@ -199,13 +216,12 @@ local function field_under_cursor()
         return "state"
     end
 
-    local order = { "kind", "state", "pen" }
     local index = 0
     for start, word in line:sub(bopen + 1, bclose - 1):gmatch("()(%S+)") do
         index = index + 1
         local first = bopen + start
         if col >= first and col < first + #word then
-            return order[index] or "state"
+            return FIELDS[index] or "state"
         end
     end
     return "state"
@@ -278,11 +294,11 @@ local function delete_note()
     rebuild(shape)
 end
 
----Values each interactive filter key offers, as in the browser.
+---Values each interactive filter key offers.
 local FILTERS = {
-    kind = require("sidenote.core.record").KIND_NAMES,
-    state = require("sidenote.core.record").STATE_NAMES,
-    status = require("sidenote.core.resolve").STATUS_NAMES,
+    kind = record.KIND_NAMES,
+    state = record.STATE_NAMES,
+    status = resolve.STATUS_NAMES,
 }
 
 ---Change one filter key and rebuild the list through it.
@@ -325,8 +341,6 @@ local function flip_scope()
     end
     local opts = held[shape]
     if opts.scope == "project" then
-        -- Narrowing needs a file; the one under the cursor is the obvious
-        -- candidate, and the one the list opened from is the fallback
         local item = items[vim.fn.line(".")]
         local bufnr = item and loaded_source(item) or opts.bufnr
         if not bufnr then
@@ -352,9 +366,7 @@ local HELP_FOOTER = {
 ---
 ---One qf buffer serves every list a session ever shows, so the keys decide
 ---at press time: in a sidenote-titled list they act, anywhere else they
----fall through to whatever the key normally does. The actions table serves
----twice — the keymaps are built from it and `g?` renders it — so the help
----can never drift from what the keys do.
+---fall through to whatever the key normally does.
 ---@param bufnr integer quickfix buffer
 function M.bind(bufnr)
     ---@type {lhs: string, desc: string, fn: fun()}[]

@@ -14,7 +14,7 @@ local render = require("sidenote.browser.render")
 ---@field pen string|nil pen column, nil when it held the `-` placeholder
 ---@field location string location column exactly as written
 ---@field prose string[] the lines beneath the header, summary first
----@field fields table<string, sidenote.browser.Field> column ranges, telling a cycle which field the cursor is on
+---@field fields table<string, sidenote.browser.Field> mapping of column name -> the byte range it occupies
 
 ---@class sidenote.browser.ParseError
 ---@field lnum integer buffer line the error belongs to, 1-based
@@ -41,8 +41,8 @@ local function check(row)
     if not record.STATES[row.state] then
         return ("unknown state %q; expected open, resolved, wontfix or archived"):format(row.state)
     end
-    -- Shape only: whether the pen is configured needs the config, which the
-    -- applying layer has and a parser does not
+    -- Shape only: whether the pen is configured needs the config, which a
+    -- parser does not have
     if row.pen ~= nil and not row.pen:match("^%w[%w_-]*$") then
         return ("%q is not a pen; use a word, or - for none"):format(row.pen)
     end
@@ -50,7 +50,7 @@ local function check(row)
     return err
 end
 
----Read a header line into its id and three columns.
+---Read a header line into its id and columns.
 ---
 ---Ids are word characters alone, so a prose line mentioning /etc/hosts can
 ---never read as a header. Columns are separated by a run of two or more
@@ -112,8 +112,7 @@ function M.buffer(lines)
 
     for lnum, text in ipairs(lines) do
         if not text:match("%S") then
-            -- Held rather than stored: a blank line is prose only when more
-            -- prose follows it, so a spacer before the next row is dropped
+            -- A blank line is prose only when more prose follows; a trailing spacer is dropped
             blanks = blanks + 1
         else
             local row, err = M.header(text)

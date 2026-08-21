@@ -1,18 +1,17 @@
 ---@class sidenote.IndexEntry
----@field against string hash of the file content this was resolved against
----@field resolution sidenote.Resolution cached outcome for that content
+---@field against string hash of the inputs this was resolved from
+---@field resolution sidenote.Resolution cached outcome for those inputs
 
 ---@class sidenote.Index
----@field version integer cache format version, discarded when it does not match
+---@field version integer cache format version; a mismatch discards the cache
 ---@field entries table<string, sidenote.IndexEntry> mapping of annotation id -> cached resolution
 ---@field by_path table<string, string[]> mapping of source path -> annotation ids
 
 ---Disposable resolution cache.
 ---
----Everything here is recomputable by globbing the store's `*.metadata.json`
----files, so a corrupt or version-mismatched cache is discarded rather than
----repaired. Anchor status is never authoritative on disk; this is the only
----place it is stored at all.
+---Everything here is recomputable from the store's records, so a corrupt or
+---version-mismatched cache is discarded rather than repaired. Anchor status
+---is never authoritative on disk; this is the only place it is stored at all.
 ---@class sidenote.core.index
 local M = {}
 
@@ -23,6 +22,7 @@ function M.new()
     return { version = M.VERSION, entries = {}, by_path = {} }
 end
 
+---Read the cache at `path`, or a fresh empty index when it cannot be used.
 ---@param path string
 ---@return sidenote.Index
 function M.load(path)
@@ -40,8 +40,7 @@ function M.load(path)
     if decoded.version ~= M.VERSION or type(decoded.entries) ~= "table" then
         return M.new()
     end
-    -- An index written before by_path existed is still usable; heal it rather
-    -- than discarding resolution results that remain valid
+    -- Heal a missing tracking map: the cached resolutions are still good
     if type(decoded.by_path) ~= "table" then
         decoded.by_path = {}
     end
@@ -71,17 +70,19 @@ end
 
 ---@param idx sidenote.Index
 ---@param id string
----@param file_sha string
----@return sidenote.Resolution|nil
-function M.get(idx, id, file_sha)
+---@param key string hash of the inputs the resolution must have been drawn from
+---@return sidenote.Resolution|nil resolution nil when nothing is cached for that id and key
+function M.get(idx, id, key)
     local entry = idx.entries[id]
-    if not entry or entry.against ~= file_sha then
+    if not entry or entry.against ~= key then
         return nil
     end
     return entry.resolution
 end
 
----Record that an annotation targets a source file. Idempotent.
+---Record that an annotation targets a source file.
+---
+---Tracking an id already held for that path is a no-op.
 ---@param idx sidenote.Index
 ---@param source_path string
 ---@param id string

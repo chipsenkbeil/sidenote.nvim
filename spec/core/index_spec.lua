@@ -1,6 +1,6 @@
 local index = require("sidenote.core.index")
 
-local RES = {
+local RESOLUTION = {
     status = "attached",
     tier = "L2",
     line_start = 5,
@@ -16,7 +16,7 @@ end
 describe("index round-trip", function()
     it("returns what was put, for the same content hash", function()
         local idx = index.new()
-        index.put(idx, "id1", { against = "sha-a", resolution = RES })
+        index.put(idx, "id1", { against = "sha-a", resolution = RESOLUTION })
         local got = index.get(idx, "id1", "sha-a")
         assert.eq(got.status, "attached")
         assert.eq(got.line_start, 5)
@@ -24,7 +24,7 @@ describe("index round-trip", function()
 
     it("returns nil when the file content has changed", function()
         local idx = index.new()
-        index.put(idx, "id1", { against = "sha-a", resolution = RES })
+        index.put(idx, "id1", { against = "sha-a", resolution = RESOLUTION })
         assert.is_nil(index.get(idx, "id1", "sha-b"))
     end)
 
@@ -35,7 +35,7 @@ describe("index round-trip", function()
     it("survives save and load", function()
         local path = tmpfile()
         local idx = index.new()
-        index.put(idx, "id1", { against = "sha-a", resolution = RES })
+        index.put(idx, "id1", { against = "sha-a", resolution = RESOLUTION })
         assert.truthy(index.save(path, idx))
 
         local got = index.get(index.load(path), "id1", "sha-a")
@@ -120,13 +120,11 @@ describe("index by_path", function()
     end)
 
     it("heals an index written before by_path existed", function()
-        -- Resolution results in such a file are still valid; discarding them
-        -- would throw away work for a purely additive schema change
         local path = tmpfile()
         local fh = assert(io.open(path, "w"))
         fh:write(vim.json.encode({
             version = index.VERSION,
-            entries = { id1 = { against = "sha-a", resolution = RES } },
+            entries = { id1 = { against = "sha-a", resolution = RESOLUTION } },
         }))
         fh:close()
 

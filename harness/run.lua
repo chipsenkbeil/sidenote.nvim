@@ -1,5 +1,4 @@
--- Invoked directly as `nvim -l harness/run.lua`, nothing has set up the module
--- search path yet; under the test runner this is already done and harmless
+-- A direct `nvim -l harness/run.lua` starts with no module search path set up
 local root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
 package.path = ("%s/lua/?.lua;%s/lua/?/init.lua;%s/?.lua;%s"):format(root, root, root, package.path)
 
@@ -17,7 +16,7 @@ local resolve = require("sidenote.core.resolve")
 ---@class harness.run
 local M = {}
 
----@class harness.Report
+---@class harness.run.Report
 ---@field repo string repository the samples came from
 ---@field path string file the samples came from, relative to the repo
 ---@field depth integer how many commits back the samples were taken
@@ -36,8 +35,9 @@ local M = {}
 ---@field samples integer number of regions to measure
 ---@field height integer lines per sampled region
 
+---Measure resolver accuracy over `opts.samples` regions of one file.
 ---@param opts harness.run.Opts
----@return harness.Report
+---@return harness.run.Report
 function M.measure(opts)
     local base_rev = ("HEAD~%d"):format(opts.depth)
     local old = assert(git.show(opts.repo, base_rev, opts.path), "cannot read file at base rev")
@@ -45,10 +45,10 @@ function M.measure(opts)
     local old_lines = hash.split(old)
 
     local height = opts.height
-    local last = #old_lines - height + 1
-    assert(last >= opts.samples, "file too short for the requested sample count")
+    local last_start = #old_lines - height + 1
+    assert(last_start >= opts.samples, "file too short for the requested sample count")
 
-    local step = math.max(1, math.floor(last / opts.samples))
+    local step = math.max(1, math.floor(last_start / opts.samples))
 
     local starts, ranges = {}, {}
     for i = 0, opts.samples - 1 do
@@ -104,9 +104,11 @@ function M.measure(opts)
     return report
 end
 
----@param report harness.Report
----@param baseline harness.Report
----@return {ok: boolean, regressions: string[]}
+---Grade `report` against `baseline`, failing only on more wrong or fewer
+---correct placements.
+---@param report harness.run.Report
+---@param baseline harness.run.Report
+---@return {ok: boolean, regressions: string[]} verdict with one message per regression
 function M.compare(report, baseline)
     local regressions = {}
     if report.wrong > baseline.wrong then
@@ -125,9 +127,7 @@ function M.compare(report, baseline)
 end
 
 -- CLI: nvim -l harness/run.lua REPO PATH DEPTH [SAMPLES] [HEIGHT]
---
--- Guarded on arg[0] so that requiring this module from the test runner, which
--- also populates _G.arg, does not kick off a measurement run
+-- Matched on arg[0] because a caller that requires this module also fills _G.arg
 if _G.arg and _G.arg[0] and _G.arg[0]:match("run%.lua$") and _G.arg[1] then
     print(vim.json.encode(M.measure({
         repo = _G.arg[1],

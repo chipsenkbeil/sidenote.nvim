@@ -7,16 +7,20 @@
 local M = {}
 
 ---@param cfg sidenote.Config
-local function report_store(cfg)
+local function report_global_store(cfg)
     if vim.fn.isdirectory(cfg.global_dir) == 1 or vim.fn.mkdir(cfg.global_dir, "p") == 1 then
         vim.health.ok(("global store writable at %s"):format(cfg.global_dir))
     else
         vim.health.error(("cannot create the global store at %s"):format(cfg.global_dir))
     end
+end
 
-    local project = require("sidenote.store.project")
+---@param cfg sidenote.Config
+local function report_project_store(cfg)
+    local WRITABLE_DIRECTORY = 2
+
     local here = vim.fn.getcwd()
-    local root = project.root(here)
+    local root = require("sidenote.store.project").root(here)
     if not root then
         vim.health.info(
             ("no project root at or above %s; notes here go to the global store"):format(here)
@@ -27,7 +31,7 @@ local function report_store(cfg)
     local dir = root .. "/" .. cfg.project_dir
     if vim.fn.isdirectory(dir) ~= 1 then
         vim.health.info(("project root %s, with no store yet at %s"):format(root, dir))
-    elseif vim.fn.filewritable(dir) == 2 then
+    elseif vim.fn.filewritable(dir) == WRITABLE_DIRECTORY then
         local count = #require("sidenote.store").ids(dir)
         vim.health.ok(("project store at %s holds %d annotation(s)"):format(dir, count))
     else
@@ -53,8 +57,6 @@ end
 
 ---@param cfg sidenote.Config
 local function report_prose(cfg)
-    -- A prose filetype nothing can highlight still works; the note is text
-    -- either way, so this is worth knowing rather than worth warning about
     if cfg.filetype == "org" and not pcall(require, "orgmode") then
         vim.health.info("prose filetype is org, but nvim-orgmode is not installed")
     end
@@ -70,7 +72,8 @@ function M.check()
         vim.health.ok(("configuration valid, prose filetype %q"):format(cfg.filetype))
     end
 
-    report_store(cfg)
+    report_global_store(cfg)
+    report_project_store(cfg)
     report_vcs()
     report_prose(cfg)
 end

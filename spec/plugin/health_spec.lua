@@ -2,19 +2,18 @@ local health = require("sidenote.health")
 
 ---@class spec.plugin.Reported
 ---@field ok string[] everything reported as working
----@field info string[] everything reported as absent but optional
+---@field info string[] everything reported as worth knowing but not a fault
 ---@field warn string[] everything reported as a warning
 ---@field error string[] everything reported as broken
 
----Run a health check while standing in for `vim.health`, so the report can be
----read rather than only looked at.
----@param fn function
+---Run `fn` while standing in for `vim.health`, and return everything it reported.
+---@param fn fun()
 ---@return spec.plugin.Reported
 local function captured(fn)
     local real = vim.health
     local out = { ok = {}, info = {}, warn = {}, error = {} }
 
-    ---@param level string
+    ---@param level "ok"|"info"|"warn"|"error"
     ---@return fun(message: string)
     local function collect(level)
         return function(message)
@@ -47,9 +46,9 @@ local function mentions(reported, needle)
     return false
 end
 
----Run a function with the working directory somewhere else.
+---Run `fn` with the working directory at `dir`.
 ---@param dir string
----@param fn function
+---@param fn fun()
 local function within(dir, fn)
     local before = vim.fn.getcwd()
     vim.fn.chdir(dir)
@@ -80,15 +79,11 @@ describe("health.check", function()
     end)
 
     it("reports the version control it found", function()
-        -- Optional rather than required, so its absence is info and never a
-        -- warning
         local report = captured(health.check)
         assert.truthy(mentions(report.ok, "provenance") or mentions(report.info, "provenance"))
     end)
 
     it("says nothing about treesitter, which no tier reads", function()
-        -- The old line checked the checkhealth buffer's own filetype mapping,
-        -- reporting readiness for a tier that was cut
         local report = captured(health.check)
         assert.falsy(mentions(report.ok, "treesitter") or mentions(report.info, "treesitter"))
     end)

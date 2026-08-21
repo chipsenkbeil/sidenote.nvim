@@ -44,13 +44,16 @@ local function annotated(prose)
     return { entry = session.entries(bufnr, opts())[1], bufnr = bufnr }
 end
 
+---@class spec.ui.GlanceOpts
+---@field style "float"|"virt_lines"|"split"|"none" where the note is shown
+---@field max_lines? integer prose lines the preview keeps, 20 by default
+
 ---@param case spec.ui.PreviewCase
----@param style string
----@param max_lines? integer defaults to 20
-local function show(case, style, max_lines)
+---@param glance spec.ui.GlanceOpts
+local function show(case, glance)
     preview.show(case.entry, {
-        style = style,
-        max_lines = max_lines or 20,
+        style = glance.style,
+        max_lines = glance.max_lines or 20,
         filetype = "org",
         bufnr = case.bufnr,
     })
@@ -69,47 +72,47 @@ end
 
 describe("preview.show float", function()
     it("shows the prose in a floating window", function()
-        show(annotated("why this returns one\n"), "float")
+        show(annotated("why this returns one\n"), { style = "float" })
         assert.eq(vim.api.nvim_buf_get_lines(preview_buf(), 0, 1, false)[1], "why this returns one")
         preview.hide()
     end)
 
     it("sets the configured filetype so the prose highlights", function()
-        show(annotated("* a heading\n"), "float")
+        show(annotated("* a heading\n"), { style = "float" })
         assert.eq(vim.bo[preview_buf()].filetype, "org")
         preview.hide()
     end)
 
     it("truncates to max_lines", function()
-        show(annotated(string.rep("line\n", 40)), "float", 5)
+        show(annotated(string.rep("line\n", 40)), { style = "float", max_lines = 5 })
         assert.lte(vim.api.nvim_buf_line_count(preview_buf()), 5)
         preview.hide()
     end)
 
     it("shows a placeholder when the note is still empty", function()
-        show(annotated(""), "float")
+        show(annotated(""), { style = "float" })
         assert.match(vim.api.nvim_buf_get_lines(preview_buf(), 0, -1, false)[1], "empty")
         preview.hide()
     end)
 
     it("leaves the preview buffer unmodifiable", function()
-        show(annotated("text\n"), "float")
+        show(annotated("text\n"), { style = "float" })
         assert.eq(vim.bo[preview_buf()].modifiable, false)
         preview.hide()
     end)
 
     it("replaces a previous preview rather than stacking windows", function()
         local case = annotated("first\n")
-        show(case, "float")
+        show(case, { style = "float" })
         local first = preview.winid()
-        show(case, "float")
+        show(case, { style = "float" })
         assert.falsy(vim.api.nvim_win_is_valid(first))
         preview.hide()
     end)
 
     it("leaves the cursor in the source buffer", function()
         local before = vim.api.nvim_get_current_win()
-        show(annotated("text\n"), "float")
+        show(annotated("text\n"), { style = "float" })
         assert.eq(vim.api.nvim_get_current_win(), before)
         preview.hide()
     end)
@@ -120,7 +123,7 @@ describe("preview dismissal", function()
         local case = annotated("transient\n")
         vim.api.nvim_set_current_buf(case.bufnr)
         vim.api.nvim_win_set_cursor(0, { 4, 0 })
-        show(case, "float")
+        show(case, { style = "float" })
         assert.not_nil(preview.winid())
 
         vim.api.nvim_win_set_cursor(0, { 1, 0 })
@@ -129,12 +132,11 @@ describe("preview dismissal", function()
     end)
 
     it("survives the move that showed it", function()
-        -- The motion that opens a preview can flush its own CursorMoved after
-        -- the fact; at the armed position it means nothing
+        -- The motion that opens a preview can flush its own CursorMoved after it
         local case = annotated("still here\n")
         vim.api.nvim_set_current_buf(case.bufnr)
         vim.api.nvim_win_set_cursor(0, { 4, 0 })
-        show(case, "float")
+        show(case, { style = "float" })
 
         vim.cmd("doautocmd CursorMoved")
         assert.not_nil(preview.winid())
@@ -145,7 +147,7 @@ describe("preview dismissal", function()
         local case = annotated("gone on insert\n")
         vim.api.nvim_set_current_buf(case.bufnr)
         vim.api.nvim_win_set_cursor(0, { 4, 0 })
-        show(case, "float")
+        show(case, { style = "float" })
 
         vim.cmd("doautocmd InsertEnter")
         assert.is_nil(preview.winid())
@@ -155,7 +157,7 @@ describe("preview dismissal", function()
         local case = annotated("hangs beneath\n")
         vim.api.nvim_set_current_buf(case.bufnr)
         vim.api.nvim_win_set_cursor(0, { 4, 0 })
-        show(case, "virt_lines")
+        show(case, { style = "virt_lines" })
         assert.eq(#marks(case.bufnr), 1)
 
         vim.api.nvim_win_set_cursor(0, { 1, 0 })
@@ -167,7 +169,7 @@ end)
 describe("preview.show identity", function()
     it("names what it shows in the float's winbar", function()
         local case = annotated("why this returns one\n")
-        show(case, "float")
+        show(case, { style = "float" })
         local winbar = vim.wo[assert(preview.winid())].winbar
         assert.contains(winbar, "m.lua:4")
         assert.contains(winbar, "note")
@@ -176,10 +178,8 @@ describe("preview.show identity", function()
 
     it("marks a cut float with how much it held back", function()
         local case = annotated(string.rep("line\n", 40))
-        show(case, "float", 5)
-        local bufnr = vim.api.nvim_win_get_buf(assert(preview.winid()))
-        local placed =
-            vim.api.nvim_buf_get_extmarks(bufnr, preview.NAMESPACE, 0, -1, { details = true })
+        show(case, { style = "float", max_lines = 5 })
+        local placed = marks(preview_buf())
         assert.eq(#placed, 1)
         assert.contains(placed[1][4].virt_lines[1][1][1], "35 more")
         preview.hide()
@@ -190,14 +190,14 @@ describe("preview.show virt_lines", function()
     it("opens no window at all", function()
         -- The whole point of this style is staying in the code
         local case = annotated("why this returns one\n")
-        show(case, "virt_lines")
+        show(case, { style = "virt_lines" })
         assert.is_nil(preview.winid())
         preview.hide()
     end)
 
     it("leads with the note's identity, prose beneath a divider", function()
         local case = annotated("why this returns one\n")
-        show(case, "virt_lines")
+        show(case, { style = "virt_lines" })
 
         local placed = marks(case.bufnr)
         assert.eq(#placed, 1)
@@ -211,7 +211,7 @@ describe("preview.show virt_lines", function()
 
     it("renders every prose line as its own virtual line", function()
         local case = annotated("first\nsecond\nthird\n")
-        show(case, "virt_lines")
+        show(case, { style = "virt_lines" })
         local virt = marks(case.bufnr)[1][4].virt_lines
         assert.eq(#virt, 5, "identity, divider, then the three lines")
         assert.eq(virt[#virt][1][1], "third")
@@ -220,7 +220,7 @@ describe("preview.show virt_lines", function()
 
     it("cuts at max_lines and says how much it held back", function()
         local case = annotated(string.rep("line\n", 40))
-        show(case, "virt_lines", 5)
+        show(case, { style = "virt_lines", max_lines = 5 })
         local virt = marks(case.bufnr)[1][4].virt_lines
         assert.eq(#virt, 8, "identity, divider, five lines, the marker")
         assert.contains(virt[#virt][1][1], "35 more")
@@ -229,15 +229,15 @@ describe("preview.show virt_lines", function()
 
     it("shows a placeholder when the note is still empty", function()
         local case = annotated("")
-        show(case, "virt_lines")
+        show(case, { style = "virt_lines" })
         assert.match(marks(case.bufnr)[1][4].virt_lines[3][1][1], "empty")
         preview.hide()
     end)
 
     it("replaces a previous preview rather than stacking marks", function()
         local case = annotated("text\n")
-        show(case, "virt_lines")
-        show(case, "virt_lines")
+        show(case, { style = "virt_lines" })
+        show(case, { style = "virt_lines" })
         assert.eq(#marks(case.bufnr), 1)
         preview.hide()
     end)
@@ -249,7 +249,7 @@ describe("preview.show virt_lines", function()
         vim.api.nvim_buf_set_lines(case.bufnr, 0, -1, false, { "totally", "different" })
         case.entry = session.entries(case.bufnr, opts())[1]
 
-        show(case, "virt_lines")
+        show(case, { style = "virt_lines" })
         assert.eq(#marks(case.bufnr), 0)
         preview.hide()
     end)
@@ -263,7 +263,7 @@ end)
 describe("preview.show none", function()
     it("opens nothing", function()
         local case = annotated("text\n")
-        show(case, "none")
+        show(case, { style = "none" })
         assert.is_nil(preview.winid())
         assert.eq(#marks(case.bufnr), 0)
     end)
@@ -271,14 +271,14 @@ end)
 
 describe("preview.hide", function()
     it("closes the window", function()
-        show(annotated("text\n"), "float")
+        show(annotated("text\n"), { style = "float" })
         preview.hide()
         assert.is_nil(preview.winid())
     end)
 
     it("clears an attached virtual preview", function()
         local case = annotated("text\n")
-        show(case, "virt_lines")
+        show(case, { style = "virt_lines" })
         preview.hide()
         assert.eq(#marks(case.bufnr), 0)
     end)

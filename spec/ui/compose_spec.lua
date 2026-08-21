@@ -75,8 +75,7 @@ describe("sidenote.add composing", function()
     end)
 
     it("seeds the buffer from the template, and the file not at all", function()
-        -- The seed is an unsaved edit the user may keep or discard; the prose
-        -- file is only ever written by their own confirmed :write
+        -- The seed is an unsaved edit the user may keep or discard
         editing()
         local result = added(opts(function(ctx)
             return { "* TODO " .. ctx.path, "" }
@@ -93,7 +92,6 @@ describe("sidenote.add composing", function()
     end)
 
     it("reveals highlights a toggle had hidden, so the capture shows", function()
-        -- Half-hiding the new mark instead would read as a failed capture
         local bufnr = editing()
         local cfg = opts()
         cfg.indicator = { style = "sign", highlight = "on" }
@@ -167,8 +165,7 @@ describe("sidenote.at_cursor", function()
     end)
 
     it("prefers the narrowest note containing the cursor", function()
-        -- Overlaps are legal; the most specific note is the one the cursor
-        -- position is talking about
+        -- Overlapping notes are legal
         editing()
         added(opts())
         put_away()
@@ -182,8 +179,7 @@ describe("sidenote.at_cursor", function()
     end)
 
     it("selects from a caller-held list without resolving again", function()
-        -- What lets follow mode pay for resolution once per buffer state
-        -- rather than once per cursor move
+        -- The caller pays for resolution once per buffer state, not once per cursor move
         editing()
         added(opts())
         put_away()

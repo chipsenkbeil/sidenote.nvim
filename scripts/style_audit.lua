@@ -1,12 +1,7 @@
 -- Flag mechanical lua-style violations across a file list.
 --
--- Covers only the rules a script can check. Comment *content*, naming, and
--- layering still need reading; `make style` is a floor, not a ceiling
-
-local files = {}
-for i = 1, #arg do
-    files[#files + 1] = arg[i]
-end
+-- Only the rules a script can check live here. Comment *content*, naming and
+-- layering still need reading; a clean run is a floor, not a ceiling
 
 local findings = {}
 
@@ -18,7 +13,7 @@ local function report(file, line, rule, detail)
     findings[#findings + 1] = ("%s:%d  [%s] %s"):format(file, line, rule, detail)
 end
 
----An inline comment, as opposed to a `---` doc comment
+---Whether `line` is a `--` comment rather than a `---` doc comment.
 ---@param line string|nil
 ---@return boolean
 local function is_inline(line)
@@ -33,9 +28,7 @@ end
 
 ---Whether a field annotation's tail is a type alone, with no description.
 ---
----A type may carry spaces inside brackets — `table<string, boolean>` — so
----balanced pairs are collapsed before looking for prose. A bare function
----type's return annotation still reads as prose; the audit is a floor.
+---A bare function type reads as prose, so an undescribed one goes unflagged.
 ---@param rest string everything after the field name
 ---@return boolean
 local function undescribed(rest)
@@ -47,7 +40,7 @@ local function undescribed(rest)
     return collapsed:match("%s%S") == nil
 end
 
----Rules that read one line at a time
+---Check the rules that need one line of context.
 ---@param file string
 ---@param lines string[]
 local function check_lines(file, lines)
@@ -93,8 +86,8 @@ local function check_lines(file, lines)
 
         -- Doc summary running straight into details with no blank --- line
         if line:match("^%-%-%-%a") and lines[n - 1] and not lines[n - 1]:match("^%-%-%-") then
-            local nxt = lines[n + 1]
-            if nxt and nxt:match("^%-%-%-%a") and line:match("%.%s") then
+            local next_line = lines[n + 1]
+            if next_line and next_line:match("^%-%-%-%a") and line:match("%.%s") then
                 report(file, n, "summary-run-on", line:sub(1, 60))
             end
         end
@@ -115,7 +108,7 @@ local function check_lines(file, lines)
     end
 end
 
----A bare `--` is a paragraph break, so it ends one block and starts the next
+---Whether `line` is a bare `--`, which ends one comment block and opens the next.
 ---@param line string|nil
 ---@return boolean
 local function is_break(line)
@@ -133,10 +126,9 @@ local function opens_on_code(head)
     return first_word ~= nil and first_word:match("[%._:(]") ~= nil
 end
 
----Shape rules for a run of inline comment lines.
+---Check the shape rules for each run of inline comment lines.
 ---
----A comment opening the file is its header — documentation about the module
----rather than a note bound to a statement — so none of these apply to it.
+---A comment opening the file is its header, and is exempt from all of them.
 ---@param file string
 ---@param lines string[]
 local function check_comment_blocks(file, lines)
@@ -181,7 +173,7 @@ local function check_comment_blocks(file, lines)
     end
 end
 
----Every parameter of a documented function carries an `@param`.
+---Check that every parameter of a documented function carries an `@param`.
 ---
 ---Only functions that already have a doc block are checked: a half-documented
 ---signature is the smell, and flagging every undocumented local would drown it.
@@ -193,14 +185,14 @@ local function check_params(file, lines)
             or line:match("^%s*function [%w_%.:]+%(([^)]*)%)")
         if params and params ~= "" then
             local documented, has_doc = {}, false
-            local k = n - 1
-            while k > 0 and lines[k]:match("^%s*%-%-%-") do
+            local above = n - 1
+            while above > 0 and lines[above]:match("^%s*%-%-%-") do
                 has_doc = true
-                local name = lines[k]:match("@param%s+([%w_]+)")
+                local name = lines[above]:match("@param%s+([%w_]+)")
                 if name then
                     documented[name] = true
                 end
-                k = k - 1
+                above = above - 1
             end
 
             if has_doc then
@@ -214,7 +206,7 @@ local function check_params(file, lines)
     end
 end
 
-for _, file in ipairs(files) do
+for _, file in ipairs(arg) do
     local lines = {}
     for line in io.lines(file) do
         lines[#lines + 1] = line
@@ -230,6 +222,4 @@ for _, finding in ipairs(findings) do
 end
 print(("\n%d findings"):format(#findings))
 
--- Without this the gate is decorative: `make style` would print findings and
--- pass anyway, locally and in CI alike
 os.exit(#findings == 0 and 0 or 1)

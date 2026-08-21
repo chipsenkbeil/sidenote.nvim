@@ -1,11 +1,12 @@
+local render = require("sidenote.browser.render")
+
 ---Called with everything an edit would do, to decide whether it happens.
 ---@alias sidenote.browser.ConfirmFn fun(actions: sidenote.browser.Action[]): boolean
 
 ---Describes pending browser edits, and asks before any of them happen.
 ---
 ---Nothing here touches the store; it only renders actions and puts the
----question. Keeping it separate is what lets the wording be tested without a
----prompt appearing.
+---question.
 ---@class sidenote.browser.confirm
 local M = {}
 
@@ -14,8 +15,8 @@ M.RULE = "── these lose information ──"
 
 ---Kinds listed one line each, because the specific values are the point.
 ---
----Deletes included: `dd` on a closed fold destroys sight-unseen, so the
----quoted summary is the moment of seeing. Only writes stay counted.
+---Deletes included: `dd` on a closed fold destroys sight-unseen, so the quoted
+---summary is the moment of seeing.
 local PER_ACTION = { move = true, rescope = true, change = true, delete = true }
 
 ---Most characters of a summary a delete's quote shows.
@@ -24,19 +25,18 @@ local QUOTE_MAX = 50
 ---Order kinds appear in, so the dialog reads the same way every time.
 local ORDER = { "write", "change", "move", "rescope", "delete" }
 
----What an action does or costs, shown at the end of its row.
+---Say what an action does or costs, for the end of its row.
 ---
 ---By cost, not by kind: a rescope within the file keeps its anchor, and a move
 ---to file scope drops it.
----@param kind string
----@param lossy boolean
----@return string|nil
-local function note_for(kind, lossy)
-    if kind == "delete" then
+---@param action sidenote.browser.Action
+---@return string|nil callout nil when there is nothing to say
+local function callout_for(action)
+    if action.kind == "delete" then
         return "(REMOVES PROSE FILE)"
     end
-    if kind == "move" or kind == "rescope" then
-        return lossy and "(DROPS ANCHOR)" or "(re-anchored by content)"
+    if action.kind == "move" or action.kind == "rescope" then
+        return action.lossy and "(DROPS ANCHOR)" or "(re-anchored by content)"
     end
     return nil
 end
@@ -52,9 +52,8 @@ end
 ---@return string
 local function detail(action)
     if action.kind == "change" then
-        -- A pen change has a nil side when it is picked up or put down; the
-        -- placeholder is how the column renders that
-        return ("%s   %s -> %s"):format(action.field, action.from or "-", action.to or "-")
+        local from, to = action.from or render.NO_PEN, action.to or render.NO_PEN
+        return ("%s   %s -> %s"):format(action.field, from, to)
     end
     if action.kind == "delete" then
         local summary = action.summary
@@ -81,11 +80,11 @@ end
 
 ---@param kind string
 ---@param body string
----@param note string|nil
+---@param callout string|nil
 ---@return string
-local function row(kind, body, note)
+local function row(kind, body, callout)
     local line = ("  %-8s %s"):format(kind:upper(), body)
-    return note and (line .. "   " .. note) or line
+    return callout and (line .. "   " .. callout) or line
 end
 
 ---@param actions sidenote.browser.Action[]
@@ -102,18 +101,18 @@ local function describe(actions)
         local group = by_kind[kind]
         if group and PER_ACTION[kind] then
             for _, action in ipairs(group) do
-                lines[#lines + 1] = row(kind, detail(action), note_for(kind, action.lossy))
+                lines[#lines + 1] = row(kind, detail(action), callout_for(action))
             end
         elseif group then
-            lines[#lines + 1] = row(kind, counted(kind, #group), note_for(kind, group[1].lossy))
+            lines[#lines + 1] = row(kind, counted(kind, #group), callout_for(group[1]))
         end
     end
     return lines
 end
 
----The dialog text, with anything that costs information below a rule.
+---Build the dialog text, with anything that costs information below a rule.
 ---@param actions sidenote.browser.Action[]
----@return string[]
+---@return string[] lines empty when there is nothing to apply
 function M.summary(actions)
     if #actions == 0 then
         return {}
@@ -134,9 +133,9 @@ function M.summary(actions)
     return lines
 end
 
----Put the question, returning whether to go ahead.
+---Put the question.
 ---@param actions sidenote.browser.Action[]
----@return boolean confirmed
+---@return boolean confirmed false when declined, and when there is nothing to apply
 function M.ask(actions)
     if #actions == 0 then
         return false

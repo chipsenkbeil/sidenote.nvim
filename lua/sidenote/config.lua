@@ -9,7 +9,7 @@
 ---@class sidenote.EditorConfig
 ---@field style "split"|"float"|"toggle"|"current"|"tab" where a note opens for writing
 ---@field position "left"|"right"|"top"|"bottom" side the split takes
----@field size integer columns for a vertical split, rows for a horizontal one
+---@field size integer columns for a float or vertical split, rows for a horizontal one
 
 ---@class sidenote.BrowserConfig
 ---@field style "split"|"float"|"current"|"tab" where a listing opens
@@ -26,7 +26,7 @@
 
 ---@class sidenote.Config
 ---@field filetype string extension and filetype for prose files
----@field strategy string|string[]|fun(path: string): string|nil store roots, tried in order
+---@field strategy sidenote.store.strategy.Entry|sidenote.store.strategy.Entry[] store roots, tried in order
 ---@field global_dir string root of the machine-wide store
 ---@field project_dir string directory name used for an in-project store
 ---@field cache_dir string where scans cache resolutions, never inside a store
@@ -57,6 +57,9 @@ local BROWSER_STYLES = { split = true, float = true, current = true, tab = true 
 local POSITIONS = { left = true, right = true, top = true, bottom = true }
 local STRATEGIES = { project = true, global = true }
 
+---Build the configuration the plugin ships with.
+---
+---Every call builds a fresh table, so a caller may keep and edit the result.
 ---@return sidenote.Config
 function M.defaults()
     return {
@@ -102,24 +105,18 @@ function M.defaults()
     }
 end
 
+---Report the first thing about `cfg` the plugin cannot run on.
 ---@param cfg sidenote.Config
----@return string|nil err
+---@return string|nil err nil when every field is usable
 local function validate(cfg)
     local function fail(path, detail)
         return ("vim.g.sidenote.%s: %s"):format(path, detail)
     end
 
-    if type(cfg.filetype) ~= "string" then
-        return fail("filetype", ("expected a string, got %s"):format(type(cfg.filetype)))
-    end
-    if type(cfg.global_dir) ~= "string" then
-        return fail("global_dir", ("expected a string, got %s"):format(type(cfg.global_dir)))
-    end
-    if type(cfg.project_dir) ~= "string" then
-        return fail("project_dir", ("expected a string, got %s"):format(type(cfg.project_dir)))
-    end
-    if type(cfg.cache_dir) ~= "string" then
-        return fail("cache_dir", ("expected a string, got %s"):format(type(cfg.cache_dir)))
+    for _, key in ipairs({ "filetype", "global_dir", "project_dir", "cache_dir" }) do
+        if type(cfg[key]) ~= "string" then
+            return fail(key, ("expected a string, got %s"):format(type(cfg[key])))
+        end
     end
 
     local entries = cfg.strategy
@@ -146,8 +143,7 @@ local function validate(cfg)
         return fail("pens", ("expected a table, got %s"):format(type(cfg.pens)))
     end
     for name, group in pairs(cfg.pens) do
-        -- The same shape the record accepts: anything else could not sit in
-        -- a browser column
+        -- One word only, so a pen can sit in a space-delimited column
         if type(name) ~= "string" or not name:match("^%w[%w_-]*$") then
             return fail("pens", ("%s is not a pen name; use a word"):format(tostring(name)))
         end
@@ -181,8 +177,8 @@ local function validate(cfg)
         return fail("pen", ("expected a pen name or a table by kind, got %s"):format(type(cfg.pen)))
     end
 
-    -- Checked before their styles are read: indexing a number would throw, and
-    -- a validator that throws takes every entry point down with it
+    -- Indexing a number throws, and a validator that throws takes every entry
+    -- point down with it
     for _, section in ipairs({ "indicator", "preview", "editor", "browser" }) do
         if type(cfg[section]) ~= "table" then
             return fail(section, ("expected a table, got %s"):format(type(cfg[section])))
@@ -245,6 +241,7 @@ function M.resolve(raw)
     return merged, nil
 end
 
+---Resolve what the user put in `vim.g.sidenote`.
 ---@return sidenote.Config
 ---@return string|nil err
 function M.get()

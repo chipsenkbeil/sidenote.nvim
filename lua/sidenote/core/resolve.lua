@@ -16,19 +16,18 @@ local score = require("sidenote.core.score")
 ---@field col_start integer|nil first resolved byte column, when the tier knows one
 ---@field col_end integer|nil last resolved byte column, inclusive
 ---@field confidence number 0..1, and 1 for the exact tiers
----@field tier string ladder rung that decided, or "-" when none ran
+---@field tier string what decided the placement, or "-" when nothing ran
 ---@field candidates integer[]|nil competing start lines, when status is ambiguous
 ---@field guess sidenote.Placement|nil best rejected placement, offered but not applied
 
 ---Deterministic anchor resolution: a record plus file bytes in, a status and a
----range out. Never mutates the record, never touches a buffer.
+---range out.
+---
+---Never mutates the record.
 ---@class sidenote.core.resolve
 local M = {}
 
 ---Statuses the ladder can conclude with, in worsening order.
----
----Exported so a caller validating user input checks against the set this
----module actually produces rather than a copy of it.
 ---@type string[]
 M.STATUS_NAMES = { "attached", "drifted", "ambiguous", "orphaned", "filegone" }
 
@@ -39,6 +38,9 @@ for _, name in ipairs(M.STATUS_NAMES) do
 end
 
 ---Score at or above which a fuzzy match is placed.
+---
+---Measured, not chosen: a lower bar buys back few anchors and costs many wrong
+---placements, and a wrong placement points at code the note never meant.
 M.ACCEPT = 0.80
 
 ---Score at or above which a fuzzy match is offered as a guess but not placed.
@@ -53,18 +55,17 @@ M.GUESS = 0.60
 
 ---@param status sidenote.Status
 ---@param tier string
----@param opts sidenote.core.resolve.Outcome
+---@param outcome sidenote.core.resolve.Outcome
 ---@return sidenote.Resolution
-local function result(status, tier, opts)
-    opts = opts or {}
+local function result(status, tier, outcome)
     return {
         status = status,
         tier = tier,
-        line_start = opts.line_start,
-        line_end = opts.line_end,
-        confidence = opts.confidence or 0,
-        candidates = opts.candidates,
-        guess = opts.guess,
+        line_start = outcome.line_start,
+        line_end = outcome.line_end,
+        confidence = outcome.confidence or 0,
+        candidates = outcome.candidates,
+        guess = outcome.guess,
     }
 end
 
@@ -72,7 +73,7 @@ end
 ---@param lines string[]
 ---@param rec sidenote.Annotation
 ---@return integer[] starts
----@return integer height
+---@return integer height lines the anchor spans
 local function literal_hits(lines, rec)
     local anchor_lines = hash.split(rec.text)
     local height = #anchor_lines
@@ -86,6 +87,7 @@ local function literal_hits(lines, rec)
     return hits, height
 end
 
+---Sort `hits` in place, closest to `hint` first.
 ---@param hits integer[]
 ---@param hint integer
 local function nearest_first(hits, hint)
@@ -95,9 +97,10 @@ local function nearest_first(hits, hint)
 end
 
 ---How many of the captured context sides still surround a candidate placement.
----Exact here, unlike the fuzzy tier's graded comparison: this is a tie-break
----among candidates that already matched the anchor verbatim, so anything short
----of an exact context match is not evidence.
+---
+---The comparison is exact rather than graded: every candidate already matched
+---the anchor verbatim, so anything short of an exact context match is not
+---evidence either way.
 ---@param lines string[]
 ---@param rec sidenote.Annotation
 ---@param start integer
@@ -121,13 +124,12 @@ local function context_matches(lines, rec, start, height)
     return matched
 end
 
----Pick the single candidate whose context matches best, or nil when nothing
----matched or the best is tied.
+---Pick the single candidate whose context matches best.
 ---@param lines string[]
 ---@param rec sidenote.Annotation
 ---@param hits integer[]
 ---@param height integer
----@return integer|nil
+---@return integer|nil start nil when no context matched or the best was tied
 local function disambiguate(lines, rec, hits, height)
     local best, best_score, tied = nil, -1, false
     for _, n in ipairs(hits) do
@@ -161,6 +163,7 @@ local function normalized_hits(lines, rec, height)
     return hits
 end
 
+---Resolve where `rec`'s anchor sits in `content` now.
 ---@param rec sidenote.Annotation
 ---@param content string|nil nil when the file no longer exists
 ---@return sidenote.Resolution
@@ -170,22 +173,22 @@ function M.resolve(rec, content)
         return result("filegone", "-", {})
     end
 
-    -- L0: the file is byte-identical to capture time
-    if hash.sha256(content) == rec.file_sha then
-        return result("attached", "L0", {
-            line_start = rec.scope ~= "file" and rec.line_start or nil,
-            line_end = rec.scope ~= "file" and rec.line_end or nil,
-            confidence = 1,
-        })
-    end
-
     -- A file-scoped note has no text anchor; the file existing is enough
     if rec.scope == "file" then
         return result("attached", "L0", { confidence = 1 })
     end
 
-    -- Capture refuses blank selections; a legacy record with no anchor text
-    -- cannot be searched for, and honesty beats a ghost attach
+    -- L0: the file is byte-identical to capture time
+    if hash.sha256(content) == rec.file_sha then
+        return result("attached", "L0", {
+            line_start = rec.line_start,
+            line_end = rec.line_end,
+            confidence = 1,
+        })
+    end
+
+    -- A record with no anchor text cannot be searched for, and an honest
+    -- orphan beats a ghost attach
     if rec.text == "" then
         return result("orphaned", "-", {})
     end
@@ -210,6 +213,7 @@ function M.resolve(rec, content)
             confidence = 1,
         })
     end
+
     -- L3: several verbatim hits; let the captured context break the tie
     if #hits > 1 then
         nearest_first(hits, rec.line_start)
@@ -246,8 +250,9 @@ function M.resolve(rec, content)
         return result("ambiguous", "L4", { candidates = norm })
     end
 
-    -- L6, never L5, which was reserved for a treesitter tier and cut unbuilt.
-    -- Two thresholds: a guess shown as truth is worse than an honest orphan
+    -- L6, not L5: L5 names a treesitter tier this ladder does not implement
+    --
+    -- Two thresholds, since a guess shown as truth is worse than an honest orphan
     local hit = score.best(lines, rec)
     if hit and hit.score >= M.ACCEPT then
         return result("drifted", "L6", {

@@ -8,36 +8,36 @@ local config = require("sidenote.config")
 ---@class sidenote.pen
 local M = {}
 
----@type string|nil pen chosen this session, meaningful only when chosen
-local active
+---The word standing in for no pen, in the ring and on the command line.
+local NONE = "none"
 
----@type boolean whether the session overrode the configured pen
-local chosen = false
+---@type {pen: string|nil}|nil the pen picked up this session, nil until one is
+local held
 
----The single pen held right now, or nil when none is.
+---Return the single pen held right now.
 ---
----A kind-split config holds no single pen, so this is nil until one is
----chosen; `for_kind` is what a capture asks.
+---A kind-split config holds no single pen, so the answer stays nil until one
+---is chosen.
 ---@param cfg? sidenote.Config
----@return string|nil
+---@return string|nil name pen held, nil when no single pen is up
 function M.get(cfg)
-    if chosen then
-        return active
+    if held then
+        return held.pen
     end
     local pen = (cfg or config.get()).pen
     return type(pen) == "string" and pen or nil
 end
 
----The pen a fresh capture of `kind` picks up.
+---Return the pen a fresh capture of `kind` picks up.
 ---
 ---A pen chosen this session wins outright — the user is holding it — then
 ---the config decides: one name inks both kinds, a table inks each its own.
 ---@param kind "note"|"todo"
 ---@param cfg? sidenote.Config
----@return string|nil
+---@return string|nil name pen to ink with, nil when neither names one
 function M.for_kind(kind, cfg)
-    if chosen then
-        return active
+    if held then
+        return held.pen
     end
     local pen = (cfg or config.get()).pen
     if type(pen) == "table" then
@@ -54,13 +54,13 @@ local function sync(cfg)
     vim.g.sidenote_state = state
 end
 
----The ring the pen rotates through: none first, then the pens sorted.
+---List what the pen rotates through, none first and the pens sorted after.
 ---@param cfg? sidenote.Config
 ---@return string[] names with "none" standing in for no pen
 function M.ring(cfg)
-    local names = vim.tbl_keys((cfg or config.get()).pens or {})
+    local names = vim.tbl_keys((cfg or config.get()).pens)
     table.sort(names)
-    table.insert(names, 1, "none")
+    table.insert(names, 1, NONE)
     return names
 end
 
@@ -71,14 +71,14 @@ end
 ---@return string|nil err
 function M.set(name, cfg)
     cfg = cfg or config.get()
-    if name == "none" then
+    if name == NONE then
         name = nil
     end
-    if name ~= nil and not (cfg.pens or {})[name] then
+    if name ~= nil and not cfg.pens[name] then
         return false,
             ("unknown pen %q; expected one of %s"):format(name, table.concat(M.ring(cfg), ", "))
     end
-    active, chosen = name, true
+    held = { pen = name }
     sync(cfg)
     return true, nil
 end
@@ -89,7 +89,7 @@ end
 function M.cycle(cfg)
     cfg = cfg or config.get()
     local ring = M.ring(cfg)
-    local now = M.get(cfg) or "none"
+    local now = M.get(cfg) or NONE
     local at = 1
     for i, name in ipairs(ring) do
         if name == now then
@@ -103,7 +103,7 @@ end
 
 ---Forget the session's choice, falling back to the configured pen.
 function M.reset()
-    active, chosen = nil, false
+    held = nil
 end
 
 return M

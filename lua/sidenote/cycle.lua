@@ -5,16 +5,15 @@ local store = require("sidenote.store")
 
 ---Rotates a note's kind, state or pen, from wherever the note is visible.
 ---
----One writer serves the browser's `t`/`T`, the source-buffer plugs and the
----menu, so the rings and the write path can never drift apart.
+---Every surface that rotates one comes through here, so the rings and the
+---write path can never drift apart.
 ---@class sidenote.cycle
 local M = {}
 
 ---The values a field rotates through, in a stable order.
 ---
 ---A pen's ring opens with the `-` placeholder, so cycling can put the pen
----back down; the configured names follow, sorted, since a table has no
----order of its own.
+---back down; the configured names follow, sorted.
 ---@param field "kind"|"state"|"pen"
 ---@param cfg sidenote.Config
 ---@return string[]
@@ -25,7 +24,7 @@ function M.ring(field, cfg)
     if field == "state" then
         return record.STATE_NAMES
     end
-    local names = vim.tbl_keys(cfg.pens or {})
+    local names = vim.tbl_keys(cfg.pens)
     table.sort(names)
     table.insert(names, 1, render.NO_PEN)
     return names
@@ -62,7 +61,7 @@ end
 ---Set a field of a note and repaint what shows it.
 ---@param entry sidenote.session.Entry
 ---@param opts sidenote.cycle.SetOpts
----@return boolean ok
+---@return boolean ok false when the note is gone from the store or the write failed
 function M.set(entry, opts)
     local rec = store.read(entry.root, entry.id)
     if not rec then
@@ -80,11 +79,10 @@ function M.set(entry, opts)
     return true
 end
 
----Rotate a field of the note under the cursor, telling the user where it
----landed — the sign column says nothing about state, so the words must.
+---Rotate a field of the note under the cursor, telling the user where it landed.
 ---@param field "kind"|"state"|"pen"
 ---@param offset integer 1 forward, -1 backward
----@return boolean turned false when no note sits under the cursor
+---@return boolean turned false when no note sits under the cursor or the write failed
 function M.at_cursor(field, offset)
     local cfg = config.get()
     local entry = require("sidenote").at_cursor()

@@ -1,7 +1,8 @@
 local vimdoc = require("scripts.vimdoc")
 
+---Render `markdown` as the lines of a help file.
 ---@param markdown string
----@param opts? sidenote.vimdoc.Opts
+---@param opts? scripts.vimdoc.Opts front matter, defaulting to a demo plugin
 ---@return string[]
 local function render(markdown, opts)
     local lines = {}
@@ -14,6 +15,7 @@ local function render(markdown, opts)
     )
 end
 
+---Render `markdown` as one help-file string.
 ---@param markdown string
 ---@return string
 local function text(markdown)
@@ -22,12 +24,11 @@ end
 
 ---Find the rendered line carrying `needle`, and the one before it.
 ---
----Rendered output opens with the title and the table of contents, so a section
----never sits at a fixed index.
+---Raises when nothing matches.
 ---@param lines string[]
 ---@param needle string Lua pattern the wanted line matches
 ---@return string line
----@return string previous
+---@return string previous line above the match, empty when it is the first
 local function locate(lines, needle)
     for i, line in ipairs(lines) do
         if line:find(needle) then
@@ -51,8 +52,7 @@ describe("vimdoc headings", function()
     end)
 
     it("honours an explicit tag directive over the derived one", function()
-        -- The whole point of owning the emitter: a tag is a promise to users,
-        -- not something a heading rename may silently break
+        -- A tag is a promise to users, and a heading rename must not break it
         local out = render("<!-- vimdoc:tag demo-start -->\n## Getting started\n")
         assert.contains(locate(out, "^1%. Getting"), "*demo-start*")
         assert.falsy(table.concat(out, "\n"):find("demo-getting-started", 1, true))
@@ -65,8 +65,7 @@ describe("vimdoc headings", function()
     end)
 
     it("treats a level-one heading as the document title, not a section", function()
-        -- The README opens with the project name; repeating it as a section
-        -- would push every real section down by one
+        -- Repeating the project name as a section pushes every real one down
         local out = text("# demo.nvim\n\n## First\n\nprose\n")
         assert.contains(out, "1. First")
         assert.falsy(out:find("DEMO.NVIM", 1, true))
@@ -102,8 +101,6 @@ describe("vimdoc front matter", function()
     end)
 
     it("keeps every line inside the page, however long a heading is", function()
-        -- Two ways a heading can overflow: the entry in the contents, and the
-        -- heading line itself with its tag beside it
         local long = "## " .. ("Extremely wordy section title "):rep(3) .. "\n\nprose\n"
         local out = render(long)
         for _, line in ipairs(out) do
@@ -198,8 +195,7 @@ describe("vimdoc directives", function()
     end)
 
     it("gives an anchor directive a right-aligned tag of its own", function()
-        -- Verbatim, not slugified: `:Demo` is the tag a reader types, and a
-        -- derived one would be a different promise
+        -- A slugified tag would not be the `:Demo` a reader types
         local line = locate(render("## S\n\n<!-- vimdoc:anchor :Demo -->\n\nprose\n"), "%*:Demo%*")
         assert.contains(line, "*:Demo*")
         assert.eq(#line, 78)

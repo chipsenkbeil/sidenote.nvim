@@ -54,7 +54,7 @@ local function press(keys)
 end
 
 ---@return integer
-local function windows()
+local function window_count()
     return #vim.api.nvim_tabpage_list_wins(0)
 end
 
@@ -73,10 +73,9 @@ describe("browser placement", function()
     end)
 
     after_each(function()
-        -- Close the tracked note window through the tracker, or a later
-        -- spec's editor.open would reuse the window this one leaves behind
+        -- A note window left open is reused by the next spec's editor.open
         local editor = require("sidenote.editor")
-        if editor.winid() and #vim.api.nvim_tabpage_list_wins(0) == 1 then
+        if editor.winid() and window_count() == 1 then
             vim.cmd.split()
         end
         require("sidenote.window").close(editor.winid())
@@ -103,11 +102,11 @@ describe("browser placement", function()
         local source = project_buffer()
         annotate(source, 1)
         assert(browser.open(source, { config = opts() }))
-        local opened = windows()
+        local opened = window_count()
 
         press("<C-w>p")
         assert(browser.open(source, { config = opts() }))
-        assert.eq(windows(), opened, "the second open made no second window")
+        assert.eq(window_count(), opened, "the second open made no second window")
     end)
 
     it("keeps the takeover behavior under style current", function()
@@ -115,29 +114,28 @@ describe("browser placement", function()
         annotate(source, 1)
         vim.api.nvim_win_set_buf(0, source)
         local before = vim.api.nvim_get_current_win()
-        local count = windows()
+        local count = window_count()
 
         local listing = assert(browser.open(source, { config = opts("current") }))
 
         assert.eq(vim.api.nvim_get_current_win(), before)
-        assert.eq(windows(), count)
+        assert.eq(window_count(), count)
         assert.eq(vim.api.nvim_win_get_buf(before), listing)
     end)
 
     it("widens in place rather than opening a second surface", function()
-        local source, path = project_buffer()
+        local source = project_buffer()
         annotate(source, 1)
         assert(browser.open(source, { config = opts() }))
         local winid = vim.api.nvim_get_current_win()
-        local count = windows()
+        local count = window_count()
 
         press("-")
 
         assert.eq(vim.api.nvim_get_current_win(), winid)
-        assert.eq(windows(), count)
+        assert.eq(window_count(), count)
         local name = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(winid))
         assert.match(name, "/$", "the trailing slash marks a project listing")
-        local _ = path
     end)
 
     it("gf from a split lands in the window you came from", function()

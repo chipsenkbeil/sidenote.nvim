@@ -1,7 +1,6 @@
 ---The runner cannot test itself in-process, so these drive a nested one.
----Each writes a throwaway spec, runs `nvim -l spec/runner.lua` on it, and
----reads the summary line the way `make test` does.
 
+---Run `body` as a spec in a nested runner process.
 ---@param body string spec source to run
 ---@return string output stdout and stderr, interleaved
 ---@return integer code
@@ -16,8 +15,7 @@ end
 
 describe("the runner's hook handling", function()
     it("fails only the affected test when a before_each throws", function()
-        -- Unprotected, the first hook failure would kill the whole run and
-        -- every later spec would silently not execute
+        -- Unprotected, one hook failure would kill the run and silently skip every later spec
         local out, code = nested([[
             describe("with a broken hook", function()
                 before_each(function()

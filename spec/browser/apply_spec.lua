@@ -2,6 +2,7 @@ local apply = require("sidenote.browser.apply")
 local browser = require("sidenote.browser")
 local capture = require("sidenote.capture")
 local diff = require("sidenote.browser.diff")
+local parse = require("sidenote.browser.parse")
 local store = require("sidenote.store")
 
 ---@return sidenote.Config
@@ -69,18 +70,6 @@ end
 
 ---@param state sidenote.browser.State
 ---@param id string
----@return sidenote.Annotation
-local function stored(state, id)
-    for _, row in ipairs(state.rows) do
-        if row.entry.id == id then
-            return assert(store.read(row.entry.root, id))
-        end
-    end
-    error("no such annotation: " .. id)
-end
-
----@param state sidenote.browser.State
----@param id string
 ---@return string
 local function root_of(state, id)
     for _, row in ipairs(state.rows) do
@@ -91,12 +80,18 @@ local function root_of(state, id)
     error("no such annotation: " .. id)
 end
 
----Edit the browser's own lines and diff them, which is what :w does.
+---@param state sidenote.browser.State
+---@param id string
+---@return sidenote.Annotation
+local function stored(state, id)
+    return assert(store.read(root_of(state, id), id))
+end
+
+---Diff edits to the browser's own lines, which is what :w does.
 ---@param state sidenote.browser.State
 ---@param edited string[]
 ---@return sidenote.browser.Action[]
 local function actions_from(state, edited)
-    local parse = require("sidenote.browser.parse")
     local rows, errors = parse.buffer(edited)
     assert.eq_deep(errors, {}, "the edited buffer did not parse")
     return diff.compute(state, rows)

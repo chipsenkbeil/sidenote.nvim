@@ -1,6 +1,7 @@
 local buffer = require("sidenote.buffer")
 local config = require("sidenote.config")
 local id = require("sidenote.util.id")
+local pen = require("sidenote.pen")
 local project = require("sidenote.store.project")
 local record = require("sidenote.core.record")
 local store = require("sidenote.store")
@@ -14,7 +15,7 @@ local vcs = require("sidenote.store.vcs")
 
 ---@class sidenote.capture.Opts
 ---@field scope "file"|"lines"|"range" what to capture
----@field range? integer[] line_start, col_start, line_end, col_end, with 1-indexed lines
+---@field range? integer[] line_start, col_start, line_end, col_end, lines 1-indexed; required outside file scope
 ---@field kind? "note"|"todo" defaults to note
 ---@field config? sidenote.Config resolved config, read from vim.g when omitted
 
@@ -48,6 +49,7 @@ function M.run(bufnr, opts)
     local root = roots[1]
 
     local project_root = project.root(target.path)
+    local kind = opts.kind or "note"
     local rec = record.capture({
         id = id.new(),
         project_key = project.key(project_root or vim.fn.fnamemodify(target.path, ":h")),
@@ -58,8 +60,8 @@ function M.run(bufnr, opts)
         col_start = target.col_start,
         col_end = target.col_end,
         content = target.content,
-        kind = opts.kind,
-        pen = require("sidenote.pen").for_kind(opts.kind or "note", cfg),
+        kind = kind,
+        pen = pen.for_kind(kind, cfg),
         vcs = vcs.probe(target.path),
         now = os.date("!%Y-%m-%dT%H:%M:%SZ"),
     })

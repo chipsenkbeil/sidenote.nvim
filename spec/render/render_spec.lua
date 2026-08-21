@@ -1,18 +1,18 @@
 local render = require("sidenote.render")
 local highlight = require("sidenote.highlight")
 
+local LINES = { "one", "two", "three", "four", "five" }
+
 ---@param lines string[]
----@return integer
+---@return integer bufnr
 local function scratch(lines)
     local bufnr = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     return bufnr
 end
 
-local LINES = { "one", "two", "three", "four", "five" }
-
 ---@param bufnr integer
----@return table[]
+---@return table[] marks extmark rows of id, 0-based row, 0-based column, details
 local function marks(bufnr)
     return vim.api.nvim_buf_get_extmarks(bufnr, render.NAMESPACE, 0, -1, { details = true })
 end
@@ -95,6 +95,7 @@ describe("render.paint", function()
                 top, top_priority = mark[4].sign_text, mark[4].priority
             end
         end
+
         -- Sign text is padded to two cells on its way in
         assert.eq(vim.trim(top), highlight.SIGNS.orphaned)
     end)
@@ -186,7 +187,6 @@ describe("render.paint", function()
     end)
 
     it("falls back to the status ink for a pen the caller does not know", function()
-        -- A pen dropped from the config degrades rather than erroring
         local bufnr = scratch(LINES)
         render.paint(
             bufnr,
@@ -258,7 +258,6 @@ describe("render.paint", function()
     end)
 
     it("signs a healthy open todo as an unchecked box", function()
-        -- Kind shows only while the anchor is exact; hurt stays louder
         local bufnr = scratch(LINES)
         render.paint(bufnr, {
             {
@@ -447,7 +446,6 @@ end)
 
 describe("render.paint span styles", function()
     it("gives underline a different look from highlight", function()
-        -- They were the same mark, so the option did nothing
         local bufnr = scratch(LINES)
         local entries = { { id = "1", status = "attached", line_start = 2, line_end = 2 } }
 

@@ -2,12 +2,14 @@ local window = require("sidenote.window")
 
 ---One cheat sheet for every listing surface, answering `g?` the way oil does.
 ---
----A surface passes the same actions table its keys were bound from, so the
+---The caller passes the same actions table its keys were bound from, so the
 ---help can never drift from what the keys do.
 ---@class sidenote.help
 local M = {}
 
----Show `actions` as a float; `q`, `<Esc>` and `g?` close it again.
+---Show `actions` as a float.
+---
+---`q`, `<Esc>` and `g?` close it again.
 ---@param actions {lhs: string, desc: string}[] the mappings, in binding order
 ---@param opts? {footer?: string[]} extra lines below the mappings
 function M.show(actions, opts)

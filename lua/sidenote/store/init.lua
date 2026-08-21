@@ -32,7 +32,14 @@ function M.paths(root, id, filetype)
     return { meta = M.meta_path(root, id), prose = M.prose_path(root, id, filetype) }
 end
 
----Write `content` through a hidden sibling and a rename.
+---Annotation id a metadata filename carries, or nil when it is not one.
+---@param name string basename within a store root
+---@return string|nil
+local function meta_id(name)
+    return name:match("^(.+)%.metadata%.json$")
+end
+
+---Write `content` atomically.
 ---
 ---In-place truncation destroys the old bytes before the new ones land, so an
 ---interrupted write costs the whole file. A rename replaces it or leaves it.
@@ -99,10 +106,8 @@ end
 
 ---Write a note's prose, the one sanctioned path into a user-owned file.
 ---
----Every other write in this module touches metadata alone. This exists because
----the browser lets prose be edited in place, and it runs only as the direct
----application of text the user typed and then confirmed — never on capture,
----never on write-back, never on repair.
+---Runs only as the direct application of text the user typed and then
+---confirmed — never on capture, never on write-back, never on repair.
 ---@param opts sidenote.store.WriteProseOpts
 ---@return boolean ok
 ---@return string|nil err
@@ -111,7 +116,9 @@ function M.write_prose(opts)
     return write_file(path, table.concat(opts.lines, "\n") .. "\n")
 end
 
----Persist a changed record. Touches metadata only.
+---Persist a changed record.
+---
+---Touches metadata only; prose on disk is left alone.
 ---@param root string
 ---@param rec sidenote.Annotation
 ---@return boolean ok
@@ -126,8 +133,8 @@ end
 
 ---@param root string
 ---@param id string
----@return sidenote.Annotation|nil
----@return string|nil err
+---@return sidenote.Annotation|nil rec nil when the id is absent or its metadata is corrupt
+---@return string|nil err set only when metadata is present and failed to decode
 function M.read(root, id)
     local raw = read_file(M.meta_path(root, id))
     if not raw then
@@ -138,15 +145,13 @@ end
 
 ---Path of the prose file that actually exists for an annotation.
 ---
----Reads and edits fall back to whatever extension is on disk rather than
----trusting the configured one. A store written while `filetype` was `org` has
----to stay usable after that setting changes, and a headless run has no user
----config to consult at all. Only creating a new note uses the configured
----extension unconditionally.
+---Reads and edits take whatever extension is on disk rather than trusting the
+---configured one: a store written while `filetype` was `org` stays usable once
+---that setting changes, and a headless run has no user config to consult.
 ---@param root string
 ---@param id string
 ---@param filetype string extension to prefer
----@return string|nil
+---@return string|nil path nil when the annotation has no prose file
 function M.prose_file(root, id, filetype)
     local preferred = M.prose_path(root, id, filetype)
     if vim.uv.fs_stat(preferred) then
@@ -162,7 +167,7 @@ function M.prose_file(root, id, filetype)
         if not name then
             return nil
         end
-        if name:sub(1, #id + 1) == id .. "." and not name:match("%.metadata%.json$") then
+        if name:sub(1, #id + 1) == id .. "." and not meta_id(name) then
             return root .. "/" .. name
         end
     end
@@ -171,7 +176,7 @@ end
 ---Path a note's prose is edited at: the file that exists, or the configured
 ---one when none does.
 ---
----Every surface that opens or rewrites prose resolves through this, so a
+---Every caller that opens or rewrites prose resolves through this, so a
 ---changed `filetype` can never fork one note across two files.
 ---@param root string
 ---@param id string
@@ -191,9 +196,6 @@ function M.prose(root, id, filetype)
 end
 
 ---First non-blank line of a note's prose, trimmed, or nil when it has none.
----
----What ambient indicators show without carrying the whole document; a file
----of nothing but whitespace counts as no prose at all.
 ---@param root string
 ---@param id string
 ---@param filetype string
@@ -226,7 +228,7 @@ function M.ids(root)
         if not name then
             break
         end
-        local id = name:match("^(.+)%.metadata%.json$")
+        local id = meta_id(name)
         if id then
             ids[#ids + 1] = id
         end

@@ -14,7 +14,7 @@ end
 ---Open a fresh note for writing, seeded by the user's template.
 ---
 ---The seed goes into the buffer alone, never the file: the prose file stays
----empty until the user's own `:write`, which is what invariant 3 means.
+---empty until the user's own `:write`.
 ---@param result sidenote.capture.Result
 ---@param cfg sidenote.Config
 local function compose(result, cfg)
@@ -54,10 +54,10 @@ function M.add(opts)
     local bufnr = vim.api.nvim_get_current_buf()
     local result, err = require("sidenote.capture").run(bufnr, opts)
     if result then
-        local cfg = (opts and opts.config) or config()
-        -- A toggle hid the highlights for a moment; a capture is the moment
-        -- ending, since a half-hidden new mark reads as a failed capture
+        local cfg = opts.config or config()
         local render = require("sidenote.render")
+
+        -- A new mark left hidden by a toggle reads as a failed capture
         if render.suppressed(bufnr) then
             render.toggle(bufnr, cfg.indicator.highlight)
             require("sidenote.session").refresh(bufnr, cfg)
@@ -90,8 +90,6 @@ function M.at_cursor(entries)
     local best, whole
     for _, entry in ipairs(entries or M.entries()) do
         if entry.line_start and line >= entry.line_start and line <= entry.line_end then
-            -- Overlaps are legal; the most specific note is the one the
-            -- cursor position is talking about
             local width = entry.line_end - entry.line_start
             if not best or width < best.line_end - best.line_start then
                 best = entry
@@ -200,16 +198,13 @@ end
 ---@field view? boolean also glance at the annotation you land on
 
 ---Jump to an adjacent annotation, previewing it only when asked.
----
----The fused motion is what makes a preview-on-landing feel live, which is
----why `view` needs no cursor-following machinery.
 ---@param direction "next"|"prev"
 ---@param opts? sidenote.JumpOpts
 ---@return boolean moved
 local function jump(direction, opts)
-    -- Jumps honor the view: landing on an invisible note reads as a broken
-    -- jump, not as a narrowed one
     local session = require("sidenote.session")
+
+    -- Landing on a note the view hides reads as a broken jump
     local entries = require("sidenote.filter").narrow(M.entries(), session.viewing())
     local target = require("sidenote.navigate")[direction](entries, vim.fn.line("."))
     if not target then
@@ -269,8 +264,9 @@ function M.qflist(opts)
     return require("sidenote.list").qflist(opts)
 end
 
----Delete the annotation under the cursor, after a confirmation that quotes
----the prose it would destroy.
+---Delete the annotation under the cursor, after confirming.
+---
+---The confirmation quotes the prose it would destroy.
 ---@return boolean deleted
 function M.delete()
     local entry = M.at_cursor()
@@ -309,7 +305,7 @@ function M.statusline()
     if not name then
         return ""
     end
-    local group = (cfg.pens or {})[name]
+    local group = cfg.pens[name]
     if not group then
         return name
     end

@@ -4,7 +4,9 @@
 ---rebuilt before each test and torn down after, so the autocmds it installs
 ---cannot fire during any other spec.
 
+local editor = require("sidenote.editor")
 local store = require("sidenote.store")
+local window = require("sidenote.window")
 
 local LINES = { "local a = 1", "local b = 2", "local c = 3", "local d = 4", "local e = 5" }
 
@@ -18,7 +20,7 @@ local function project()
     return assert(vim.uv.fs_realpath(root))
 end
 
----The one record a test's capture wrote.
+---Read the one record a test's capture wrote.
 ---@param root string
 ---@return sidenote.Annotation
 local function only_record(root)
@@ -32,14 +34,14 @@ end
 ---Left open, a later spec's `editor.open` would reuse it instead of
 ---splitting, and every window assertion there changes meaning.
 local function put_away()
-    local winid = require("sidenote.editor").winid()
+    local winid = editor.winid()
     if not winid then
         return
     end
     if #vim.api.nvim_tabpage_list_wins(0) == 1 then
         vim.cmd.split()
     end
-    require("sidenote.window").close(winid)
+    window.close(winid)
 end
 
 ---Run `:Sidenote add` over `range` and put away the note editor it opens.
@@ -92,8 +94,6 @@ describe("the :Sidenote command", function()
     end)
 
     it("writes a moved anchor back on :write", function()
-        -- The full loop: annotate, edit the code above, save, and the record
-        -- on disk follows the code
         local root = project()
         vim.cmd.edit(root .. "/code.lua")
         add("3")
@@ -353,6 +353,7 @@ describe("the :Sidenote command", function()
         end)
         assert.not_nil(only_record(root).pen)
 
+        -- Deleting asks before it acts, so the answer is stubbed
         local original = vim.fn.confirm
         vim.fn.confirm = function()
             return 1
@@ -551,7 +552,7 @@ describe("the :Sidenote command", function()
             return found
         end
 
-        -- On out of the box; the toggle takes it away and brings it back
+        -- Highlighting is on out of the box
         assert.eq(range_marks(), 1)
         vim.cmd("Sidenote highlight")
         assert.eq(range_marks(), 0)
@@ -560,8 +561,6 @@ describe("the :Sidenote command", function()
     end)
 
     it("lets the mark track an edit, and :w re-baselines the record to it", function()
-        -- Inserting a line inside a span grows the mark over it: the mark is
-        -- the truth while you edit, and saving writes that truth back
         vim.g.sidenote = { strategy = "project", indicator = { highlight = "always" } }
         local root = project()
         vim.cmd.edit(root .. "/code.lua")

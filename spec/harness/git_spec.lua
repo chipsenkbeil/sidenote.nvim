@@ -1,7 +1,7 @@
 local git = require("harness.git")
 
----Build a throwaway repo with a known history, return its path.
----@return string
+---Build a throwaway repo with a known history.
+---@return string dir path to the new repository
 local function fixture()
     local dir = vim.fn.tempname()
     vim.fn.mkdir(dir, "p")

@@ -1,5 +1,9 @@
 local browser = require("sidenote.browser")
 local capture = require("sidenote.capture")
+local highlight = require("sidenote.highlight")
+local render = require("sidenote.render")
+local session = require("sidenote.session")
+local store = require("sidenote.store")
 
 ---@return sidenote.Config
 local function opts()
@@ -40,12 +44,11 @@ end
 ---@param prose? string[] written into the note's file when given
 ---@return sidenote.capture.Result
 local function annotate(bufnr, line, prose)
-    local result = assert(
-        capture.run(bufnr, { scope = "lines", range = { line, 0, line, 0 }, config = opts() })
-    )
+    local cfg = opts()
+    local result =
+        assert(capture.run(bufnr, { scope = "lines", range = { line, 0, line, 0 }, config = cfg }))
     if prose then
-        local store = require("sidenote.store")
-        local fh = assert(io.open(store.prose_path(result.root, result.id, "org"), "w"))
+        local fh = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
         fh:write(table.concat(prose, "\n") .. "\n")
         fh:close()
     end
@@ -57,8 +60,8 @@ local function press(keys)
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, false, true), "x", false)
 end
 
----The one floating window on screen, or nil.
----@return integer|nil
+---Find the one floating window on screen.
+---@return integer|nil winid nil when no float is open
 local function floating()
     for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
         if vim.api.nvim_win_get_config(winid).relative ~= "" then
@@ -186,9 +189,8 @@ describe("verbs aimed at a listing", function()
         local listing = assert(browser.open(source, { config = opts() }))
         vim.api.nvim_set_current_buf(listing)
 
-        require("sidenote.session").refresh(listing, opts())
-        local marks =
-            vim.api.nvim_buf_get_extmarks(listing, require("sidenote.render").NAMESPACE, 0, -1, {})
+        session.refresh(listing, opts())
+        local marks = vim.api.nvim_buf_get_extmarks(listing, render.NAMESPACE, 0, -1, {})
         assert.eq(#marks, 1)
     end)
 end)
@@ -201,8 +203,7 @@ describe("browser gutter", function()
         annotate(source, 4)
         local listing = assert(browser.open(source, { config = opts() }))
 
-        local marks =
-            vim.api.nvim_buf_get_extmarks(listing, require("sidenote.render").NAMESPACE, 0, -1, {})
+        local marks = vim.api.nvim_buf_get_extmarks(listing, render.NAMESPACE, 0, -1, {})
         assert.eq(#marks, 0)
     end)
 
@@ -212,15 +213,10 @@ describe("browser gutter", function()
         vim.api.nvim_buf_set_lines(source, 0, -1, false, { "entirely", "different", "words" })
         local listing = assert(browser.open(source, { config = opts() }))
 
-        local marks = vim.api.nvim_buf_get_extmarks(
-            listing,
-            require("sidenote.render").NAMESPACE,
-            0,
-            -1,
-            { details = true }
-        )
+        local marks =
+            vim.api.nvim_buf_get_extmarks(listing, render.NAMESPACE, 0, -1, { details = true })
         assert.eq(#marks, 1)
-        assert.eq(vim.trim(marks[1][4].sign_text), require("sidenote.highlight").SIGNS.orphaned)
+        assert.eq(vim.trim(marks[1][4].sign_text), highlight.SIGNS.orphaned)
     end)
 
     it("never draws the range overlay in a listing, even toggled on there", function()
@@ -229,7 +225,6 @@ describe("browser gutter", function()
         local source = project_buffer()
         annotate(source, 4)
         vim.api.nvim_buf_set_lines(source, 0, -1, false, { "entirely", "different", "words" })
-        local render = require("sidenote.render")
 
         local listing = assert(browser.open(source, { config = opts() }))
         render.toggle(listing, "off")
@@ -280,11 +275,9 @@ describe("browser folding keys", function()
 end)
 
 describe("browser cycling", function()
-    local store = require("sidenote.store")
-
-    ---Cursor column where a header field starts, 0-based.
+    ---Find the cursor column where the `name` header field starts.
     ---@param name string
-    ---@return integer
+    ---@return integer col 0-based
     local function column_of(name)
         local text = vim.api.nvim_buf_get_lines(0, 0, 1, false)[1]
         local row = assert(require("sidenote.browser.parse").header(text))
@@ -366,13 +359,12 @@ describe("browser cycling", function()
         local cfg = opts()
         cfg.indicator = { style = "highlight" }
         annotate(source, 4)
-        require("sidenote.session").refresh(source, cfg)
+        session.refresh(source, cfg)
 
         vim.api.nvim_set_current_buf(assert(browser.open(source, { config = cfg })))
         vim.api.nvim_win_set_cursor(0, { 1, column_of("pen") })
         press("t")
 
-        local render = require("sidenote.render")
         local marks = vim.api.nvim_buf_get_extmarks(source, render.NAMESPACE, 0, -1, {
             details = true,
         })
@@ -422,9 +414,9 @@ describe("browser interactive filters", function()
         local source = project_buffer()
         annotate(source, 1)
         local result = annotate(source, 4)
-        local rec = assert(require("sidenote.store").read(result.root, result.id))
+        local rec = assert(store.read(result.root, result.id))
         rec.kind = "todo"
-        assert(require("sidenote.store").update(result.root, rec))
+        assert(store.update(result.root, rec))
 
         local listing = assert(browser.open(source, { config = opts() }))
         vim.api.nvim_set_current_buf(listing)
@@ -473,7 +465,7 @@ describe("browser interactive filters", function()
 end)
 
 describe("browser cursor", function()
-    ---The first column after the concealed marker on the listing's first line.
+    ---Find the first column after the concealed marker on the listing's first line.
     ---@param listing integer
     ---@return integer col 0-indexed, as the cursor API counts
     local function visible_start(listing)
@@ -516,7 +508,7 @@ describe("browser cursor", function()
         local listing = assert(browser.open(source, { config = opts() }))
 
         -- A word motion over a closed fold strands the cursor in the hidden
-        -- lines; the landing is simulated for the same reason as above
+        -- lines; headless never emits CursorMoved, so the landing is simulated
         vim.api.nvim_win_set_cursor(0, { 4, 5 })
         vim.api.nvim_exec_autocmds("CursorMoved", { buffer = listing })
         assert.eq_deep(vim.api.nvim_win_get_cursor(0), { 2, 0 })

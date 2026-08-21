@@ -1,15 +1,14 @@
 ---@meta
 ---LSP-only definitions for the globals `spec/runner.lua` injects into every
----spec file. The runtime implementations live at `spec/runner.lua` and
----`spec/assert.lua`; this file mirrors their surface so editors resolve
----`describe`, `it`, and `assert.eq` inside `spec/`.
+---spec file, implemented there and in `spec/assert.lua`.
 ---
----IMPORTANT: every `assert.*` helper is throw-on-failure. On failure it raises
----a Lua error at the test-body call site; the runner catches it and reports the
----test as failed. Later assertions in the same `it` block do not run.
+---Every `assert.*` helper throws on failure, so a failing assertion ends its
+---`it` block and nothing after it in that test runs.
 
----Group related tests. Nests arbitrarily; a nested group's reported name is its
----parents' names joined with its own.
+---Group related tests.
+---
+---Groups nest; a nested group's reported name is its parents' names joined
+---with its own.
 ---@param name string
 ---@param fn fun()
 function describe(name, fn) end
@@ -33,23 +32,23 @@ function after_each(fn) end
 ---@operator call:any
 assert = {}
 
----Assert two values are equal. Actual first, expected second.
----@param a any
----@param b any
+---Assert `actual` equals `expected`.
+---@param actual any
+---@param expected any
 ---@param msg? string
-function assert.eq(a, b, msg) end
+function assert.eq(actual, expected, msg) end
 
----Assert two values are not equal.
----@param a any
----@param b any
+---Assert `actual` does not equal `expected`.
+---@param actual any
+---@param expected any
 ---@param msg? string
-function assert.neq(a, b, msg) end
+function assert.neq(actual, expected, msg) end
 
----Assert deep structural equality, including matching entry counts.
----@param a any
----@param b any
+---Assert `actual` is structurally equal to `expected`, entry counts included.
+---@param actual any
+---@param expected any
 ---@param msg? string
-function assert.eq_deep(a, b, msg) end
+function assert.eq_deep(actual, expected, msg) end
 
 ---Assert value is truthy.
 ---@param v any
@@ -86,12 +85,16 @@ function assert.gte(a, b, msg) end
 function assert.lte(a, b, msg) end
 
 ---Assert string contains substring, matched literally.
----@param str string
+---@param str string?
 ---@param sub string
 ---@param msg? string
 function assert.contains(str, sub, msg) end
 
----Assert string matches a Lua pattern.
+---Assert `str` matches a Lua pattern.
+---
+---Escape metacharacters with `%`, or reach for `contains` when a literal match
+---is what you mean. Paths are a common trap: `-` and `.` are both pattern
+---syntax.
 ---@param str string?
 ---@param pattern string
 ---@param msg? string
@@ -110,7 +113,7 @@ function assert.is_nil(v, msg) end
 function assert.not_nil(v, msg) end
 
 ---Assert calling `fn` raises an error.
----@param fn function
+---@param fn fun()
 ---@param msg? string
 function assert.throws(fn, msg) end
 

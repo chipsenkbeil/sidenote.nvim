@@ -1,6 +1,6 @@
 ---@class sidenote.Location
 ---@field path string annotated file, as written in the location text
----@field scope "file"|"lines"|"range" derived from which parts were present
+---@field scope "file"|"lines"|"range" how much of the file the annotation covers
 ---@field line_start integer first line, 1-based, or 0 for file scope
 ---@field line_end integer last line, inclusive
 ---@field col_start integer first byte column, 1-based, or 0 when no column was given
@@ -14,11 +14,12 @@
 ---@class sidenote.location
 local M = {}
 
----A greedy split lets a path contain colons, but it will also happily read
----`a.lua:15:4-20` as the path `a.lua:15` with lines 4-20. Reject a captured
----path that still carries a position rather than accept the absurd reading.
----@param path string
----@return string|nil err
+---Reject a captured path that still carries a position.
+---
+---The greedy path capture is what lets a path hold colons, and it is also what
+---lets `a.lua:15:4-20` read as the path `a.lua:15` with lines 4-20.
+---@param path string captured path, which may still end in a position
+---@return string|nil err nil when the path carries no position
 local function reject_dangling_position(path)
     if path:match(":%d+$") or path:match("%-%d+$") then
         return "mixed forms are not allowed: write both sides as line or as line:col"
@@ -26,15 +27,16 @@ local function reject_dangling_position(path)
     return nil
 end
 
+---Parse `text` into a location, deriving its scope from the parts present.
 ---@param text string
 ---@return sidenote.Location|nil
----@return string|nil err
+---@return string|nil err why text is not a location
 function M.parse(text)
     if type(text) ~= "string" or text == "" then
         return nil, "empty location"
     end
 
-    -- Most specific first. `.*` is greedy, so a colon inside the path survives
+    -- Most specific first, since a shorter form's pattern also matches a longer one
     local path, ls, cs, le, ce = text:match("^(.*):(%d+):(%d+)%-(%d+):(%d+)$")
     if not path then
         path, ls, le = text:match("^(.*):(%d+)%-(%d+)$")
@@ -70,8 +72,7 @@ function M.parse(text)
         return nil, "location has a position but no path"
     end
 
-    -- Whether columns were WRITTEN, which is not the same as their value: a
-    -- literal `:0` is an invalid column, not an omitted one
+    -- A literal `:0` is an invalid column, not an omitted one
     local has_cols = cs ~= nil
     local line_start, line_end = tonumber(ls), tonumber(le)
     local col_start, col_end = tonumber(cs) or 0, tonumber(ce) or 0
@@ -122,12 +123,23 @@ function M.format(loc)
     return ("%s:%d-%d"):format(loc.path, loc.line_start, loc.line_end)
 end
 
----Check a location against real file content, clamping columns and rejecting
----anything out of range. Returns a copy; the input is never mutated.
+---Describe a line that falls past the end of the file it points into.
+---@param path string annotated file the line points into
+---@param line integer line that falls outside the file
+---@param count integer number of lines the file holds
+---@return string err
+local function past_end(path, line, count)
+    return ("line %d is past the end of %s, which has %d lines"):format(line, path, count)
+end
+
+---Check `loc` against real file content, clamping each column to its line's length.
+---
+---A line past the end of the file is refused rather than clamped, and `loc`
+---itself is never mutated.
 ---@param loc sidenote.Location
 ---@param content string|nil nil when the file does not exist
 ---@return sidenote.Location|nil
----@return string|nil err
+---@return string|nil err why loc does not fit the content
 function M.validate(loc, content)
     if content == nil then
         return nil, ("%s does not exist"):format(loc.path)
@@ -141,20 +153,10 @@ function M.validate(loc, content)
     local count = content == "" and 0 or #lines
 
     if loc.line_start > count then
-        return nil,
-            ("line %d is past the end of %s, which has %d lines"):format(
-                loc.line_start,
-                loc.path,
-                count
-            )
+        return nil, past_end(loc.path, loc.line_start, count)
     end
     if loc.line_end > count then
-        return nil,
-            ("line %d is past the end of %s, which has %d lines"):format(
-                loc.line_end,
-                loc.path,
-                count
-            )
+        return nil, past_end(loc.path, loc.line_end, count)
     end
 
     local out = vim.deepcopy(loc)

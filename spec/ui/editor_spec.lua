@@ -1,7 +1,9 @@
-local editor = require("sidenote.editor")
 local capture = require("sidenote.capture")
+local editor = require("sidenote.editor")
+local highlight = require("sidenote.highlight")
 local session = require("sidenote.session")
 local store = require("sidenote.store")
+local window = require("sidenote.window")
 
 ---@return sidenote.Config
 local function opts()
@@ -19,7 +21,7 @@ end
 
 local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
 
----Capture one annotation and return its entry and its source buffer.
+---Capture one annotation in a project of its own.
 ---@return sidenote.session.Entry
 ---@return integer source
 local function annotated()
@@ -58,12 +60,11 @@ describe("editor.open", function()
             vim.api.nvim_buf_get_name(bufnr),
             vim.uv.fs_realpath(store.prose_path(entry.root, entry.id, "org"))
         )
-        require("sidenote.window").close(winid)
+        window.close(winid)
     end)
 
     it("opens the file on disk when the configured extension has changed", function()
-        -- The note was written as org; asking for txt must not create an
-        -- empty second prose file beside it
+        -- Asking for txt must not create a second, empty prose file
         local entry = annotated()
         local winid = editor.open(entry, opts().editor, "txt")
         local bufnr = vim.api.nvim_win_get_buf(winid)
@@ -72,20 +73,20 @@ describe("editor.open", function()
             vim.uv.fs_realpath(store.prose_path(entry.root, entry.id, "org"))
         )
         assert.eq(vim.bo[bufnr].filetype, "org")
-        require("sidenote.window").close(winid)
+        window.close(winid)
     end)
 
     it("sets the configured filetype so the user's plugins apply", function()
         local winid = editor.open(annotated(), opts().editor, "org")
         assert.eq(vim.bo[vim.api.nvim_win_get_buf(winid)].filetype, "org")
-        require("sidenote.window").close(winid)
+        window.close(winid)
     end)
 
     it("leaves the cursor in the source buffer by default", function()
         local before = vim.api.nvim_get_current_win()
         local winid = editor.open(annotated(), opts().editor, "org")
         assert.eq(vim.api.nvim_get_current_win(), before)
-        require("sidenote.window").close(winid)
+        window.close(winid)
     end)
 
     it("moves the cursor into the note when focus is asked for", function()
@@ -93,7 +94,7 @@ describe("editor.open", function()
         config.focus = true
         local winid = editor.open(annotated(), config, "org")
         assert.eq(vim.api.nvim_get_current_win(), winid)
-        require("sidenote.window").close(winid)
+        window.close(winid)
     end)
 
     it("writes the user's prose through to the store", function()
@@ -104,7 +105,7 @@ describe("editor.open", function()
         vim.api.nvim_buf_call(bufnr, function()
             vim.cmd("silent write")
         end)
-        require("sidenote.window").close(winid)
+        window.close(winid)
 
         assert.eq(store.prose(entry.root, entry.id, "org"), "what I think about this\n")
     end)
@@ -125,7 +126,7 @@ describe("editor.open", function()
         local second = editor.open(annotated(), config, "org")
         assert.eq(first, second)
         assert.truthy(vim.api.nvim_win_is_valid(second))
-        require("sidenote.window").close(second)
+        window.close(second)
     end)
 
     it("reuses one window rather than stacking them", function()
@@ -133,16 +134,16 @@ describe("editor.open", function()
         local first = editor.open(entry, opts().editor, "org")
         local second = editor.open(entry, opts().editor, "org")
         assert.eq(first, second)
-        require("sidenote.window").close(second)
+        window.close(second)
     end)
 
     it("opens a fresh window after the previous one was closed", function()
         local entry = annotated()
         local first = editor.open(entry, opts().editor, "org")
-        require("sidenote.window").close(first)
+        window.close(first)
         local second = editor.open(entry, opts().editor, "org")
         assert.truthy(vim.api.nvim_win_is_valid(second))
-        require("sidenote.window").close(second)
+        window.close(second)
     end)
 end)
 
@@ -173,20 +174,14 @@ describe("editor.headline", function()
 
     it("swatches a penless note in its status ink", function()
         local entry = annotated()
-        assert.contains(
-            editor.headline(noted(entry)),
-            "%#" .. require("sidenote.highlight").MARKS.attached .. "#■"
-        )
+        assert.contains(editor.headline(noted(entry)), "%#" .. highlight.MARKS.attached .. "#■")
     end)
 
     it("shows a squiggle when the ink is the underline style", function()
         local entry = annotated()
         local note = noted(entry)
         note.config.indicator = { style = "underline" }
-        assert.contains(
-            editor.headline(note),
-            "%#" .. require("sidenote.highlight").UNDERLINES.attached .. "#~"
-        )
+        assert.contains(editor.headline(note), "%#" .. highlight.UNDERLINES.attached .. "#~")
     end)
 
     it("shows drift with its confidence, in the status color", function()
@@ -196,7 +191,7 @@ describe("editor.headline", function()
             { status = "drifted", line_start = 4, line_end = 4, confidence = 0.85, tier = "L6" }
         local bar = editor.headline(noted(entry))
         assert.contains(bar, "drifted 0.85")
-        assert.contains(bar, "%#" .. require("sidenote.highlight").GROUPS.drifted .. "#")
+        assert.contains(bar, "%#" .. highlight.GROUPS.drifted .. "#")
     end)
 
     it("escapes a path that carries a percent", function()
@@ -269,7 +264,7 @@ describe("editor DWIM context", function()
         vim.g.sidenote = nil
         local winid = editor.winid()
         if winid then
-            require("sidenote.window").close(winid)
+            window.close(winid)
         end
         vim.cmd("silent! %bwipeout!")
     end)
@@ -333,9 +328,9 @@ describe("editor DWIM context", function()
         local winid = editor.open(entry, opts().editor, "org")
         local bufnr = vim.api.nvim_win_get_buf(winid)
 
-        local rec = assert(store.read(entry.root, entry.id))
-        rec.kind = "todo"
-        assert(store.update(entry.root, rec))
+        local record = assert(store.read(entry.root, entry.id))
+        record.kind = "todo"
+        assert(store.update(entry.root, record))
         assert.truthy(editor.redecorate(bufnr))
         assert.contains(vim.wo[winid].winbar, "todo")
     end)
@@ -357,12 +352,10 @@ describe("editor.open context", function()
 
         local view = vim.api.nvim_win_call(winid, vim.fn.winsaveview)
         assert.eq(view.topfill, #marks[1][4].virt_lines, "the header must be on screen")
-        require("sidenote.window").close(winid)
+        window.close(winid)
     end)
 
     it("keeps the header above everything the user types", function()
-        -- Typing from the top of an empty note must not push the mark down
-        -- and leave the prose sitting above its own header
         local entry, source = annotated()
         entry.source = source
         local winid = editor.open(entry, opts().editor, "org")
@@ -371,7 +364,7 @@ describe("editor.open context", function()
         vim.api.nvim_buf_set_lines(bufnr, 0, 0, false, { "first thought", "second thought" })
         local placed = vim.api.nvim_buf_get_extmarks(bufnr, editor.NAMESPACE, 0, -1, {})
         assert.eq(placed[1][2], 0, "the header holds row zero")
-        require("sidenote.window").close(winid)
+        window.close(winid)
     end)
 
     it("pins the location into the winbar", function()
@@ -379,7 +372,7 @@ describe("editor.open context", function()
         entry.source = source
         local winid = editor.open(entry, opts().editor, "org")
         assert.contains(vim.wo[winid].winbar, "m.lua:4")
-        require("sidenote.window").close(winid)
+        window.close(winid)
     end)
 
     it("skips the header for a bare root-and-id note", function()
@@ -387,6 +380,6 @@ describe("editor.open context", function()
         local winid = editor.open({ root = entry.root, id = entry.id }, opts().editor, "org")
         local bufnr = vim.api.nvim_win_get_buf(winid)
         assert.eq(#vim.api.nvim_buf_get_extmarks(bufnr, editor.NAMESPACE, 0, -1, {}), 0)
-        require("sidenote.window").close(winid)
+        window.close(winid)
     end)
 end)

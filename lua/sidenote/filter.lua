@@ -5,7 +5,7 @@ local M = {}
 ---@class sidenote.Filter
 ---@field status? sidenote.Status keep only annotations the resolver put here
 ---@field kind? "note"|"todo" keep only notes or only requests to act
----@field state? string keep only one lifecycle position
+---@field state? "open"|"resolved"|"wontfix"|"archived" keep only one lifecycle position
 ---@field path? string keep only paths containing this, literally
 ---@field change? string keep only notes whose jj change id starts with this
 ---@field commit? string keep only notes whose commit id starts with this
@@ -39,7 +39,7 @@ end
 ---The entries of `entries` that pass `filter`.
 ---@param entries sidenote.session.Entry[]
 ---@param filter sidenote.Filter|nil nil keeps everything
----@return sidenote.session.Entry[]
+---@return sidenote.session.Entry[] kept `entries` itself when nothing narrows
 function M.narrow(entries, filter)
     if not filter or vim.tbl_isempty(filter) then
         return entries

@@ -12,7 +12,6 @@ local strategy = require("sidenote.store.strategy")
 ---@field root string store root the record came from
 ---@field record sidenote.Annotation the stored record
 ---@field resolution sidenote.Resolution what the resolver concluded
----@field summary string|nil first prose line, set by whoever built the entry
 
 ---Ties a buffer to the annotations that target it.
 ---@class sidenote.session
@@ -20,8 +19,8 @@ local M = {}
 
 ---Bind a record, the store it came from, and what the resolver concluded.
 ---
----The only constructor for `sidenote.session.Entry`, so a field added to that
----type cannot be forgotten by one of the places that build them.
+---The only constructor for `sidenote.session.Entry`: build one here rather
+---than by hand, so a field the type gains reaches every entry.
 ---@param root string store root the record was read from
 ---@param rec sidenote.Annotation
 ---@param resolution sidenote.Resolution
@@ -46,10 +45,10 @@ function M.entry(root, rec, resolution)
     }
 end
 
----What the mark tracking `rec` says, dressed as a resolution, or nil.
+---Read the mark tracking `rec` as a resolution.
 ---
----Usable only while a valid tracker exists: a collapsed or missing mark
----returns nil, sending the caller to the real resolver.
+---A collapsed or missing mark returns nil, sending the caller back to the
+---real resolver.
 ---@param bufnr integer
 ---@param rec sidenote.Annotation
 ---@return sidenote.Resolution|nil
@@ -121,16 +120,16 @@ function M.entries(bufnr, cfg)
     return entries
 end
 
----What painting and navigation currently show; empty shows everything.
+---What every surface currently shows; empty shows everything.
 ---@type sidenote.Filter
 local view = {}
 
----Narrow what buffers paint and navigation visits, everywhere at once.
+---Narrow what is painted and visited, everywhere at once.
 ---
----A display choice, not a data one: `entries` stays complete, so the
----browser's baseline, the exports and the cursor's own lookups never
----silently lose a note. Every loaded annotatable buffer repaints, and
----`vim.g.sidenote_state.show` mirrors the narrowing for statuslines.
+---A display choice, not a data one: `entries` stays complete, so nothing
+---reading a note's data silently loses one. Every loaded annotatable buffer
+---repaints, and `vim.g.sidenote_state.show` mirrors the narrowing for
+---statuslines.
 ---@param filter sidenote.Filter|nil nil or {} widens back to everything
 ---@return sidenote.Filter showing
 function M.view(filter)
@@ -154,7 +153,7 @@ function M.view(filter)
     return view
 end
 
----The narrowing in force, for whoever else must honor it.
+---Report the narrowing in force.
 ---@return sidenote.Filter
 function M.viewing()
     return view
@@ -169,18 +168,21 @@ end
 ---@return integer placed
 function M.refresh(bufnr, cfg)
     cfg = cfg or config.get()
-    -- An unannotatable buffer keeps whatever marks its owner painted; the
-    -- browser draws its status gutter into this same namespace
+
+    -- Marks in an unannotatable buffer belong to whoever painted them
     if not buffer.target(bufnr, { scope = "file" }) then
         return 0
     end
-    -- Hidden, not dropped: the tracker still places, so a narrowed view
-    -- never costs a note its live extent
+
     local survives = require("sidenote.filter").survives
     local entries = M.entries(bufnr, cfg)
+
+    -- Hidden, not dropped: the tracker still places, so a narrowed view
+    -- never costs a note its live extent
     for _, entry in ipairs(entries) do
         entry.hidden = not survives(entry, view)
     end
+
     return render.paint(bufnr, entries, {
         style = cfg.indicator.style,
         highlight = cfg.indicator.highlight,
@@ -188,7 +190,12 @@ function M.refresh(bufnr, cfg)
     })
 end
 
----What a save should write for one annotation, or nil to leave it alone.
+---@class sidenote.session.SaveOpts
+---@field content string full text of the saved buffer
+---@field file_sha string hash of that text
+---@field now string ISO-8601 instant of the save
+
+---Decide what a save writes for one annotation, or nil to leave it alone.
 ---
 ---Two sources, tried in order:
 ---
@@ -204,23 +211,21 @@ end
 ---guess, which includes the mark of a placement that was itself a guess.
 ---@param bufnr integer
 ---@param entry sidenote.session.Entry
----@param content string full text of the saved buffer
----@param file_sha string hash of that text
----@param now string ISO-8601 instant of the save
+---@param opts sidenote.session.SaveOpts
 ---@return sidenote.Annotation|nil
-local function rebaseline(bufnr, entry, content, file_sha, now)
+local function rebaseline(bufnr, entry, opts)
     local rec = entry.record
     local live = rec.scope ~= "file" and render.extent(bufnr, rec.id) or nil
     if live and not live.invalid and live.status == "attached" then
         return record.reanchor(rec, {
             path = rec.path,
-            content = content,
+            content = opts.content,
             scope = rec.scope,
             line_start = live.line_start,
             line_end = live.line_end,
             col_start = live.col_start > 0 and live.col_start or nil,
             col_end = live.col_end > 0 and live.col_end or nil,
-            now = now,
+            now = opts.now,
         })
     end
 
@@ -233,27 +238,26 @@ local function rebaseline(bufnr, entry, content, file_sha, now)
     if moved then
         return record.reanchor(rec, {
             path = rec.path,
-            content = content,
+            content = opts.content,
             scope = rec.scope,
             line_start = res.line_start,
             line_end = res.line_end,
             col_start = rec.col_start,
             col_end = rec.col_end,
-            now = now,
+            now = opts.now,
         })
     end
     local fresh = vim.deepcopy(rec)
-    fresh.file_sha = file_sha
-    fresh.verified = now
+    fresh.file_sha = opts.file_sha
+    fresh.verified = opts.now
     return fresh
 end
 
 ---Write anchors back after their buffer was saved.
 ---
----Only annotations whose file actually changed are touched; what each one
----gets is `rebaseline`'s decision — the live mark's tracked extent when the
----mark was placed exactly, the resolver's verdict otherwise, and nothing at
----all when either would be a guess.
+---Only annotations whose file actually changed are touched, and one is
+---left untouched whenever the buffer cannot say where its code went: a
+---good anchor is never overwritten with a guess.
 ---@param bufnr integer
 ---@param cfg? sidenote.Config
 ---@return integer written how many records were persisted
@@ -268,13 +272,16 @@ function M.written(bufnr, cfg)
     if not target then
         return 0
     end
-    local file_sha = hash.sha256(target.content)
-    local now = os.date("!%Y-%m-%dT%H:%M:%SZ")
+    local save = {
+        content = target.content,
+        file_sha = hash.sha256(target.content),
+        now = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+    }
 
     local written = 0
     for _, entry in ipairs(entries) do
-        if entry.record.file_sha ~= file_sha then
-            local fresh = rebaseline(bufnr, entry, target.content, file_sha, now)
+        if entry.record.file_sha ~= save.file_sha then
+            local fresh = rebaseline(bufnr, entry, save)
             if fresh and store.update(entry.root, fresh) then
                 written = written + 1
             end

@@ -1,9 +1,9 @@
----@class sidenote.vimdoc.Opts
+---@class scripts.vimdoc.Opts
 ---@field project string plugin name, used for the help file tag and every tag prefix
 ---@field description string one line shown beside the help file tag
 ---@field version string Neovim version the plugin targets
 
----@class sidenote.vimdoc.Block
+---@class scripts.vimdoc.Block
 ---@field kind "heading"|"anchor"|"paragraph"|"code"|"table" what the block renders as
 ---@field level integer|nil heading depth, for a heading
 ---@field text string|nil heading title, anchor tag, or paragraph body
@@ -14,28 +14,30 @@
 
 ---Markdown to vimdoc, in pure Lua.
 ---
----Written rather than borrowed so the emitter owns its help tags: a tag is a
----promise to a reader, and deriving every one of them from heading text means
----renaming a heading silently breaks `:help`. A `vimdoc:tag` directive pins the
----ones that matter.
----
 ---Handles the subset a plugin README actually uses: headings, paragraphs,
----fenced code, tables, and inline code, emphasis and links.
+---fenced code, tables, and inline code, emphasis and links. A tag is derived
+---from its heading text unless a `vimdoc:tag` directive pins it, so renaming an
+---unpinned heading changes what `:help` answers to.
 ---@class scripts.vimdoc
 local M = {}
 
 ---Columns a help file is wrapped to.
-M.WIDTH = 78
+local WIDTH = 78
 
 ---Spaces prefixing the body of a code block.
-M.INDENT = 4
+local INDENT = 4
 
----Longest a derived tag may be.
----
----A tag wider than the page cannot be shown beside anything, and one nobody can
----type is no better than none. Pin a short one with `vimdoc:tag` when a heading
----is genuinely long.
-M.MAX_TAG = 40
+---Longest a derived tag may be before it is truncated.
+local MAX_TAG = 40
+
+---Spaces separating two table columns.
+local COLUMN_GAP = "  "
+
+---Narrowest a table column may be squeezed to.
+local MIN_COLUMN = 8
+
+---Stands in for the tail of a title too wide for its contents entry.
+local ELLIPSIS = "..."
 
 ---@param text string
 ---@param project string
@@ -43,8 +45,8 @@ M.MAX_TAG = 40
 local function derive_tag(text, project)
     local slug = text:lower():gsub("[^%w%s-]", ""):gsub("%s+", "-")
     local tag = ("%s-%s"):format(project, slug)
-    if #tag > M.MAX_TAG then
-        tag = tag:sub(1, M.MAX_TAG):gsub("-+$", "")
+    if #tag > MAX_TAG then
+        tag = tag:sub(1, MAX_TAG):gsub("-+$", "")
     end
     return tag
 end
@@ -57,8 +59,8 @@ end
 ---@param project string
 ---@return string
 local function inline(text, project)
-    -- Help references first, before the backticks they sit inside are seen
     text = text:gsub("`:h[elp]*%s+([^`]+)`", "|%1|")
+
     -- A link within the document becomes the tag it points at, not a URL
     text = text:gsub("%[[^%]]+%]%(#([%w-]+)%)", function(anchor)
         return ("|%s-%s|"):format(project, anchor)
@@ -90,39 +92,36 @@ local function wrap(text, width)
     return out
 end
 
----A tag alone on its line, right-aligned.
----
----How a help file tags something that is not a section — a command, a variable
----— so it can be reached by name without inventing a heading for it.
+---Render a tag alone on its line, right-aligned.
 ---@param tag string
 ---@return string
 local function anchor(tag)
     local marked = ("*%s*"):format(tag)
-    return (" "):rep(math.max(0, M.WIDTH - #marked)) .. marked
+    return (" "):rep(math.max(0, WIDTH - #marked)) .. marked
 end
 
----A heading: title on the left, tag right-aligned to the full width.
+---Render a heading, title on the left and tag right-aligned to the full width.
 ---
----When the two cannot share a line the tag goes above on its own, which is what
----help files do and what keeps every line inside the page.
+---When the two cannot share a line the tag goes above on its own, so a long
+---title still fits the page.
 ---@param left string
 ---@param tag string
 ---@return string[]
 local function heading(left, tag)
     local marked = ("*%s*"):format(tag)
-    local gap = M.WIDTH - #left - #marked
+    local gap = WIDTH - #left - #marked
     if gap >= 1 then
         return { left .. (" "):rep(gap) .. marked }
     end
 
     local out = { anchor(tag) }
-    vim.list_extend(out, wrap(left, M.WIDTH))
+    vim.list_extend(out, wrap(left, WIDTH))
     return out
 end
 
 ---Split markdown into blocks, resolving directives as it goes.
 ---@param lines string[]
----@return sidenote.vimdoc.Block[]
+---@return scripts.vimdoc.Block[]
 local function parse(lines)
     local blocks = {}
     local paragraph, pending_tag, ignoring = {}, nil, false
@@ -203,7 +202,7 @@ local function parse(lines)
     return blocks
 end
 
----Column widths that fit the page, shrinking the widest column until they do.
+---Compute column widths that fit the page, shrinking the widest until they do.
 ---@param rows string[][]
 ---@return integer[]
 local function column_widths(rows)
@@ -215,21 +214,21 @@ local function column_widths(rows)
     end
 
     local function total()
-        local sum = 2 * (#widths - 1)
+        local sum = #COLUMN_GAP * (#widths - 1)
         for _, w in ipairs(widths) do
             sum = sum + w
         end
         return sum
     end
 
-    while total() > M.WIDTH do
+    while total() > WIDTH do
         local widest = 1
         for i, w in ipairs(widths) do
             if w > widths[widest] then
                 widest = i
             end
         end
-        if widths[widest] <= 8 then
+        if widths[widest] <= MIN_COLUMN then
             break
         end
         widths[widest] = widths[widest] - 1
@@ -244,8 +243,7 @@ local function render_table(rows, project)
     local widths = column_widths(rows)
     local out = {}
     for _, row in ipairs(rows) do
-        -- Each cell wraps within its own column, so a long value pushes its row
-        -- taller instead of pushing the table past the page
+        -- A long cell wraps within its column, growing its row, not the table
         local wrapped, height = {}, 1
         for i, cell in ipairs(row) do
             wrapped[i] = wrap(inline(cell, project), widths[i])
@@ -257,17 +255,17 @@ local function render_table(rows, project)
                 local piece = wrapped[i][line] or ""
                 parts[#parts + 1] = i == #row and piece or piece .. (" "):rep(widths[i] - #piece)
             end
-            out[#out + 1] = (table.concat(parts, "  "):gsub("%s+$", ""))
+            out[#out + 1] = (table.concat(parts, COLUMN_GAP):gsub("%s+$", ""))
         end
     end
     return out
 end
 
----@param blocks sidenote.vimdoc.Block[]
----@param opts sidenote.vimdoc.Opts
+---@param blocks scripts.vimdoc.Block[]
+---@param opts scripts.vimdoc.Opts
 ---@return string[]
 local function contents(blocks, opts)
-    local out = { ("="):rep(M.WIDTH) }
+    local out = { ("="):rep(WIDTH) }
     vim.list_extend(out, heading("Table of Contents", opts.project .. "-contents"))
     out[#out + 1] = ""
 
@@ -278,13 +276,12 @@ local function contents(blocks, opts)
             local tag = block.tag or derive_tag(block.text, opts.project)
             local link = ("|%s|"):format(tag)
             local left = ("  %d. %s"):format(index, block.text)
-            -- The link is the useful half, so an overlong title is what gives.
-            -- ASCII dots, since the budget here is bytes
-            local room = M.WIDTH - #link - 1
+            -- The link is the useful half, so an overlong title is what gives
+            local room = WIDTH - #link - 1
             if #left > room then
-                left = left:sub(1, room - 3) .. "..."
+                left = left:sub(1, room - #ELLIPSIS) .. ELLIPSIS
             end
-            out[#out + 1] = left .. (" "):rep(M.WIDTH - #left - #link) .. link
+            out[#out + 1] = left .. (" "):rep(WIDTH - #left - #link) .. link
         end
     end
     out[#out + 1] = ""
@@ -293,23 +290,23 @@ end
 
 ---Render markdown lines as a complete help file.
 ---@param lines string[]
----@param opts sidenote.vimdoc.Opts
+---@param opts scripts.vimdoc.Opts
 ---@return string[]
 function M.render(lines, opts)
     local blocks = parse(lines)
 
     local title = ("*%s.txt*"):format(opts.project)
-    local gap = math.max(1, M.WIDTH - #title - #opts.description)
+    local gap = math.max(1, WIDTH - #title - #opts.description)
     local out = { title .. (" "):rep(gap) .. opts.description, "" }
     vim.list_extend(out, contents(blocks, opts))
 
     local index = 0
     for _, block in ipairs(blocks) do
-        -- A level-one heading is the document title, already rendered above
+        -- A level-one heading is the document title, which the front matter carries
         if block.kind == "heading" and block.level == 2 then
             index = index + 1
             local tag = block.tag or derive_tag(block.text, opts.project)
-            out[#out + 1] = ("="):rep(M.WIDTH)
+            out[#out + 1] = ("="):rep(WIDTH)
             vim.list_extend(out, heading(("%d. %s"):format(index, block.text), tag))
             out[#out + 1] = ""
         elseif block.kind == "heading" and block.level >= 3 then
@@ -317,16 +314,16 @@ function M.render(lines, opts)
             vim.list_extend(out, heading(block.text:upper(), tag))
             out[#out + 1] = ""
         elseif block.kind == "anchor" then
-            -- No blank after it: the tag belongs to whatever follows, and a gap
-            -- would read as a second tag for the section above
+            -- No blank after it: the tag belongs to whatever follows it, not to
+            -- the section it sits in
             out[#out + 1] = anchor(block.text)
         elseif block.kind == "paragraph" then
-            vim.list_extend(out, wrap(inline(block.text, opts.project), M.WIDTH))
+            vim.list_extend(out, wrap(inline(block.text, opts.project), WIDTH))
             out[#out + 1] = ""
         elseif block.kind == "code" then
             out[#out + 1] = ">" .. (block.lang or "")
             for _, code in ipairs(block.lines) do
-                out[#out + 1] = code ~= "" and (" "):rep(M.INDENT) .. code or ""
+                out[#out + 1] = code ~= "" and (" "):rep(INDENT) .. code or ""
             end
             out[#out + 1] = "<"
             out[#out + 1] = ""

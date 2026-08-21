@@ -1,6 +1,7 @@
 local store = require("sidenote.store")
 local record = require("sidenote.core.record")
 
+---Make a fresh, empty store root.
 ---@return string
 local function root()
     local dir = vim.fn.tempname()
@@ -8,9 +9,10 @@ local function root()
     return dir
 end
 
----@param over? table<string, any> fields overriding the fixture defaults
+---Build a valid annotation from the fixture defaults.
+---@param overrides? table<string, any> fields overriding the fixture defaults
 ---@return sidenote.Annotation
-local function rec(over)
+local function rec(overrides)
     local base = {
         id = "01J9F3K2X7Q4V8M2ZC5T0BQWE",
         project_key = "demo-a3f91c",
@@ -21,7 +23,7 @@ local function rec(over)
         content = "local M = {}\nreturn M",
         now = "2026-08-18T09:14:00Z",
     }
-    for key, value in pairs(over or {}) do
+    for key, value in pairs(overrides or {}) do
         base[key] = value
     end
     return record.capture(base)
@@ -96,6 +98,13 @@ describe("store.read", function()
 end)
 
 describe("store.update", function()
+    local MODE = {
+        FILE_READ_ONLY = tonumber("444", 8),
+        FILE_WRITABLE = tonumber("644", 8),
+        DIR_READ_ONLY = tonumber("555", 8),
+        DIR_WRITABLE = tonumber("755", 8),
+    }
+
     it("persists a changed field", function()
         local dir = root()
         local original = rec()
@@ -117,27 +126,29 @@ describe("store.update", function()
         local fh = assert(io.open(prose_path, "w"))
         fh:write("words the user wrote\n")
         fh:close()
-        assert.truthy(vim.uv.fs_chmod(prose_path, 292)) -- 0444
+        assert.truthy(vim.uv.fs_chmod(prose_path, MODE.FILE_READ_ONLY))
 
         original.state = "resolved"
         local ok, err = store.update(dir, original)
         assert.truthy(ok, "update failed on a read-only prose file: " .. tostring(err))
         assert.eq(store.prose(dir, original.id, "org"), "words the user wrote\n")
 
-        vim.uv.fs_chmod(prose_path, 420) -- 0644, so the temp dir can be cleaned
+        -- Restore writability so the temp dir can be cleaned
+        vim.uv.fs_chmod(prose_path, MODE.FILE_WRITABLE)
     end)
 
     it("keeps the old record when a write cannot complete", function()
-        -- In-place truncation destroys the old bytes before failing; writing a
-        -- sibling and renaming leaves what was there
         local dir = root()
         local original = rec()
         store.create(dir, original, "org")
-        assert.truthy(vim.uv.fs_chmod(dir, 365)) -- 0555, so no new file can land
+        assert.truthy(vim.uv.fs_chmod(dir, MODE.DIR_READ_ONLY))
 
         original.state = "resolved"
         local ok = store.update(dir, original)
-        vim.uv.fs_chmod(dir, 493) -- 0755, so the temp dir can be cleaned
+
+        -- Restore writability before asserting, so a failure still cleans up
+        vim.uv.fs_chmod(dir, MODE.DIR_WRITABLE)
+
         assert.falsy(ok)
         assert.eq(store.read(dir, original.id).state, "open")
     end)
@@ -194,8 +205,6 @@ describe("store.prose_file", function()
     end)
 
     it("falls back to whatever extension is actually on disk", function()
-        -- A store written while `filetype` was org has to stay readable after
-        -- that setting changes, and a headless run has no config at all
         local dir, annotation = root(), rec()
         store.create(dir, annotation, "org")
         assert.eq(
@@ -224,8 +233,6 @@ describe("store.prose_file", function()
     end)
 
     it("writes prose into the file on disk, never a fork under a new extension", function()
-        -- Reading falls back to the extension that exists; writing to the
-        -- configured one instead would split the note across two files
         local dir, annotation = root(), rec()
         store.create(dir, annotation, "org")
         store.write_prose({ root = dir, id = annotation.id, filetype = "txt", lines = { "kept" } })
@@ -242,11 +249,11 @@ describe("store.prose_file", function()
 end)
 
 describe("store.summary", function()
-    ---@param prose string|nil
+    ---Make a store root holding note `01X`.
+    ---@param prose string|nil prose for the note, or nil to leave it without a prose file
     ---@return string root
     local function holding(prose)
-        local dir = vim.fn.tempname()
-        vim.fn.mkdir(dir, "p")
+        local dir = root()
         if prose then
             local fh = assert(io.open(store.prose_path(dir, "01X", "org"), "w"))
             fh:write(prose)

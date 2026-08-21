@@ -1,29 +1,22 @@
 local capture = require("sidenote.capture")
 local store = require("sidenote.store")
 
----Build a project on disk with one source file, and open it in a buffer.
----
----The root is returned symlink-resolved, because that is what the capture path
----will compare against once the buffer name has been through the filesystem.
+local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
+
+---Build a project with one source file open in a buffer.
 ---@return integer bufnr
----@return string root
+---@return string root symlink-resolved project root, as capture stores it
 local function project_buffer()
     local root = vim.fn.tempname()
     vim.fn.mkdir(root .. "/.sidenote", "p")
     local path = root .. "/m.lua"
     local fh = assert(io.open(path, "w"))
-    fh:write("local M = {}\n\nfunction M.f()\n  return 1\nend\n")
+    fh:write(table.concat(SOURCE, "\n") .. "\n")
     fh:close()
 
     local bufnr = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_name(bufnr, path)
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
-        "local M = {}",
-        "",
-        "function M.f()",
-        "  return 1",
-        "end",
-    })
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, SOURCE)
     return bufnr, assert(vim.uv.fs_realpath(root))
 end
 

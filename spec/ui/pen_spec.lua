@@ -7,7 +7,6 @@ local function opts()
         strategy = { "project" },
         project_dir = ".sidenote",
         global_dir = vim.fn.tempname(),
-        pen = nil,
         pens = { blue = "SidenotePenBlue", green = "SidenotePenGreen" },
         indicator = { style = "sign" },
         preview = { style = "float", max_lines = 20 },

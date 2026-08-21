@@ -20,7 +20,6 @@ describe("navigate.NAVIGABLE", function()
     end)
 
     it("excludes the statuses whose position means nothing", function()
-        -- Jumping to a meaningless line is worse than not jumping
         assert.falsy(navigate.NAVIGABLE.ambiguous)
         assert.falsy(navigate.NAVIGABLE.orphaned)
         assert.falsy(navigate.NAVIGABLE.filegone)

@@ -4,25 +4,25 @@ local location = require("sidenote.location")
 ---@field kind "write"|"change"|"rescope"|"move"|"delete" what to do
 ---@field id string annotation acted on
 ---@field lossy boolean whether applying it discards something unrecoverable
----@field lnum integer|nil row the edit was read from, so an error can name it
+---@field lnum integer|nil buffer line the edit was read from, so an error can name it
 ---@field field string|nil column that changed, for a change
 ---@field from string|nil value being replaced, for change, rescope and move
 ---@field to string|nil value replacing it, for change, rescope and move
 ---@field prose string[]|nil the note's new prose, for a write
----@field summary string|nil first prose line, for a delete's dialog to quote
+---@field summary string|nil first prose line, for a delete to quote
 
 ---Turns an edited buffer into the actions that would make it true.
 ---
 ---Compares against what was rendered rather than against the store, so an
 ---untouched row can never produce an action. Pure, and blind to whether any of
----the actions are possible: that is the applying layer's job.
+---the actions are possible: that is the consumer's job.
 ---@class sidenote.browser.diff
 local M = {}
 
 ---Columns whose edit means the same thing whatever the value.
 ---
----Pen included: a record with none and a parsed `-` placeholder are both nil
----by the time they reach the comparison, so the placeholder never diffs.
+---Pen included: the `-` placeholder parses to nil, exactly as a record with no
+---pen holds nil, so the placeholder never diffs.
 local COLUMNS = { "kind", "state", "pen" }
 
 ---@param a string[]
@@ -40,13 +40,14 @@ local function same_lines(a, b)
     return true
 end
 
----A location edit is a move when the path changed and a rescope otherwise.
+---Turn an edited location column into the action that re-points the note.
 ---
----Only widening to file scope is lossy: every other edit re-anchors from the
----file as it is now, so nothing that could be recovered is discarded.
+---A move when the path changed, a rescope otherwise. Only widening to file
+---scope is lossy: every other edit re-anchors from the file as it is now, so
+---nothing that could be recovered is discarded.
 ---@param row sidenote.browser.Row
 ---@param parsed sidenote.browser.Parsed
----@return sidenote.browser.Action|nil
+---@return sidenote.browser.Action|nil action nil when the location is unchanged
 local function relocation(row, parsed)
     local rec = row.entry.record
     local from = location.format(rec)
@@ -97,9 +98,9 @@ function M.compute(before, after)
                 end
             end
 
-            local moved = relocation(row, parsed)
-            if moved then
-                actions[#actions + 1] = moved
+            local relocated = relocation(row, parsed)
+            if relocated then
+                actions[#actions + 1] = relocated
             end
 
             if not same_lines(row.prose, parsed.prose) then
@@ -126,13 +127,11 @@ function M.compute(before, after)
     return actions
 end
 
----Deleted notes whose prose was left behind, glued onto the note above.
+---Find deleted notes whose prose was left behind, glued onto the note above.
 ---
----A header deleted on its own leaves its prose in place, and the grammar
----hands every unmarked line to the previous note — so the diff reads it as
----a rewrite of a neighbor nobody touched, beside the delete. The shape is
----precise: a written note whose new prose is its own followed by the old
----prose of the deleted notes that used to sit under it, in order.
+---A header deleted on its own leaves its prose in place, and the grammar hands
+---every unmarked line to the previous note, so the diff reads it as a rewrite
+---of a neighbor nobody touched, beside the delete.
 ---@param before sidenote.browser.State what the browser rendered
 ---@param actions sidenote.browser.Action[] what `compute` derived
 ---@return sidenote.browser.ParseError[] errors one per note left behind

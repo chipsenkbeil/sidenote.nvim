@@ -1,6 +1,8 @@
 local capture = require("sidenote.capture")
+local editor = require("sidenote.editor")
 local menu = require("sidenote.menu")
 local store = require("sidenote.store")
+local window = require("sidenote.window")
 
 ---@return sidenote.Config
 local function opts()
@@ -50,10 +52,10 @@ local function lines_of(win)
     return vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(win), 0, -1, false)
 end
 
----Buffer line of the row reading `text`, or nil.
+---Find the buffer line of the row reading `text`.
 ---@param win integer
 ---@param text string
----@return integer|nil
+---@return integer|nil lnum nil when no row holds the text
 local function row_of(win, text)
     for i, line in ipairs(lines_of(win)) do
         if line:find(text, 1, true) then
@@ -71,9 +73,9 @@ describe("menu", function()
     after_each(function()
         menu.close()
         vim.g.sidenote = nil
-        local editor = require("sidenote.editor").winid()
-        if editor then
-            require("sidenote.window").close(editor)
+        local note_win = editor.winid()
+        if note_win then
+            window.close(note_win)
         end
         vim.cmd("silent! %bwipeout!")
     end)
@@ -149,7 +151,7 @@ describe("menu", function()
         local win = assert(menu.open())
         press("o")
         assert.falsy(vim.api.nvim_win_is_valid(win))
-        local editor = assert(require("sidenote.editor").winid())
-        assert.eq(vim.api.nvim_get_current_win(), editor)
+        local note_win = assert(editor.winid())
+        assert.eq(vim.api.nvim_get_current_win(), note_win)
     end)
 end)

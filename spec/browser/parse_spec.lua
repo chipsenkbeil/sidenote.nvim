@@ -11,7 +11,7 @@ local function header(id, columns)
     return ("/%s %s"):format(id, columns)
 end
 
----Prose is any unmarked line, verbatim at the margin.
+---Label `text` as prose: an unmarked line, verbatim at the margin.
 ---@param text string
 ---@return string
 local function prose(text)
@@ -42,8 +42,7 @@ describe("browser.parse.header", function()
     end)
 
     it("treats an unmarked line as no header at all", function()
-        -- The concealed id marker is what makes a header; everything else in
-        -- the buffer is prose of the note above it
+        -- Not an error: an unmarked line is prose of the note above it
         local row, err = parse.header("todo  open      m.lua")
         assert.is_nil(row)
         assert.is_nil(err)
@@ -56,8 +55,7 @@ describe("browser.parse.header", function()
     end)
 
     it("keeps a path holding a double space intact", function()
-        -- The location is the last column and runs to the end of the line,
-        -- so a run of spaces inside it cannot read as a boundary
+        -- No column follows the location, so a run of spaces inside it is no boundary
         local row = assert(parse.header(header(ID, "note  open      -  my  file.lua:4")))
         assert.eq(row.location, "my  file.lua:4")
     end)
@@ -91,8 +89,8 @@ describe("browser.parse.header", function()
     end)
 
     it("rejects answered, which nothing produces", function()
-        -- Reserved for an agent verb that was cut; accepting it here would be
-        -- the one door back in
+        -- The listing is the only place a state can be typed, so it is the
+        -- one door a retired state could come back in through
         local row = parse.header(header(ID, "note  answered  -  m.lua:4"))
         assert.is_nil(row)
     end)
@@ -178,7 +176,7 @@ describe("browser.parse.buffer", function()
     end)
 
     it("errors on the same id appearing twice, naming both lines", function()
-        -- Which is exactly what yanking a row and pasting it produces
+        -- Yanking a row and pasting it produces exactly this
         local _, errors = parse.buffer({
             header(ID, "note  open      -  m.lua:4"),
             header(ID, "note  open      -  m.lua:9"),
@@ -233,8 +231,9 @@ describe("browser render and parse round-trip", function()
         }
     end
 
-    ---Rendering then parsing must return exactly what went in, or an untouched
-    ---row reports an edit nobody made.
+    ---Assert `annotation_prose` survives a render and a parse in canonical form.
+    ---
+    ---A row that does not round-trip reports an edit nobody made.
     ---@param annotation_prose string[]
     local function round_trips(annotation_prose)
         local rows, errors = parse.buffer(render.rows({ row(annotation_prose) }))
@@ -268,8 +267,6 @@ describe("browser render and parse round-trip", function()
     end)
 
     it("round-trips a summary that opens with whitespace", function()
-        -- The summary stays trimmed in canonical form: it is what a closed
-        -- fold previews, and the preview trims
         round_trips({ "  leading spaces", "body" })
     end)
 
@@ -282,7 +279,6 @@ describe("browser render and parse round-trip", function()
     end)
 
     it("round-trips a body line that indents itself further", function()
-        -- Body lines keep their own indentation; only the summary cannot
         round_trips({ "summary", "    a code block", "        deeper still" })
     end)
 

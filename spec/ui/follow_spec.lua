@@ -2,6 +2,7 @@ local capture = require("sidenote.capture")
 local editor = require("sidenote.editor")
 local follow = require("sidenote.follow")
 local store = require("sidenote.store")
+local window = require("sidenote.window")
 
 ---@return sidenote.Config
 local function opts()
@@ -19,6 +20,7 @@ end
 
 local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
 
+---Build a project with one source file open in a buffer.
 ---@return integer bufnr
 local function project_buffer()
     local root = vim.fn.tempname()
@@ -58,22 +60,22 @@ local function move_to(bufnr, line)
     vim.cmd("doautocmd CursorMoved")
 end
 
----The prose file the editor window currently shows.
+---Return the prose file the editor window currently shows.
 ---@return string
 local function showing()
     local win = assert(editor.winid(), "no editor window is open")
     return vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(win))
 end
 
-local function put_away()
-    follow.disable()
-    local win = editor.winid()
-    if win then
-        require("sidenote.window").close(win)
-    end
-end
-
 describe("follow", function()
+    after_each(function()
+        follow.disable()
+        local win = editor.winid()
+        if win then
+            window.close(win)
+        end
+    end)
+
     it("opens the note under the cursor without stealing focus", function()
         local source = project_buffer()
         local id = annotate(source, 4, { "the note" })
@@ -84,7 +86,6 @@ describe("follow", function()
         follow.enable(opts())
         assert.eq(vim.api.nvim_get_current_win(), before)
         assert.contains(showing(), id)
-        put_away()
     end)
 
     it("re-points the one window as the cursor crosses into another note", function()
@@ -101,7 +102,6 @@ describe("follow", function()
         move_to(source, 4)
         assert.eq(editor.winid(), win, "the same window, re-pointed")
         assert.contains(showing(), second)
-        put_away()
     end)
 
     it("keeps the last note while the cursor rests on unannotated code", function()
@@ -113,7 +113,6 @@ describe("follow", function()
 
         move_to(source, 1)
         assert.contains(showing(), id)
-        put_away()
     end)
 
     it("saves the prose it is leaving, so the store never lies", function()
@@ -129,7 +128,6 @@ describe("follow", function()
 
         move_to(source, 4)
         assert.eq(store.prose(root, first, "org"), "rewritten in the panel\n")
-        put_away()
     end)
 
     it("turns itself off when the panel is closed", function()
@@ -140,11 +138,10 @@ describe("follow", function()
         vim.api.nvim_win_set_cursor(0, { 3, 0 })
         follow.enable(opts())
 
-        require("sidenote.window").close(assert(editor.winid()))
+        window.close(assert(editor.winid()))
         move_to(source, 4)
         assert.is_nil(editor.winid(), "a closed panel stays closed")
         assert.falsy(follow.active())
-        put_away()
     end)
 
     it("toggles", function()
@@ -153,6 +150,5 @@ describe("follow", function()
         vim.api.nvim_set_current_buf(source)
         assert.eq(follow.toggle(opts()), true)
         assert.eq(follow.toggle(opts()), false)
-        put_away()
     end)
 end)

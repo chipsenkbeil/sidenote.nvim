@@ -12,6 +12,7 @@ local ORIGINAL = table.concat({
     "return M", -- 8
 }, "\n")
 
+---Capture a range anchored on the function, lines 3 to 6.
 ---@return sidenote.Annotation
 local function rec()
     return record.capture({
@@ -55,8 +56,7 @@ describe("resolve L6 fuzzy", function()
     end)
 
     it("never places an orphan, even when it has a guess", function()
-        -- An orphan must never carry a position: a guessed line presented as a
-        -- location is what the export gate exists to prevent
+        -- A guess presented as a location points at code that was never the note's subject
         local rewritten = table.concat({
             "local M = {}",
             "",

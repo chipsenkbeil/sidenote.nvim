@@ -5,8 +5,7 @@ local editor = require("sidenote.editor")
 ---
 ---One pinned window, re-pointed as the cursor crosses into another note —
 ---never focused, never duplicated. On unannotated code the panel keeps the
----last note it showed: a blanking panel is churn, and the context header is
----what keeps a held-over note legible as such.
+---last note it showed, since a blanking panel is churn.
 ---@class sidenote.follow
 local M = {}
 
@@ -53,8 +52,7 @@ local function point()
 
     local cfg = held or config.get()
     shown = entry.id
-    local note =
-        vim.tbl_extend("keep", { source = vim.api.nvim_get_current_buf(), config = cfg }, entry)
+    local note = vim.tbl_extend("keep", { source = bufnr, config = cfg }, entry)
     editor.open(note, vim.tbl_extend("force", cfg.editor, { focus = false }), cfg.filetype)
 end
 
@@ -74,6 +72,7 @@ function M.enable(cfg)
     point()
 end
 
+---Stop following, leaving the panel where it is.
 function M.disable()
     if group then
         vim.api.nvim_del_augroup_by_id(group)

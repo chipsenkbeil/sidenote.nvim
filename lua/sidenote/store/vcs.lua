@@ -7,10 +7,11 @@
 ---@class sidenote.store.vcs
 local M = {}
 
----@param dir string
----@param args string[]
----@return string|nil
-local function run(dir, args)
+---Run git in `dir` and return its trimmed output.
+---@param dir string directory git runs in
+---@param args string[] arguments after the directory
+---@return string|nil output nil when git exits non-zero
+local function git(dir, args)
     local cmd = { "git", "-C", dir }
     for _, arg in ipairs(args) do
         cmd[#cmd + 1] = arg
@@ -22,10 +23,10 @@ local function run(dir, args)
     return (out:gsub("%s+$", ""))
 end
 
----Nearest directory at or above `path` containing `marker`.
----@param path string
----@param marker string
----@return string|nil
+---Find the nearest directory at or above `path` containing `marker`.
+---@param path string a file or a directory
+---@param marker string name looked for in each candidate directory
+---@return string|nil nil when no ancestor holds the marker
 local function find_up(path, marker)
     local start = vim.fn.isdirectory(path) == 1 and path or vim.fn.fnamemodify(path, ":h")
     if vim.uv.fs_stat(start .. "/" .. marker) then
@@ -39,14 +40,12 @@ local function find_up(path, marker)
     return nil
 end
 
----The working copy's change id, the stable name a review filter keys on.
+---Read the working copy's change id.
 ---
----A jj change id survives the rewrites that constantly replace the
----working-copy commit, which is what makes it usable as "the change these
----review comments belong to". Nil when jj is absent or the directory is no
----real repository.
+---A change id survives the rewrites that constantly replace the working-copy
+---commit, so it is the stable name for the change an annotation belongs to.
 ---@param root string directory holding .jj
----@return string|nil
+---@return string|nil change nil when jj is absent or `root` is no real repository
 local function jj_change(root)
     if vim.fn.executable("jj") == 0 then
         return nil
@@ -69,23 +68,24 @@ local function jj_change(root)
     return (out:gsub("%s+$", ""))
 end
 
----@param path string
----@return sidenote.Vcs|nil
+---Record the provenance of the file at `path`.
+---@param path string absolute path to the annotated file
+---@return sidenote.Vcs|nil vcs nil outside a repository git can read
 function M.probe(path)
     local git_root = find_up(path, ".git")
     if not git_root then
-        -- A non-colocated jj repository has no .git to read, so there is no
-        -- commit id to record. Reporting nothing beats reporting a guess
+        -- A non-colocated jj repository has no .git, so there is no commit id
+        -- to record, and reporting nothing beats reporting a guess
         return nil
     end
 
-    local commit = run(git_root, { "rev-parse", "HEAD" })
+    local commit = git(git_root, { "rev-parse", "HEAD" })
     if not commit then
         return nil
     end
 
     local jj_root = find_up(path, ".jj")
-    local status = run(git_root, { "status", "--porcelain", "--", path })
+    local status = git(git_root, { "status", "--porcelain", "--", path })
     return {
         kind = jj_root and "jj" or "git",
         commit = commit,

@@ -9,21 +9,9 @@ local function text(actions)
     return table.concat(confirm.summary(actions), "\n")
 end
 
----Line number the lossy rule sits on, or nil when there is none.
----@param actions sidenote.browser.Action[]
----@return integer|nil
-local function rule_at(actions)
-    for i, line in ipairs(confirm.summary(actions)) do
-        if line:find(confirm.RULE, 1, true) then
-            return i
-        end
-    end
-    return nil
-end
-
 ---@param actions sidenote.browser.Action[]
 ---@param needle string
----@return integer|nil
+---@return integer|nil index nil when no line holds needle
 local function line_at(actions, needle)
     for i, line in ipairs(confirm.summary(actions)) do
         if line:find(needle, 1, true) then
@@ -31,6 +19,12 @@ local function line_at(actions, needle)
         end
     end
     return nil
+end
+
+---@param actions sidenote.browser.Action[]
+---@return integer|nil index nil when the summary draws no rule
+local function rule_at(actions)
+    return line_at(actions, confirm.RULE)
 end
 
 local WRITE = { kind = "write", id = ID, lossy = false, prose = { "new" } }
@@ -91,7 +85,6 @@ describe("browser.confirm lossy grouping", function()
     end)
 
     it("keeps a non-lossy rescope above the rule", function()
-        -- Grouping is by what an action costs, not by which kind it is
         local narrowing =
             vim.tbl_extend("force", RESCOPE, { lossy = false, to = "lua/lobby.lua:45" })
         local actions = { narrowing, DELETE }
@@ -112,7 +105,6 @@ describe("browser.confirm callouts", function()
     end)
 
     it("says a non-lossy rescope is re-anchored, never that it drops the anchor", function()
-        -- The note follows what the action costs, not which kind it is
         local narrowing =
             vim.tbl_extend("force", RESCOPE, { lossy = false, to = "lua/lobby.lua:45" })
         local body = text({ narrowing })
@@ -128,13 +120,10 @@ describe("browser.confirm callouts", function()
     end)
 
     it("warns that a delete removes the prose file", function()
-        -- The one action that destroys a document rather than a record
         assert.contains(text({ DELETE }), "REMOVES PROSE FILE")
     end)
 
     it("quotes what a delete destroys, one line per note", function()
-        -- `dd` on a closed fold deletes sight-unseen; the quote is the
-        -- moment of seeing
         local other = { kind = "delete", id = OTHER, lossy = true, summary = "the other note" }
         local body = text({ DELETE, other })
         assert.contains(body, '"race in lobby join"')

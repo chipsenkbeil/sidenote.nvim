@@ -11,6 +11,7 @@ local ORIGINAL = table.concat({
     "return M", -- 7
 }, "\n")
 
+---Capture a range anchored on the function, lines 3 to 5.
 ---@return sidenote.Annotation
 local function rec()
     return record.capture({
@@ -100,8 +101,7 @@ end)
 
 describe("resolve anchorless records", function()
     it("orphans a lines record with no anchor text once the file changes", function()
-        -- Capture refuses blank selections now; a record like this predates
-        -- that and cannot be searched for, so honesty beats a ghost attach
+        -- Hand-built: capture refuses a blank selection
         local ghost = rec()
         ghost.scope = "lines"
         ghost.text = ""

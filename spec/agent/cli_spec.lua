@@ -49,9 +49,9 @@ local function annotate_with(root, name, capture_opts, prose)
     local result = assert(capture.run(bufnr, capture_opts))
     vim.api.nvim_buf_delete(bufnr, { force = true })
 
-    local note = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
-    note:write(table.concat(prose, "\n") .. "\n")
-    note:close()
+    local out = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
+    out:write(table.concat(prose, "\n") .. "\n")
+    out:close()
     return result.id
 end
 
@@ -134,8 +134,6 @@ describe("cli list", function()
     end)
 
     it("lists a file-wide annotation by its path alone", function()
-        -- A placed file-scope annotation has a status but no lines, so its
-        -- location column is the bare path, not a formatted position
         local root = project()
         annotate_with(root, "alpha.lua", { scope = "file" }, { "about the whole file" })
 
@@ -253,8 +251,10 @@ describe("cli argument handling", function()
 end)
 
 describe("cli run as a script", function()
-    -- The in-process tests inject a writer, so only running the real thing can
-    -- prove which stream the output lands on
+    ---Run the real CLI as a subprocess and return what it wrote to stdout.
+    ---
+    ---The in-process tests inject a writer, so only a real run can prove which
+    ---stream the output lands on.
     ---@param argv string[]
     ---@return string stdout
     local function shell(argv)

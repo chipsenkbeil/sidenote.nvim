@@ -4,8 +4,8 @@ local highlight = require("sidenote.highlight")
 ---@field id string annotation this mark stands for
 ---@field status sidenote.Status anchor status, deciding the styling
 ---@field pen? string pen name coloring the ink instead of the status
----@field kind? string note or todo, deciding a healthy anchor's glyph
----@field state? string lifecycle position, checking a done todo's box
+---@field kind? "note"|"todo" deciding a healthy anchor's glyph
+---@field state? "open"|"resolved"|"wontfix"|"archived" lifecycle position, checking a done todo's box
 ---@field hidden? boolean tracked but not drawn, for a narrowed view
 ---@field summary? string first prose line, nil while the note has none
 ---@field confidence? number resolver confidence at placement, kept by the tracker
@@ -29,10 +29,12 @@ local highlight = require("sidenote.highlight")
 ---@field confidence number resolver confidence at placement
 ---@field ranged boolean whether the span carries exact columns
 
----@class sidenote.render.PaintOpts
----@field style string sign, virt_text, highlight, underline, summary or none
----@field highlight? string the range overlay mode: off, on, always or never
+---@class sidenote.render.InkOpts
+---@field style "sign"|"virt_text"|"highlight"|"underline"|"summary"|"none" how an annotation announces itself
 ---@field pens? table<string, string> mapping of pen name -> highlight group its ink uses
+
+---@class sidenote.render.PaintOpts: sidenote.render.InkOpts
+---@field highlight? "off"|"on"|"always"|"never" range overlay mode, a toggleable default or pinned
 
 ---Paints resolved annotations into a buffer.
 ---
@@ -46,18 +48,25 @@ M.NAMESPACE = vim.api.nvim_create_namespace("sidenote")
 ---Where the invisible tracking marks live, apart from the visible ones.
 M.TRACK = vim.api.nvim_create_namespace("sidenote.track")
 
----Live trackers per buffer: annotation id -> the mark following its span.
+---Longest end-of-line summary drawn before it is ellipsized.
+local SUMMARY_WIDTH = 60
+
+---Live trackers, mapping of buffer -> annotation id -> the tracker on its span.
 ---@type table<integer, table<string, sidenote.render.Tracker>>
 local trackers = {}
 
----The buffer tick each paint ran at, which is how edits-since are detected.
+---What each buffer's changedtick was when it was last painted.
 ---@type table<integer, integer>
 local ticks = {}
 
----Groups are defined on first paint rather than at plugin load, so the entry
----point stays free of eager requires.
+---Per-buffer overrides of the configured highlight default.
+---@type table<integer, boolean>
+local overrides = {}
+
+---Whether the highlight groups exist yet, defined lazily by the first paint.
 local defined = false
 
+---Remove a buffer's marks, visible and tracking alike.
 ---@param bufnr integer
 function M.clear(bufnr)
     vim.api.nvim_buf_clear_namespace(bufnr, M.NAMESPACE, 0, -1)
@@ -80,13 +89,9 @@ function M.edited(bufnr)
         and tick ~= vim.api.nvim_buf_get_changedtick(bufnr)
 end
 
----Per-buffer overrides of the configured highlight default.
----@type table<integer, boolean>
-local overrides = {}
-
 ---Whether range highlights show in a buffer, under the configured mode.
 ---@param bufnr integer
----@param mode string|nil off, on, always or never; nil reads as off
+---@param mode "off"|"on"|"always"|"never"|nil nil reads as off
 ---@return boolean
 function M.highlighted(bufnr, mode)
     if mode == "always" then
@@ -111,7 +116,7 @@ end
 
 ---Flip a buffer's range highlights, the way `:set spell!` flips spelling.
 ---@param bufnr integer
----@param mode string|nil the configured default
+---@param mode "off"|"on"|"always"|"never"|nil the configured default
 ---@return boolean|nil shown nil when the mode pins highlights on or off
 function M.toggle(bufnr, mode)
     if mode == "always" or mode == "never" then
@@ -146,33 +151,28 @@ end
 
 ---@class sidenote.render.Tail
 ---@field row integer 0-based row the continuation starts on
----@field opts table extmark options for the continuation mark
+---@field opts vim.api.keyset.set_extmark extmark options for the continuation mark
 
+---Build the extmark that draws `entry`, in whatever style is configured.
 ---@param bufnr integer
 ---@param entry sidenote.render.Entry
----@param style string
----@param pens table<string, string>|nil pen name -> highlight group
+---@param opts sidenote.render.InkOpts
 ---@return integer|nil col 0-based start column, nil when nothing is drawn
----@return table|nil opts extmark options
+---@return vim.api.keyset.set_extmark|nil mark extmark options
 ---@return sidenote.render.Tail|nil tail second mark for a badge's span
-local function mark_opts(bufnr, entry, style, pens)
+local function mark_opts(bufnr, entry, opts)
+    local style, pens = opts.style, opts.pens
     local group = highlight.GROUPS[entry.status]
     if style == "sign" then
-        -- A ranged sign mark repeats its glyph on every covered line, and here
-        -- `end_row` is inclusive, unlike a highlight's
-
         -- A healthy note with no prose dims into the deletion candidate it
         -- is; a hurt anchor keeps its status color, prose or none
         local ink = entry.status == "attached" and not entry.summary and highlight.BARE or group
 
-        -- A healthy todo signs as a box, checked once it is no longer open
         local glyph = highlight.SIGNS[entry.status]
         if entry.status == "attached" and entry.kind == "todo" then
             glyph = entry.state == "open" and highlight.TODO.open or highlight.TODO.done
         end
 
-        -- Bars extend; badges mark once. A checkbox on every covered line
-        -- reads as that many todos, so a span checks one box and trails off
         if highlight.BADGES[glyph] and entry.line_end > entry.line_start then
             return 0,
                 { sign_text = glyph, sign_hl_group = ink },
@@ -197,12 +197,10 @@ local function mark_opts(bufnr, entry, style, pens)
             { virt_text = { { highlight.SIGNS[entry.status], group } }, virt_text_pos = "eol" }
     end
     if style == "summary" then
-        -- The ambient reading mode: prose line one sits at end of line, in
-        -- the note's own pen when it carries one
         local pen = entry.pen and pens and pens[entry.pen]
         local text = entry.summary
-        if text and #text > 60 then
-            text = text:sub(1, 60) .. "…"
+        if text and #text > SUMMARY_WIDTH then
+            text = text:sub(1, SUMMARY_WIDTH) .. "…"
         end
         return 0,
             {
@@ -213,8 +211,7 @@ local function mark_opts(bufnr, entry, style, pens)
             }
     end
 
-    -- Ink over the text and only the text, the way a marker pen reads: exact
-    -- columns for a range, through the last line's end otherwise
+    -- Ink over the text and only the text, the way a marker pen reads
     if style == "highlight" or style == "underline" then
         -- A pen the caller no longer knows degrades to the status ink
         local pen = entry.pen and pens and pens[entry.pen]
@@ -344,7 +341,7 @@ function M.paint(bufnr, entries, opts)
             -- not cost a note its save-time truth
             track(bufnr, entry)
             if opts.style ~= "none" and not entry.hidden then
-                local col, mark, tail = mark_opts(bufnr, entry, opts.style, opts.pens)
+                local col, mark, tail = mark_opts(bufnr, entry, opts)
                 if mark then
                     mark.priority = highlight.PRIORITIES[entry.status]
                     vim.api.nvim_buf_set_extmark(
@@ -361,7 +358,8 @@ function M.paint(bufnr, entries, opts)
                     vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, tail.row, 0, tail.opts)
                 end
                 if overlay then
-                    local ink, range = mark_opts(bufnr, entry, "highlight", opts.pens)
+                    local ink, range =
+                        mark_opts(bufnr, entry, { style = "highlight", pens = opts.pens })
                     range.priority = highlight.PRIORITIES[entry.status]
                     vim.api.nvim_buf_set_extmark(
                         bufnr,

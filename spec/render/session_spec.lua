@@ -1,6 +1,7 @@
 local session = require("sidenote.session")
 local capture = require("sidenote.capture")
 local render = require("sidenote.render")
+local store = require("sidenote.store")
 
 ---@return sidenote.Config
 local function opts()
@@ -18,7 +19,7 @@ end
 local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
 
 ---Build a project with one source file open in a buffer.
----@return integer
+---@return integer bufnr
 local function project_buffer()
     local root = vim.fn.tempname()
     vim.fn.mkdir(root .. "/.sidenote", "p")
@@ -52,7 +53,6 @@ describe("session.entries", function()
         local bufnr = project_buffer()
         local result =
             assert(capture.run(bufnr, { scope = "lines", range = { 4, 0, 4, 0 }, config = opts() }))
-        local store = require("sidenote.store")
         local fh = assert(io.open(store.prose_path(result.root, result.id, "org"), "w"))
         fh:write("the note\na body line\n")
         fh:close()
@@ -84,12 +84,8 @@ describe("session.entries", function()
         capture.run(bufnr, { scope = "file", config = opts() })
 
         local other = vim.api.nvim_create_buf(false, true)
-        -- Parenthesized: gsub returns a count as its second value, which would
-        -- otherwise arrive as an extra argument
-        vim.api.nvim_buf_set_name(
-            other,
-            (vim.api.nvim_buf_get_name(bufnr):gsub("m%.lua$", "n.lua"))
-        )
+        local other_path = vim.api.nvim_buf_get_name(bufnr):gsub("m%.lua$", "n.lua")
+        vim.api.nvim_buf_set_name(other, other_path)
         vim.api.nvim_buf_set_lines(other, 0, -1, false, SOURCE)
         assert.eq_deep(session.entries(other, opts()), {})
     end)
@@ -114,8 +110,6 @@ end)
 
 describe("session.entries while the buffer is edited", function()
     it("reports the span its mark tracked, not a fresh resolution", function()
-        -- Between paints the mark has followed every keystroke; resolving
-        -- the stored content again would fight the edit in progress
         local bufnr = project_buffer()
         capture.run(bufnr, { scope = "lines", range = { 3, 0, 5, 0 }, config = opts() })
         session.refresh(bufnr, opts())

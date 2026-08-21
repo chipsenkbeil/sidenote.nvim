@@ -1,7 +1,7 @@
 -- Test runner. Run with `nvim -l spec/runner.lua [path ...]`, or `make test`.
 --
 -- Follows doug-game's harness shape: `describe` / `it` globals plus an
--- `assert` table, with nesting tracked by a stack
+-- `assert` table
 
 local root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
 package.path = ("%s/lua/?.lua;%s/lua/?/init.lua;%s/?.lua;%s/?/init.lua;%s"):format(
@@ -14,12 +14,12 @@ package.path = ("%s/lua/?.lua;%s/lua/?/init.lua;%s/?.lua;%s/?/init.lua;%s"):form
 
 ---@class spec.Context
 ---@field name string display name of this group, empty for the root
----@field before function[] hooks run before each test in the group
----@field after function[] hooks run after each test in the group
+---@field before fun()[] hooks run before each test in the group
+---@field after fun()[] hooks run after each test in the group
 
 ---@class spec.Test
 ---@field name string display name of this test
----@field fn function test body
+---@field fn fun() test body
 ---@field context spec.Context[] enclosing groups, outermost first
 
 ---@type spec.Context[]
@@ -31,7 +31,7 @@ local tests = {}
 _G.assert = dofile(root .. "/spec/assert.lua")
 
 ---@param name string
----@param fn function
+---@param fn fun()
 function _G.describe(name, fn)
     stack[#stack + 1] = { name = name, before = {}, after = {} }
     local ok, err = pcall(fn)
@@ -42,7 +42,7 @@ function _G.describe(name, fn)
 end
 
 ---@param name string
----@param fn function
+---@param fn fun()
 function _G.it(name, fn)
     local context = {}
     for i, entry in ipairs(stack) do
@@ -51,13 +51,13 @@ function _G.it(name, fn)
     tests[#tests + 1] = { name = name, fn = fn, context = context }
 end
 
----@param fn function
+---@param fn fun()
 function _G.before_each(fn)
     local top = stack[#stack]
     top.before[#top.before + 1] = fn
 end
 
----@param fn function
+---@param fn fun()
 function _G.after_each(fn)
     local top = stack[#stack]
     top.after[#top.after + 1] = fn
@@ -79,6 +79,10 @@ end
 ---@param targets string[]
 ---@return string[]
 local function spec_files(targets)
+    if #targets == 0 then
+        targets = { root .. "/spec" }
+    end
+
     local found = {}
     for _, target in ipairs(targets) do
         if vim.fn.isdirectory(target) == 1 then
@@ -86,9 +90,6 @@ local function spec_files(targets)
         else
             found[#found + 1] = target
         end
-    end
-    if #targets == 0 then
-        found = vim.fn.glob(root .. "/spec/**/*_spec.lua", false, true)
     end
     table.sort(found)
     return found
@@ -114,8 +115,8 @@ end
 
 local passed, failures = 0, {}
 for _, test in ipairs(tests) do
-    -- Hooks run inside the protection: a throwing before_each fails this
-    -- test rather than killing the whole run
+    -- Before hooks run inside the protection: a throwing before_each fails
+    -- this test rather than killing the whole run
     local ok, err = xpcall(function()
         for _, entry in ipairs(test.context) do
             for _, fn in ipairs(entry.before) do

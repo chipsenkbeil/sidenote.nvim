@@ -2,6 +2,7 @@ local store = require("sidenote.store")
 local record = require("sidenote.core.record")
 local index = require("sidenote.core.index")
 
+---Make a fresh, empty store root.
 ---@return string
 local function root()
     local dir = vim.fn.tempname()
@@ -9,9 +10,10 @@ local function root()
     return dir
 end
 
----@param dir string
----@param id string
----@param path string
+---Store an annotation on the first line of `path`.
+---@param dir string store root to write into
+---@param id string annotation id
+---@param path string annotated file, relative to the project root
 local function put(dir, id, path)
     store.create(
         dir,

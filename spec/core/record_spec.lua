@@ -11,9 +11,9 @@ local CONTENT = table.concat({
     "return M", -- 7
 }, "\n")
 
----@param over? table<string, any> fields overriding the fixture defaults
+---@param overrides? table<string, any> fields overriding the fixture defaults
 ---@return sidenote.Annotation
-local function capture(over)
+local function capture(overrides)
     local opts = {
         id = "01J9F3K2X7Q4V8M2ZC5T0BQWE",
         project_key = "demo-a3f91c",
@@ -26,7 +26,7 @@ local function capture(over)
         content = CONTENT,
         now = "2026-08-18T09:14:00Z",
     }
-    for key, value in pairs(over or {}) do
+    for key, value in pairs(overrides or {}) do
         opts[key] = value
     end
     return record.capture(opts)
@@ -59,8 +59,6 @@ describe("record.capture", function()
     end)
 
     it("keeps the context verbatim, not only as a hash", function()
-        -- The fuzzy tier grades context by similarity; a hash can only answer
-        -- same-or-different, which zeroes the whole term on any edit above
         local rec = capture()
         assert.eq(rec.prefix, "local M = {}\n")
         assert.eq(rec.suffix, "\nreturn M")
@@ -93,8 +91,6 @@ describe("record.capture", function()
     end)
 
     it("gives a line annotation no columns, since it covers whole lines", function()
-        -- The location grammar derives scope from the presence of columns, so a
-        -- non-zero column here would make `lines` render as `range`
         local rec = capture({ scope = "lines", line_start = 4, line_end = 4 })
         assert.eq(rec.col_start, 0)
         assert.eq(rec.col_end, 0)
@@ -182,8 +178,7 @@ describe("record.validate", function()
     end)
 
     it("rejects a pen that could not sit in a browser column", function()
-        -- Columns split on runs of spaces, and a bare `-` is the placeholder
-        -- a penless row renders
+        -- A bare `-` is the placeholder a penless row renders
         for _, bad in ipairs({ "-", "two words", "" }) do
             local rec = capture()
             rec.pen = bad
@@ -234,10 +229,10 @@ end)
 describe("record.reanchor", function()
     local LATER = "2026-09-01T12:00:00Z"
 
-    ---@param over? table<string, any> fields overriding the re-anchor defaults
-    ---@return sidenote.Annotation
+    ---@param overrides? table<string, any> fields overriding the re-anchor defaults
+    ---@return sidenote.Annotation fresh
     ---@return sidenote.Annotation original
-    local function reanchor(over)
+    local function reanchor(overrides)
         local original = capture({ kind = "todo" })
         original.state = "wontfix"
         local opts = {
@@ -248,7 +243,7 @@ describe("record.reanchor", function()
             line_end = 7,
             now = LATER,
         }
-        for key, value in pairs(over or {}) do
+        for key, value in pairs(overrides or {}) do
             opts[key] = value
         end
         return record.reanchor(original, opts), original
@@ -277,15 +272,12 @@ describe("record.reanchor", function()
     end)
 
     it("keeps the original capture instant", function()
-        -- The annotation did not stop existing; only its anchor moved
         local fresh, original = reanchor()
         assert.eq(fresh.captured, original.captured)
         assert.eq(fresh.verified, LATER)
     end)
 
     it("re-captures the anchor from the file as it is now", function()
-        -- Not a search for the old text: editing a location asserts where the
-        -- annotation belongs, which beats any resolver inference
         local fresh = reanchor()
         assert.eq(fresh.text, "return M")
         assert.eq(fresh.text_sha, hash.sha256("return M"))
@@ -306,7 +298,6 @@ describe("record.reanchor", function()
     end)
 
     it("keeps columns at zero outside range scope", function()
-        -- A column here would make the grammar render `lines` as a range
         local fresh = reanchor()
         assert.eq(fresh.col_start, 0)
         assert.eq(fresh.col_end, 0)

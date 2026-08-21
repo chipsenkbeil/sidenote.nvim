@@ -30,8 +30,8 @@ describe("plugin entry point", function()
         local calls = 0
         for args in entry_source():gmatch("vim%.keymap%.set(%b())") do
             calls = calls + 1
-            -- The mode is either a quoted string or a table of them, so the
-            -- mapping is the quoted string after the first top-level comma
+
+            -- The mode is either a quoted string or a table of them
             local mapping = args:match('^%(%s*%b{}%s*,%s*"([^"]+)"')
                 or args:match('^%(%s*"[^"]*"%s*,%s*"([^"]+)"')
             assert.not_nil(mapping, "could not read the mapping from: " .. args)

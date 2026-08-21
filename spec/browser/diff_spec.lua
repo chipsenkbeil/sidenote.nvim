@@ -5,9 +5,8 @@ local OTHER = "01J9F3K2X7Q4V8M2ZC5T0BQWF"
 
 ---@class spec.browser.RowSpec
 ---@field id? string annotation id, defaults to the stub ULID
----@field create? boolean true for a row the user typed, which carries no id
 ---@field kind? "note"|"todo" defaults to note
----@field state? string lifecycle position, defaults to open
+---@field state? "open"|"resolved"|"wontfix"|"archived" lifecycle position, defaults to open
 ---@field pen? string pen name, defaults to none
 ---@field path? string defaults to lua/lobby.lua
 ---@field line_start? integer defaults to 42
@@ -30,7 +29,7 @@ local function location_of(spec)
     return ("%s:%d-%d"):format(path, line_start, line_end)
 end
 
----What the browser rendered, which is the baseline an edit is measured from.
+---Build the rendered baseline an edit is measured from.
 ---@param specs spec.browser.RowSpec[]
 ---@return sidenote.browser.State
 local function before(specs)
@@ -62,14 +61,14 @@ local function before(specs)
     return { path = "/project/lua/lobby.lua", source = 0, config = {}, rows = rows }
 end
 
----What the user left in the buffer.
+---Build the rows the user left in the buffer.
 ---@param specs spec.browser.RowSpec[]
 ---@return sidenote.browser.Parsed[]
 local function after(specs)
     local rows = {}
     for i, spec in ipairs(specs) do
         rows[i] = {
-            id = not spec.create and (spec.id or ID) or nil,
+            id = spec.id or ID,
             lnum = i,
             kind = spec.kind or "note",
             state = spec.state or "open",
@@ -84,7 +83,7 @@ end
 
 ---@param actions sidenote.browser.Action[]
 ---@param kind string
----@return sidenote.browser.Action|nil
+---@return sidenote.browser.Action|nil action nil when no action has that kind
 local function find(actions, kind)
     for _, action in ipairs(actions) do
         if action.kind == kind then

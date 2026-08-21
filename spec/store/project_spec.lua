@@ -69,6 +69,40 @@ describe("project.root", function()
     end)
 end)
 
+describe("project.root with a rockspec", function()
+    ---Build a throwaway directory holding a file named `name` and a `lua/`
+    ---subdirectory, and return its resolved root.
+    ---@param name string
+    ---@return string dir
+    local function dir_with(name)
+        local dir = vim.fn.tempname()
+        vim.fn.mkdir(dir .. "/lua", "p")
+        local fh = assert(io.open(dir .. "/" .. name, "w"))
+        fh:write("package = 'demo'\n")
+        fh:close()
+        return assert(vim.uv.fs_realpath(dir))
+    end
+
+    it("treats a rockspec as a project marker", function()
+        local dir = dir_with("sidenote-scm-1.rockspec")
+        assert.eq(project.root(dir .. "/lua/init.lua"), dir)
+    end)
+
+    it("matches a rockspec whatever its version suffix", function()
+        local dir = dir_with("demo-1.2.3-4.rockspec")
+        assert.eq(project.root(dir .. "/lua/init.lua"), dir)
+    end)
+
+    it("is not fooled by a file that merely mentions rockspec", function()
+        local dir = dir_with("notes-about-rockspec.md")
+        assert.is_nil(project.root(dir .. "/lua/init.lua"))
+    end)
+
+    it("lists the rockspec glob among its markers, for error messages", function()
+        assert.contains(table.concat(project.MARKERS, " "), "rockspec")
+    end)
+end)
+
 describe("project.key", function()
     it("combines the basename with a hash of the absolute path", function()
         assert.match(project.key("/tmp/demo"), "^demo%-%x+$")
@@ -94,39 +128,5 @@ describe("project.relative", function()
 
     it("returns the path unchanged when it is outside the root", function()
         assert.eq(project.relative("/p", "/other/a.lua"), "/other/a.lua")
-    end)
-end)
-
-describe("project.root with a rockspec", function()
-    ---@param name string
-    ---@return string dir
-    local function dir_with(name)
-        local dir = vim.fn.tempname()
-        vim.fn.mkdir(dir .. "/lua", "p")
-        local fh = assert(io.open(dir .. "/" .. name, "w"))
-        fh:write("package = 'demo'\n")
-        fh:close()
-        return assert(vim.uv.fs_realpath(dir))
-    end
-
-    it("treats a rockspec as a project marker", function()
-        -- The marker the Lua ecosystem actually uses, and the one a Neovim
-        -- plugin repo is most likely to carry
-        local dir = dir_with("sidenote-scm-1.rockspec")
-        assert.eq(project.root(dir .. "/lua/init.lua"), dir)
-    end)
-
-    it("matches a rockspec whatever its version suffix", function()
-        local dir = dir_with("demo-1.2.3-4.rockspec")
-        assert.eq(project.root(dir .. "/lua/init.lua"), dir)
-    end)
-
-    it("is not fooled by a file that merely mentions rockspec", function()
-        local dir = dir_with("notes-about-rockspec.md")
-        assert.is_nil(project.root(dir .. "/lua/init.lua"))
-    end)
-
-    it("lists the rockspec glob among its markers, for error messages", function()
-        assert.contains(table.concat(project.MARKERS, " "), "rockspec")
     end)
 end)

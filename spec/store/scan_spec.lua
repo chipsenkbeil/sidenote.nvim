@@ -30,10 +30,7 @@ local function project()
     return assert(vim.uv.fs_realpath(root))
 end
 
----Annotate a file through a throwaway buffer, then discard it.
----
----The point of the scanner is that nothing needs to be loaded afterwards, so
----the buffer is deleted before anything is scanned.
+---Annotate a file through a throwaway buffer, leaving nothing loaded to scan.
 ---@param root string
 ---@param name string
 ---@param line integer

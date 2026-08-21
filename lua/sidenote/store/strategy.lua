@@ -9,16 +9,20 @@ local project = require("sidenote.store.project")
 ---@class sidenote.store.strategy
 local M = {}
 
+---A store name, `global` or `project`, or a function mapping a source path to
+---a root, returning nil to fall through to the next entry.
+---@alias sidenote.store.strategy.Entry string|fun(path: string): string|nil
+
 ---@class sidenote.store.strategy.Opts
----@field strategy string|string[]|fun(path: string): string|nil entries tried in order
+---@field strategy sidenote.store.strategy.Entry|sidenote.store.strategy.Entry[] entries tried in order
 ---@field global_dir string root of the machine-wide store
 ---@field project_dir string directory name used for an in-project store
 
----@param entry string|fun(path: string): string|nil
+---@param entry sidenote.store.strategy.Entry
 ---@param source_path string
 ---@param opts sidenote.store.strategy.Opts
 ---@return string|nil root
-local function resolve_one(entry, source_path, opts)
+local function resolve_entry(entry, source_path, opts)
     if type(entry) == "function" then
         return entry(source_path)
     end
@@ -35,6 +39,21 @@ local function resolve_one(entry, source_path, opts)
 end
 
 ---@param source_path string
+---@param entries sidenote.store.strategy.Entry[] entries that all failed
+---@return string err
+local function no_store_error(source_path, entries)
+    local names = {}
+    for _, entry in ipairs(entries) do
+        names[#names + 1] = type(entry) == "function" and "<function>" or tostring(entry)
+    end
+    return ("no store resolved for %s; tried: %s. A 'project' strategy needs one of %s at or above the file."):format(
+        source_path,
+        table.concat(names, ", "),
+        table.concat(project.MARKERS, ", ")
+    )
+end
+
+---@param source_path string
 ---@param opts sidenote.store.strategy.Opts
 ---@return string[]|nil roots the first is the write target
 ---@return string|nil err
@@ -46,23 +65,14 @@ function M.resolve(source_path, opts)
 
     local roots = {}
     for _, entry in ipairs(entries) do
-        local root = resolve_one(entry, source_path, opts)
+        local root = resolve_entry(entry, source_path, opts)
         if root then
             roots[#roots + 1] = root
         end
     end
 
     if #roots == 0 then
-        local names = {}
-        for _, entry in ipairs(entries) do
-            names[#names + 1] = type(entry) == "function" and "<function>" or tostring(entry)
-        end
-        return nil,
-            ("no store resolved for %s; tried: %s. A 'project' strategy needs one of %s at or above the file."):format(
-                source_path,
-                table.concat(names, ", "),
-                table.concat(project.MARKERS, ", ")
-            )
+        return nil, no_store_error(source_path, entries)
     end
     return roots, nil
 end

@@ -46,7 +46,7 @@ end
 ---
 ---Under `cache_dir`, never inside the store: the cache is the one replaceable
 ---artifact, and writing it into a committed store would turn every scan into
----a diff. A config with no `cache_dir` scans uncached.
+---a diff.
 ---@param store_root string
 ---@param cfg sidenote.Config
 ---@return string|nil
@@ -62,9 +62,8 @@ end
 ---Resolve every annotation the project holds.
 ---
 ---Sorted by path and then by line, so two runs over unchanged input produce
----the same order and a diff between them means something. Resolutions are
----cached per store, keyed by the file content and the record together, so a
----rewrite of either simply misses and re-resolves.
+---the same order and a diff between them means something. A path under no
+---configured store yields an empty list rather than an error.
 ---@param opts sidenote.scan.Opts
 ---@return sidenote.session.Entry[]
 function M.project(opts)
@@ -90,7 +89,6 @@ function M.project(opts)
     local entries = {}
     for _, held in ipairs(records(roots)) do
         local rec = held.record
-        -- Each source file is read once however many notes target it
         if sources[rec.path] == nil then
             local absolute = root and (root .. "/" .. rec.path) or rec.path
             sources[rec.path] = { content = buffer.content(absolute) }

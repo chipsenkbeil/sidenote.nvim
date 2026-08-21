@@ -179,8 +179,7 @@ describe("session.written from a live mark", function()
     end)
 
     it("leaves the record alone when the span was deleted outright", function()
-        -- Deleting is not editing: nothing asserts a new home, so nothing
-        -- is written and the note reports as stale instead
+        -- Deleting is not editing: nothing asserts a new home for the note
         local bufnr = project_buffer()
         local root, before = painted(bufnr, 3, 5)
         vim.api.nvim_buf_set_lines(bufnr, 2, 5, false, {})
@@ -209,8 +208,7 @@ describe("session.written from a live mark", function()
         local bufnr = project_buffer()
         local root, before = painted(bufnr, 4, 4)
 
-        -- Rewrite the span from disk state, then re-paint: the resolver can
-        -- only guess now, and the mark inherits that
+        -- Re-painting over a rewritten span leaves the mark on a guess
         vim.api.nvim_buf_set_lines(bufnr, 3, 4, false, { "  return 1 + offset" })
         session.refresh(bufnr, opts())
         vim.api.nvim_buf_set_lines(bufnr, 3, 4, false, { "  return 2 + offset" })

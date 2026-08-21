@@ -8,21 +8,19 @@ local M = {}
 ---Prose shown as virtual text beneath annotated code.
 M.PROSE = "SidenoteProse"
 
----The note editor's context header, comment-colored so it reads as margin.
+---A note's context header, comment-colored so it reads as margin.
 M.CONTEXT = "SidenoteContext"
 
 ---A healthy anchor with no prose yet, dimmed into a deletion candidate.
 M.BARE = "SidenoteBare"
 
----The note editor's winbar, backed like a statusline so it reads as chrome.
+---A note window's winbar, backed like a statusline so it reads as chrome.
 M.WINBAR = "SidenoteWinbar"
 
----Severity ordering, expressed by borrowing the diagnostic vocabulary: an
----exact anchor is information, a guessed one is a hint, and anything the
----resolver declined to place is a warning or worse.
+---Severity per status, borrowing the diagnostic vocabulary.
 ---
----Written once and used for every family of groups below, so the ordering
----cannot drift between them.
+---An exact anchor is information, a guessed one is a hint, and anything the
+---resolver declined to place is a warning or worse.
 ---@type table<sidenote.Status, string>
 local SEVERITY = {
     attached = "Info",
@@ -32,6 +30,7 @@ local SEVERITY = {
     filegone = "Error",
 }
 
+---Status ink, coloring a glyph or a label rather than the text it points at.
 ---@type table<sidenote.Status, string>
 M.GROUPS = {
     attached = "SidenoteAttached",
@@ -41,21 +40,26 @@ M.GROUPS = {
     filegone = "SidenoteFilegone",
 }
 
+---Name one group per status, `prefix` followed by the capitalized status.
+---@param prefix string shared start of every name in the family
+---@return table<sidenote.Status, string> family mapping of status -> group name
+local function family(prefix)
+    local groups = {}
+    for status in pairs(M.GROUPS) do
+        groups[status] = prefix .. status:sub(1, 1):upper() .. status:sub(2)
+    end
+    return groups
+end
+
 ---Groups for the `underline` indicator, which marks the annotated text itself
 ---rather than tinting the whole line.
 ---@type table<sidenote.Status, string>
-M.UNDERLINES = {}
-for status in pairs(M.GROUPS) do
-    M.UNDERLINES[status] = "SidenoteUnderline" .. status:sub(1, 1):upper() .. status:sub(2)
-end
+M.UNDERLINES = family("SidenoteUnderline")
 
 ---Groups for the `highlight` indicator and the range overlay: marker-pen ink
 ---over the annotated text, so they need a background, not a glyph color.
 ---@type table<sidenote.Status, string>
-M.MARKS = {}
-for status in pairs(M.GROUPS) do
-    M.MARKS[status] = "SidenoteMark" .. status:sub(1, 1):upper() .. status:sub(2)
-end
+M.MARKS = family("SidenoteMark")
 
 ---What each marker links to when a colorscheme says nothing.
 ---
@@ -97,9 +101,8 @@ M.PRIORITIES = {
 
 ---Gutter glyph per status, one distinct mark each.
 ---
----Beside visible code the highlight alone would carry the difference, but the
----browser lists annotations away from their source, where the status is the
----whole point and has to survive a colourless terminal.
+---A listing shows annotations away from their source, where the status is the
+---whole point and has to survive a colorless terminal.
 ---@type table<sidenote.Status, string>
 M.SIGNS = {
     attached = "▍",
@@ -111,16 +114,14 @@ M.SIGNS = {
 
 ---Glyphs a healthy todo signs with: a box, checked once it is not open.
 ---
----Kind shows only while the anchor is exact; every hurt status keeps its
----own glyph, since hurt is louder than kind.
+---Kind shows only while the anchor is exact, since hurt is louder than kind.
 ---@type {open: string, done: string}
 M.TODO = { open = "☐", done = "☑" }
 
 ---Glyphs that mark one spot rather than extending down a span.
 ---
----A bar repeated down a span reads as continuation; a badge repeated
----reads as that many separate notes, so a span shows a badge once with
----`TAIL` on the lines below it.
+---A badge repeated down a span reads as that many separate notes, so a span
+---shows one badge with `TAIL` on the lines below it.
 ---@type table<string, boolean>
 M.BADGES = {
     [M.SIGNS.ambiguous] = true,

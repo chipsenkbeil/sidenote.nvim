@@ -1,6 +1,7 @@
 local vcs = require("sidenote.store.vcs")
 
----@return string
+---Build a git repository holding one committed file.
+---@return string root
 local function git_repo()
     local dir = vim.fn.tempname()
     vim.fn.mkdir(dir, "p")
@@ -58,8 +59,6 @@ describe("vcs.probe", function()
     end)
 
     it("reports kind jj for a colocated repository", function()
-        -- Detection is directory-based, so a real jj repo is not needed to
-        -- exercise it; a colocated repo has both .jj and .git
         local dir = git_repo()
         vim.fn.mkdir(dir .. "/.jj", "p")
         assert.eq(vcs.probe(dir .. "/f.txt").kind, "jj")
@@ -72,8 +71,6 @@ describe("vcs.probe", function()
     end)
 
     it("stamps the stable jj change id beside the commit", function()
-        -- The change id is what review filtering keys on: it survives the
-        -- rewrites that constantly replace a jj working-copy commit
         if vim.fn.executable("jj") == 0 then
             return
         end

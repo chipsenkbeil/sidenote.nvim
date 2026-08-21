@@ -568,7 +568,7 @@ The whole project's annotations as the quickfix list.
 
 `sidenote.delete()`
 
-Delete the annotation under the cursor, after a confirmation that quotes
+Delete the annotation under the cursor, after confirming.
 
 `sidenote.pen()`
 

@@ -1,8 +1,7 @@
 ---`doc/sidenote.txt` is generated from README.md and the plugin's own source.
 ---These check the pipeline's contract: that the help file is a real help file,
 ---that its tags resolve, and that the README declares a block for every
----reference section. Coverage of the API, commands and config is no longer
----asserted here — generation is what guarantees it.
+---reference section.
 
 ---@param path string
 ---@return string
@@ -46,7 +45,6 @@ describe("the generated help file", function()
     end)
 
     it("resolves every tag it links to", function()
-        -- A |link| with no matching *tag* is a dead end for a reader
         vim.cmd("helptags doc")
         local tags = read("doc/tags")
         local linked = 0
@@ -98,8 +96,7 @@ describe("the README as documentation source", function()
     end)
 
     it("has its generated blocks filled in", function()
-        -- An empty block means the generator has not run since the marker was
-        -- added, and `make docs-check` would be the only thing to notice
+        -- An empty block means the generator has not run since the marker was added
         local body = readme()
         for name in body:gmatch("<!%-%- gen:(%w+) %-%->") do
             local block = body:match(("<!%%-%%- gen:%s %%-%%->\n(.-)<!%%-%%- /gen:"):format(name))

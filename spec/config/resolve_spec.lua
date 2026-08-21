@@ -124,15 +124,14 @@ describe("config.resolve", function()
     end)
 
     it("degrades on a section that is not a table, rather than erroring", function()
-        -- The promise is defaults alongside the error; indexing 5 would throw
-        -- and take every entry point down with it
+        -- Indexing 5 would throw and take every entry point down with it
         local resolved, err = config.resolve({ indicator = 5 })
         assert.contains(err, "vim.g.sidenote.indicator")
         assert.eq(resolved.indicator.style, "sign")
     end)
 
     it("says a string is not a section, which is the common slip", function()
-        -- `preview = "float"` for `preview = { style = "float" }`
+        -- The intended form is `preview = { style = "float" }`
         local _, err = config.resolve({ preview = "float" })
         assert.contains(err, "vim.g.sidenote.preview")
         assert.contains(err, "expected a table")
@@ -175,7 +174,8 @@ describe("config.resolve", function()
     it("rejects a kind-split pen with an unknown kind or pen", function()
         local _, err = config.resolve({ pen = { idea = "green" } })
         assert.contains(err, "vim.g.sidenote.pen")
-        local _, bad = config.resolve({ pen = { todo = "sparkles" } })
-        assert.contains(bad, "vim.g.sidenote.pen.todo")
+
+        _, err = config.resolve({ pen = { todo = "sparkles" } })
+        assert.contains(err, "vim.g.sidenote.pen.todo")
     end)
 end)

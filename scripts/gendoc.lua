@@ -30,6 +30,13 @@ local function write(path, lines)
     fh:close()
 end
 
+---@param path string
+---@param lines string[]
+---@return boolean
+local function matches(path, lines)
+    return table.concat(read(path), "\n") == table.concat(lines, "\n")
+end
+
 ---@param lang string fence language, or "" for none
 ---@param lines string[]
 ---@return string[]
@@ -40,28 +47,26 @@ local function fenced(lang, lines)
     return out
 end
 
----The default configuration, quoted from the function that returns it.
 ---@return string[]
 local function config_block()
     local body = source.section(root .. "/lua/sidenote/config.lua", "^%s*return {", "^%s*}$")
-    local out = { "```lua", "vim.g.sidenote = {" }
+    local out = { "vim.g.sidenote = {" }
     for _, line in ipairs(body) do
         out[#out + 1] = (line:gsub("^        ", "    "))
     end
     out[#out + 1] = "}"
-    out[#out + 1] = "```"
-    return out
+    return fenced("lua", out)
 end
 
 ---@return string[]
 local function commands_block()
+    local FENCE_WIDTH = 68 -- Widest line a help file's indented, never-rewrapped fence fits
+
     local names = source.subcommands(root .. "/plugin/sidenote.lua")
-    -- Wrapped here: a code fence is indented four spaces in the help file and
-    -- never rewrapped, so one long line would overflow the page
     local lines, line = {}, ":Sidenote"
     for i, name in ipairs(names) do
         local sep = i == 1 and " " or " | "
-        if #line + #sep + #name > 68 then
+        if #line + #sep + #name > FENCE_WIDTH then
             lines[#lines + 1] = line
             line = "          | " .. name
         else
@@ -154,15 +159,7 @@ local help = vimdoc.render(readme, {
     version = "NVIM v0.11.0",
 })
 
----@param path string
----@param lines string[]
----@return boolean
-local function matches(path, lines)
-    return table.concat(read(path), "\n") == table.concat(lines, "\n")
-end
-
--- `--check` compares instead of writing. Byte comparison rather than a VCS
--- diff, so it means the same thing in a working tree with other changes in it
+-- Compare bytes, not a VCS diff, so other changes in the tree cannot skew it
 if _G.arg[1] == "--check" then
     local stale = {}
     for path, wanted in pairs({ [README] = readme, [HELP] = help }) do

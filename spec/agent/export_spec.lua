@@ -32,13 +32,16 @@ local function project()
     return assert(vim.uv.fs_realpath(root))
 end
 
+---@class spec.agent.NoteOpts
+---@field name string file to annotate, relative to the root
+---@field line integer line to anchor on
+---@field prose string[] the note itself
+
 ---@param root string
----@param name string
----@param line integer
----@param prose string[]
+---@param note spec.agent.NoteOpts
 ---@return string id
-local function annotate(root, name, line, prose)
-    local path = root .. "/" .. name
+local function annotate(root, note)
+    local path = root .. "/" .. note.name
     local bufnr = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_name(bufnr, path)
     local fh = assert(io.open(path, "r"))
@@ -47,13 +50,16 @@ local function annotate(root, name, line, prose)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(body:gsub("\n$", ""), "\n"))
 
     local cfg = opts()
-    local result =
-        assert(capture.run(bufnr, { scope = "lines", range = { line, 0, line, 0 }, config = cfg }))
+    local result = assert(capture.run(bufnr, {
+        scope = "lines",
+        range = { note.line, 0, note.line, 0 },
+        config = cfg,
+    }))
     vim.api.nvim_buf_delete(bufnr, { force = true })
 
-    local note = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
-    note:write(table.concat(prose, "\n") .. "\n")
-    note:close()
+    local out = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
+    out:write(table.concat(note.prose, "\n") .. "\n")
+    out:close()
     return result.id
 end
 
@@ -74,9 +80,9 @@ describe("export.project", function()
 
     it("groups annotations from several files, sorted by path then line", function()
         local root = project()
-        annotate(root, "beta.lua", 3, { "third" })
-        annotate(root, "alpha.lua", 4, { "second" })
-        annotate(root, "alpha.lua", 1, { "first" })
+        annotate(root, { name = "beta.lua", line = 3, prose = { "third" } })
+        annotate(root, { name = "alpha.lua", line = 4, prose = { "second" } })
+        annotate(root, { name = "alpha.lua", line = 1, prose = { "first" } })
 
         local doc = document(root)
         assert.eq(#doc.annotations, 3)
@@ -87,7 +93,7 @@ describe("export.project", function()
 
     it("reports a deleted source file as code that no longer exists", function()
         local root = project()
-        annotate(root, "beta.lua", 2, { "about deleted code" })
+        annotate(root, { name = "beta.lua", line = 2, prose = { "about deleted code" } })
         os.remove(root .. "/beta.lua")
 
         local record = document(root).annotations[1]
@@ -99,17 +105,16 @@ describe("export.project", function()
 
     it("round-trips through vim.json unchanged", function()
         local root = project()
-        annotate(root, "alpha.lua", 4, { "the note", "with a body" })
+        annotate(root, { name = "alpha.lua", line = 4, prose = { "the note", "with a body" } })
         local doc = document(root)
         assert.eq_deep(vim.json.decode(vim.json.encode(doc)), doc)
     end)
 
     it("produces identical output for two runs over unchanged input", function()
-        -- The document is meant to be diffable; a reordering between runs would
-        -- make every diff meaningless
+        -- A reordering between runs would make the document undiffable
         local root = project()
-        annotate(root, "beta.lua", 3, { "one" })
-        annotate(root, "alpha.lua", 1, { "two" })
+        annotate(root, { name = "beta.lua", line = 3, prose = { "one" } })
+        annotate(root, { name = "alpha.lua", line = 1, prose = { "two" } })
         assert.eq(vim.json.encode(document(root)), vim.json.encode(document(root)))
     end)
 
@@ -126,13 +131,16 @@ describe("export.project", function()
 
     it("carries prose with its trailing newline trimmed but its shape intact", function()
         local root = project()
-        annotate(root, "alpha.lua", 4, { "summary", "", "body after a gap" })
+        annotate(
+            root,
+            { name = "alpha.lua", line = 4, prose = { "summary", "", "body after a gap" } }
+        )
         assert.eq(document(root).annotations[1].prose, "summary\n\nbody after a gap")
     end)
 
     it("gives a note with no prose an empty string rather than nothing", function()
         local root = project()
-        annotate(root, "alpha.lua", 4, {})
+        annotate(root, { name = "alpha.lua", line = 4, prose = {} })
         assert.eq(document(root).annotations[1].prose, "")
     end)
 end)
