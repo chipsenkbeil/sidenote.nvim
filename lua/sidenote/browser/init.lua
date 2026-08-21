@@ -41,15 +41,16 @@ local M = {}
 ---Prefix naming a browser buffer, followed by the absolute source path.
 M.SCHEME = "sidenote://"
 
----Fold expression folding each note's body, its header and summary exempt.
+---Fold expression folding each note's whole prose, its header exempt.
 ---
 ---Structure is read back out of the text, so nothing has to be kept in step
----with the buffer as it is edited. A header and the line under it (the
----summary) sit at level zero, so no fold can ever swallow them; the body
----starts its own fold on the line after the summary. The marker is matched
----fully, so a prose line mentioning /etc/hosts does not start a fold.
-M.FOLDEXPR = [[getline(v:lnum) =~ '^/\w\+ ' || getline(v:lnum-1) =~ '^/\w\+ ' ? '0']]
-    .. [[ : getline(v:lnum-2) =~ '^/\w\+ ' ? '>1' : '1']]
+---with the buffer as it is edited. A header sits at level zero, so no fold
+---can ever swallow it; the prose starts its own fold on the line below, and
+---a closed fold reads as its first line — the summary — org-style. The
+---marker is matched fully, so a prose line mentioning /etc/hosts does not
+---start a fold.
+M.FOLDEXPR = [[getline(v:lnum) =~ '^/\w\+ ' ? '0']]
+    .. [[ : getline(v:lnum-1) =~ '^/\w\+ ' ? '>1' : '1']]
 
 ---@type table<integer, sidenote.browser.State>
 local states = {}
@@ -145,12 +146,12 @@ local function configure(winid)
     set_local(winid, "concealcursor", "nvic")
     set_local(winid, "foldmethod", "expr")
     set_local(winid, "foldexpr", M.FOLDEXPR)
-    -- A closed body renders as one dim line saying how much it holds; see
+    -- A closed note renders as its own summary line, org-style; see
     -- M.foldtext
     set_local(winid, "foldtext", "v:lua.require'sidenote.browser'.foldtext()")
     set_local(winid, "foldenable", true)
-    -- A one-line body is a one-line fold, which vim leaves open at the
-    -- default of 1. Zero keeps "every body starts folded" true
+    -- A summary-only note is a one-line fold, which vim leaves open at the
+    -- default of 1. Zero keeps "every note starts folded" true
     set_local(winid, "foldminlines", 0)
     set_local(
         winid,
@@ -162,11 +163,16 @@ local function configure(winid)
     set_local(winid, "wrap", false)
 end
 
----One dim line standing in for a folded body. Display only.
+---A folded note stands in as its own summary line, the way org folds a
+---headline.
+---
+---Read from the buffer at draw time, so an edit made while the fold was
+---open shows through the moment it closes. Display only: nothing here can
+---leak into a write.
 ---@return string
 function M.foldtext()
-    local hidden = vim.v.foldend - vim.v.foldstart + 1
-    return ("⋯ +%d line%s"):format(hidden, hidden == 1 and "" or "s")
+    local summary = vim.trim(vim.fn.getline(vim.v.foldstart))
+    return summary == "" and "⋯" or (summary .. " ⋯")
 end
 
 ---Collapse every body, then hand back the rows whose bodies were open.
@@ -185,8 +191,8 @@ local function refold(bufnr, state, keep)
             if keep then
                 vim.api.nvim_win_call(winid, function()
                     for i, row in ipairs(state.rows) do
-                        if keep[row.entry.id] and #row.prose > 1 then
-                            pcall(vim.cmd, (state.headers[i] + 2) .. "foldopen")
+                        if keep[row.entry.id] and #row.prose > 0 then
+                            pcall(vim.cmd, (state.headers[i] + 1) .. "foldopen")
                         end
                     end
                 end)
@@ -195,18 +201,18 @@ local function refold(bufnr, state, keep)
     end
 end
 
----Which bodies are open right now, by id, for a repaint to hand back.
+---Which notes are open right now, by id, for a repaint to hand back.
 ---
 ---Read from the current window, which is where every caller of a
----preserving repaint already sits. The body fold starts two lines under
----the header; a note with no body is trivially open.
+---preserving repaint already sits. The prose fold starts on the line under
+---the header; a note with no prose is trivially open.
 ---@param state sidenote.browser.State
 ---@return table<string, boolean>
 local function unfolded(state)
     local open = {}
     for i, row in ipairs(state.rows or {}) do
         local lnum = state.headers and state.headers[i]
-        if lnum and vim.fn.foldclosed(lnum + 2) == -1 then
+        if lnum and vim.fn.foldclosed(lnum + 1) == -1 then
             open[row.entry.id] = true
         end
     end
@@ -292,16 +298,16 @@ local function report(applied, problems)
     end
 end
 
----Toggle the note's body fold, the way org's TAB cycles a headline.
+---Toggle the note's prose fold, the way org's TAB cycles a headline.
 ---
----From any of the note's lines: the body fold starts two lines under the
----header, and a note with no body has nothing to toggle.
+---From any of the note's lines: the prose fold starts on the line under
+---the header, and a note with no prose has nothing to toggle.
 ---@param bufnr integer
 local function toggle_fold(bufnr)
     for n = vim.fn.line("."), 1, -1 do
         local text = vim.api.nvim_buf_get_lines(bufnr, n - 1, n, false)[1] or ""
         if text:match("^/%S+ ") then
-            local fold = n + 2
+            local fold = n + 1
             if vim.fn.foldclosed(fold) == -1 then
                 pcall(vim.cmd, fold .. "foldclose")
             else
@@ -320,7 +326,7 @@ end
 local function toggle_all(state)
     for i, row in ipairs(state.rows or {}) do
         local lnum = state.headers and state.headers[i]
-        if lnum and #row.prose > 1 and vim.fn.foldclosed(lnum + 2) == -1 then
+        if lnum and #row.prose > 0 and vim.fn.foldclosed(lnum + 1) == -1 then
             vim.cmd("normal! zM")
             return
         end
@@ -331,9 +337,9 @@ end
 ---What `g?` shows below the mappings themselves.
 local HELP_FOOTER = {
     "",
-    "  Folds are real: za, zR, zM and friends work on any body",
+    "  Folds are real: za, zR, zM and friends work on any prose",
     "  Edit any column or prose line, then :w to apply",
-    "  Deleting a note is d2j on its header; a closed body counts once",
+    "  Deleting a note is dj on its header; closed prose counts once",
 }
 
 ---Step out of the listing surface before opening something else.
@@ -641,14 +647,14 @@ local function bind(bufnr)
         },
         {
             lhs = "<Tab>",
-            desc = "Toggle this note's body, org-style",
+            desc = "Toggle this note's prose, org-style",
             fn = function()
                 toggle_fold(bufnr)
             end,
         },
         {
             lhs = "<S-Tab>",
-            desc = "Toggle every body: the index, or all the prose",
+            desc = "Toggle every note: the index, or all the prose",
             fn = function()
                 local state = states[bufnr]
                 if state then

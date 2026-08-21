@@ -107,41 +107,41 @@ describe("browser.open", function()
         assert.eq(browser.open(source, { config = opts() }), first)
     end)
 
-    it("opens with every body folded, headers and summaries in plain sight", function()
+    it("opens with every note's prose folded, headers in plain sight", function()
         -- Entries sort by line, so the note on line 1 renders first and the
         -- one on line 4 renders second, carrying its body with it
         local source = project_buffer()
         annotate(source, 4, { "has a body", "the body line" })
-        annotate(source, 1, { "no body" })
+        annotate(source, 1, { "just a summary" })
 
         assert(browser.open(source, { config = opts() }))
         assert.eq(vim.fn.foldclosed(1), -1, "a header is never folded")
-        assert.eq(vim.fn.foldclosed(2), -1, "a summary is never folded")
+        assert.eq(vim.fn.foldclosed(2), 2, "the prose folds shut, summary included")
+        assert.eq(vim.fn.foldclosedend(2), 2)
         assert.eq(vim.fn.foldclosed(3), -1)
-        assert.eq(vim.fn.foldclosed(4), -1)
-        assert.eq(vim.fn.foldclosed(5), 5, "the body folds shut")
-        assert.eq(vim.fn.foldclosedend(5), 5)
+        assert.eq(vim.fn.foldclosed(4), 4)
+        assert.eq(vim.fn.foldclosedend(4), 5)
     end)
 
-    it("stands a folded body in with one dim line saying how much it holds", function()
+    it("stands a folded note in with its own summary, org-style", function()
         local source = project_buffer()
-        annotate(source, 4, { "summary", "body one", "body two" })
+        annotate(source, 4, { "something is bacon", "body one", "body two" })
         assert(browser.open(source, { config = opts() }))
 
-        assert.eq(vim.fn.foldclosed(3), 3)
-        assert.eq(vim.fn.foldclosedend(3), 4)
-        assert.contains(vim.fn.foldtextresult(3), "2")
+        assert.eq(vim.fn.foldclosed(2), 2)
+        assert.eq(vim.fn.foldclosedend(2), 4)
+        assert.contains(vim.fn.foldtextresult(2), "something is bacon")
     end)
 
-    it("takes a whole note with d2j, the closed body counting once", function()
+    it("takes a whole note with dj, the closed prose counting once", function()
         -- An operator motion over a closed fold includes the whole fold, so
-        -- header, summary and however much body is three lines to d
+        -- header and however much prose is two lines to d
         local source = project_buffer()
         annotate(source, 4, { "summary", "body one", "body two" })
         local bufnr = assert(browser.open(source, { config = opts() }))
 
         vim.api.nvim_win_set_cursor(0, { 1, 0 })
-        vim.cmd("normal! d2j")
+        vim.cmd("normal! dj")
         assert.eq_deep(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), { "" })
     end)
 
