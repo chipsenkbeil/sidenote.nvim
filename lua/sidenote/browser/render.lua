@@ -25,7 +25,9 @@ local M = {}
 ---@type sidenote.browser.Column[]
 M.COLUMNS = {
     { name = "kind", width = 4 },
-    { name = "state", width = 8 },
+    -- Sized to content, so a listing of nothing but open notes carries no
+    -- dead pad; a longer state widens every row together
+    { name = "state", width = 0 },
     -- Sized to content: pen names are user-configured, so no width is safe
     { name = "pen", width = 0 },
     { name = "location", width = 0 },

@@ -78,6 +78,13 @@ describe("browser.render columns", function()
         assert.eq(select(2, rest:gsub("%s%s+", "")), 3)
     end)
 
+    it("sizes the state column to its content, like the pen column", function()
+        -- A fixed width of eight left dead space after "open" in any
+        -- listing that held no longer state
+        local rest = without_id(render.rows({ row() })[1])
+        assert.match(rest, "^note  open  %-  ")
+    end)
+
     it("renders a penless row with a placeholder, and a pen by its name", function()
         local lines = render.rows({ row(), row({ id = OTHER, pen = "coral" }) })
         assert.contains(without_id(lines[1]), "  -  ")
