@@ -735,8 +735,18 @@ local function show(state)
             buffer = bufnr,
             desc = "Clamp the cursor past the concealed id, the way oil does",
             callback = function(event)
-                local first = vim.api.nvim_get_current_line():match("^/%w+ ()")
                 local pos = vim.api.nvim_win_get_cursor(0)
+
+                -- A motion over a closed fold strands the cursor in the
+                -- fold's hidden lines; its header is the only honest place
+                local fold = vim.fn.foldclosed(pos[1])
+                if fold ~= -1 and fold ~= pos[1] then
+                    pos = { fold, 0 }
+                    vim.api.nvim_win_set_cursor(0, pos)
+                end
+
+                local line = vim.api.nvim_buf_get_lines(0, pos[1] - 1, pos[1], false)[1] or ""
+                local first = line:match("^/%w+ ()")
                 if first and pos[2] < first - 1 then
                     vim.api.nvim_win_set_cursor(0, { pos[1], first - 1 })
 

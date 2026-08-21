@@ -508,6 +508,19 @@ describe("browser cursor", function()
         assert.eq(assert(line:match("^/%w+ ()")) - 1, first)
     end)
 
+    it("snaps out of a closed fold's interior onto its header", function()
+        local source = project_buffer()
+        annotate(source, 1, { "the summary", "the body" })
+        local listing = assert(browser.open(source, { config = opts() }))
+        local first = visible_start(listing)
+
+        -- A word motion over a closed fold strands the cursor in the hidden
+        -- prose; the landing is simulated for the same reason as above
+        vim.api.nvim_win_set_cursor(0, { 3, 5 })
+        vim.api.nvim_exec_autocmds("CursorMoved", { buffer = listing })
+        assert.eq_deep(vim.api.nvim_win_get_cursor(0), { 1, first })
+    end)
+
     it("leaves the cursor alone on prose lines", function()
         local source = project_buffer()
         annotate(source, 1, { "the summary", "the body" })

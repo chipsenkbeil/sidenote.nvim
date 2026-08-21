@@ -313,6 +313,11 @@ already happened once here. Check `jj st` after every absorb.
   rendering bug rather than as a setting.
 - **Concealed text still owns its cursor columns**, so the browser clamps the
   cursor past the marker (CursorMoved/CursorMovedI/InsertEnter), oil-style.
+  The same autocmd snaps a cursor stranded inside a closed fold back onto the
+  fold's header — a horizontal motion over a closed row otherwise parks the
+  cursor invisibly in the hidden prose (verified: `w` lands on the fold's
+  last line and sticks). Foldtext is a painting; no cursor can move within
+  it, so motion on a closed row is inert by design and `<Tab>` is the way in.
   Two verified caveats: headless `nvim -l` never emits CursorMoved(I) — not
   even across `vim.wait` — so the spec simulates it with `nvim_exec_autocmds`
   and only the InsertEnter path tests end to end; and InsertEnter restores
