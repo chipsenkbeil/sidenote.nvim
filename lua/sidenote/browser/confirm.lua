@@ -1,4 +1,4 @@
-local render = require("sidenote.browser.render")
+local record = require("sidenote.core.record")
 
 ---Called with everything an edit would do, to decide whether it happens.
 ---@alias sidenote.browser.ConfirmFn fun(actions: sidenote.browser.Action[]): boolean
@@ -52,7 +52,7 @@ end
 ---@return string
 local function detail(action)
     if action.kind == "change" then
-        local from, to = action.from or render.NO_PEN, action.to or render.NO_PEN
+        local from, to = action.from or record.NO_PEN, action.to or record.NO_PEN
         return ("%s   %s -> %s"):format(action.field, from, to)
     end
     if action.kind == "delete" then

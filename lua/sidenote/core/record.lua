@@ -52,6 +52,13 @@ local M = {}
 ---Current on-disk schema version.
 M.SCHEMA = 1
 
+---What a penless note shows where a pen name would go.
+---
+---A column placeholder, not a name: a pen is one word so it can sit in a
+---space-delimited column, and `-` is reserved so an empty cell reads as one.
+---The word for a reader is `pen.NONE`.
+M.NO_PEN = "-"
+
 ---Format every timestamp in a record is written in: UTC, to the second.
 ---
 ---Part of the on-disk contract rather than a display choice, which is why it

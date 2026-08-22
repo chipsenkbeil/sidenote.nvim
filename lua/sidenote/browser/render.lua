@@ -1,4 +1,5 @@
 local location = require("sidenote.location")
+local record = require("sidenote.core.record")
 
 ---@class sidenote.browser.Row
 ---@field entry sidenote.session.Entry resolved annotation this row stands for
@@ -29,9 +30,6 @@ M.COLUMNS = {
     { name = "pen", width = 0 },
     { name = "location", width = 0 },
 }
-
----What the pen column renders when a row carries none.
-M.NO_PEN = "-"
 
 ---Spaces between one column and the next.
 ---
@@ -73,7 +71,7 @@ end
 ---@return string[] cells kind, state, pen and location, unpadded
 local function cells(row)
     local rec = row.entry.record
-    return { rec.kind, rec.state, rec.pen or M.NO_PEN, location.format(rec) }
+    return { rec.kind, rec.state, rec.pen or record.NO_PEN, location.format(rec) }
 end
 
 ---Measure each column, widening the unfixed ones to their widest cell.

@@ -8,8 +8,13 @@ local config = require("sidenote.config")
 ---@class sidenote.pen
 local M = {}
 
----The word standing in for no pen, in the ring and on the command line.
-local NONE = "none"
+---The word standing in for no pen wherever one is spoken to a reader.
+---
+---The name, not the placeholder: a column shows `record.NO_PEN`, but a ring, a
+---menu row and a message all say this.
+M.NONE = "none"
+
+local NONE = M.NONE
 
 ---@type {pen: string|nil}|nil the pen picked up this session, nil until one is
 local held

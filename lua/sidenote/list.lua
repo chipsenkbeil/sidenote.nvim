@@ -18,9 +18,6 @@ local M = {}
 ---The bracketed fields, in the order they render and the cursor reads them back.
 local FIELDS = { "kind", "state", "pen" }
 
----What a note with no pen shows in the pen column.
-local NO_PEN = "-"
-
 ---The resolved options behind the last list of each shape, for rebuilds.
 ---@type table<"loclist"|"qflist", sidenote.list.Opts>
 local held = {}
@@ -31,7 +28,7 @@ local held = {}
 local function label(entry)
     local parts = {}
     for i, field in ipairs(FIELDS) do
-        parts[i] = entry.record[field] or NO_PEN
+        parts[i] = entry.record[field] or record.NO_PEN
     end
     local text = "[" .. table.concat(parts, " ") .. "]"
     if entry.summary then

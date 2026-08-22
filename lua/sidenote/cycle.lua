@@ -1,6 +1,5 @@
 local config = require("sidenote.config")
 local record = require("sidenote.core.record")
-local render = require("sidenote.browser.render")
 local store = require("sidenote.store")
 
 ---Rotates a note's kind, state or pen, from wherever the note is visible.
@@ -26,7 +25,7 @@ function M.ring(field, cfg)
     end
     local names = vim.tbl_keys(cfg.pens)
     table.sort(names)
-    table.insert(names, 1, render.NO_PEN)
+    table.insert(names, 1, record.NO_PEN)
     return names
 end
 
@@ -43,12 +42,12 @@ function M.turn(rec, opts)
     local ring = M.ring(opts.field, opts.config)
     local at = 1
     for i, name in ipairs(ring) do
-        if name == (rec[opts.field] or render.NO_PEN) then
+        if name == (rec[opts.field] or record.NO_PEN) then
             at = i
         end
     end
     local turned = ring[(at - 1 + opts.offset) % #ring + 1]
-    rec[opts.field] = turned ~= render.NO_PEN and turned or nil
+    rec[opts.field] = turned ~= record.NO_PEN and turned or nil
     return turned
 end
 
@@ -102,7 +101,10 @@ function M.at_cursor(opts)
     if not M.set(entry, { field = field, value = rec[field], config = cfg }) then
         return false
     end
-    vim.notify(("sidenote: %s %s"):format(field, turned))
+    -- A message is prose: it says the word `:Sidenote pen` accepts, not the
+    -- placeholder a column shows
+    local spoken = turned == record.NO_PEN and require("sidenote.pen").NONE or turned
+    vim.notify(("sidenote: %s %s"):format(field, spoken))
     return true
 end
 

@@ -1,6 +1,7 @@
 local config = require("sidenote.config")
 local cycle = require("sidenote.cycle")
-local render = require("sidenote.browser.render")
+local pen = require("sidenote.pen")
+local record = require("sidenote.core.record")
 local store = require("sidenote.store")
 
 ---An emacs-style menu for the note under the cursor.
@@ -52,11 +53,14 @@ local function rows_for(entry, cfg)
     ---@param field "kind"|"state"|"pen"
     local function values(field)
         for _, name in ipairs(cycle.ring(field, cfg)) do
-            local held = rec[field] or render.NO_PEN
+            local held = rec[field] or record.NO_PEN
+            -- A menu row is read, not parsed, so it says the word rather than
+            -- showing the placeholder a column uses
+            local shown = name == record.NO_PEN and pen.NONE or name
             rows[#rows + 1] = {
-                text = ("  %s %s"):format(held == name and "●" or "○", name),
+                text = ("  %s %s"):format(held == name and "●" or "○", shown),
                 field = field,
-                value = name ~= render.NO_PEN and name or nil,
+                value = name ~= record.NO_PEN and name or nil,
             }
         end
     end

@@ -78,7 +78,7 @@ function M.header(text)
         row.fields[name] = { first = offset + cursor, last = offset + gap_first - 1 }
         cursor = gap_last + 1
     end
-    if row.pen == render.NO_PEN then
+    if row.pen == record.NO_PEN then
         row.pen = nil
     end
 
