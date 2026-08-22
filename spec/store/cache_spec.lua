@@ -1,43 +1,28 @@
-local capture = require("sidenote.capture")
+local fixture = require("spec.fixture")
 local index = require("sidenote.core.index")
 local scan = require("sidenote.scan")
 local store = require("sidenote.store")
 
----@param cache_dir? string omit to scan with caching off
+---@param cache_dir string where resolutions are cached
 ---@return sidenote.Config
 local function opts(cache_dir)
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
-        cache_dir = cache_dir,
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 60 },
-    }
+    return fixture.opts({ cache_dir = cache_dir })
 end
 
-local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
+local SOURCE = fixture.SOURCE
 
 ---Build a project on disk with one annotation, through a discarded buffer.
 ---@return string root
 ---@return string id
 local function project()
-    local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.sidenote", "p")
-    local path = root .. "/m.lua"
-    local fh = assert(io.open(path, "w"))
-    fh:write(table.concat(SOURCE, "\n") .. "\n")
-    fh:close()
-
-    local bufnr = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(bufnr, path)
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, SOURCE)
-    local result =
-        assert(capture.run(bufnr, { scope = "lines", range = { 4, 0, 4, 0 }, config = opts() }))
-    vim.api.nvim_buf_delete(bufnr, { force = true })
-    return assert(vim.uv.fs_realpath(root)), result.id
+    local root = fixture.project({ ["m.lua"] = fixture.SOURCE })
+    local note = fixture.annotate({
+        path = root .. "/m.lua",
+        line = 4,
+        detach = true,
+        config = opts(),
+    })
+    return root, note.id
 end
 
 ---Rewrite the one cached resolution so a later hit is unmistakable.

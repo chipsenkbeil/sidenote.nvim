@@ -1,40 +1,17 @@
 local browser = require("sidenote.browser")
-local capture = require("sidenote.capture")
+local fixture = require("spec.fixture")
 local render = require("sidenote.render")
 local session = require("sidenote.session")
 local store = require("sidenote.store")
 
 ---@return sidenote.Config
 local function opts()
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 60 },
-        browser = { style = "current" },
-    }
+    return fixture.opts({ browser = { style = "current" } })
 end
 
-local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
+local SOURCE = fixture.SOURCE
 
----Build a project with one source file open in a buffer.
----@return integer source
-local function project_buffer()
-    local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.sidenote", "p")
-    local path = root .. "/m.lua"
-    local fh = assert(io.open(path, "w"))
-    fh:write(table.concat(SOURCE, "\n") .. "\n")
-    fh:close()
-
-    local source = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(source, path)
-    vim.api.nvim_buf_set_lines(source, 0, -1, false, SOURCE)
-    return source
-end
+local project_buffer = fixture.project_buffer
 
 ---@param source integer
 ---@param line integer
@@ -42,13 +19,8 @@ end
 ---@return string id
 ---@return string root
 local function annotate(source, line, prose)
-    local cfg = opts()
-    local result =
-        assert(capture.run(source, { scope = "lines", range = { line, 0, line, 0 }, config = cfg }))
-    local fh = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
-    fh:write(table.concat(prose, "\n") .. "\n")
-    fh:close()
-    return result.id, result.root
+    local note = fixture.annotate({ bufnr = source, line = line, prose = prose, config = opts() })
+    return note.id, note.root
 end
 
 ---@return boolean

@@ -1,21 +1,11 @@
 local preview = require("sidenote.preview")
 local capture = require("sidenote.capture")
+local fixture = require("spec.fixture")
 local session = require("sidenote.session")
 
----@return sidenote.Config
-local function opts()
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 60 },
-    }
-end
+local opts = fixture.opts
 
-local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
+local SOURCE = fixture.SOURCE
 
 ---@class spec.ui.PreviewCase
 ---@field entry sidenote.session.Entry the annotation to preview

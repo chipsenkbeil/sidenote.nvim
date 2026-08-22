@@ -1,26 +1,19 @@
 local apply = require("sidenote.browser.apply")
 local browser = require("sidenote.browser")
-local capture = require("sidenote.capture")
 local diff = require("sidenote.browser.diff")
+local fixture = require("spec.fixture")
 local parse = require("sidenote.browser.parse")
 local store = require("sidenote.store")
 
 ---@return sidenote.Config
 local function opts()
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
+    return fixture.opts({
         pens = { yellow = "SidenotePenYellow" },
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 60 },
         browser = { style = "current" },
-    }
+    })
 end
 
-local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
+local SOURCE = fixture.SOURCE
 local OTHER = { "-- other file", "local x = 1", "return x" }
 
 ---@class spec.browser.Project
@@ -52,13 +45,7 @@ end
 ---@param prose string[]
 ---@return string id
 local function annotate(source, line, prose)
-    local cfg = opts()
-    local result =
-        assert(capture.run(source, { scope = "lines", range = { line, 0, line, 0 }, config = cfg }))
-    local fh = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
-    fh:write(table.concat(prose, "\n") .. "\n")
-    fh:close()
-    return result.id
+    return fixture.annotate({ bufnr = source, line = line, prose = prose, config = opts() }).id
 end
 
 ---Open the browser and hand back the state an edit is diffed against.

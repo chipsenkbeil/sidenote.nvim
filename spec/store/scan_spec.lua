@@ -1,54 +1,27 @@
-local capture = require("sidenote.capture")
+local fixture = require("spec.fixture")
 local scan = require("sidenote.scan")
 
----@return sidenote.Config
-local function opts()
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 60 },
-    }
-end
+local opts = fixture.opts
 
-local ALPHA = { "local M = {}", "", "function M.f()", "  return 1", "end" }
-local BETA = { "-- beta", "local x = 1", "return x" }
+local ALPHA = fixture.SOURCE
+local BETA = fixture.SECOND
 
----Build a project with two annotatable files on disk.
 ---@return string root
 local function project()
-    local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.sidenote", "p")
-    for name, lines in pairs({ ["alpha.lua"] = ALPHA, ["beta.lua"] = BETA }) do
-        local fh = assert(io.open(root .. "/" .. name, "w"))
-        fh:write(table.concat(lines, "\n") .. "\n")
-        fh:close()
-    end
-    return assert(vim.uv.fs_realpath(root))
+    return fixture.project({ ["alpha.lua"] = ALPHA, ["beta.lua"] = BETA })
 end
 
----Annotate a file through a throwaway buffer, leaving nothing loaded to scan.
 ---@param root string
 ---@param name string
 ---@param line integer
 ---@return string id
 local function annotate(root, name, line)
-    local path = root .. "/" .. name
-    local bufnr = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(bufnr, path)
-    local fh = assert(io.open(path, "r"))
-    local body = fh:read("*a")
-    fh:close()
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(body:gsub("\n$", ""), "\n"))
-
-    local result = assert(
-        capture.run(bufnr, { scope = "lines", range = { line, 0, line, 0 }, config = opts() })
-    )
-    vim.api.nvim_buf_delete(bufnr, { force = true })
-    return result.id
+    return fixture.annotate({
+        path = root .. "/" .. name,
+        line = line,
+        detach = true,
+        config = opts(),
+    }).id
 end
 
 describe("scan.project", function()

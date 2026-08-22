@@ -1,40 +1,19 @@
-local capture = require("sidenote.capture")
 local editor = require("sidenote.editor")
+local fixture = require("spec.fixture")
 local follow = require("sidenote.follow")
 local store = require("sidenote.store")
 local window = require("sidenote.window")
 
 ---@return sidenote.Config
 local function opts()
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
+    return fixture.opts({
         pens = {},
-        indicator = { style = "sign", highlight = "off" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 40 },
-    }
+        indicator = { highlight = "off" },
+        editor = { size = 40 },
+    })
 end
 
-local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
-
----Build a project with one source file open in a buffer.
----@return integer bufnr
-local function project_buffer()
-    local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.sidenote", "p")
-    local path = root .. "/m.lua"
-    local fh = assert(io.open(path, "w"))
-    fh:write(table.concat(SOURCE, "\n") .. "\n")
-    fh:close()
-
-    local bufnr = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(bufnr, path)
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, SOURCE)
-    return bufnr
-end
+local project_buffer = fixture.project_buffer
 
 ---@param bufnr integer
 ---@param line integer
@@ -42,13 +21,8 @@ end
 ---@return string id
 ---@return string root
 local function annotate(bufnr, line, prose)
-    local cfg = opts()
-    local result =
-        assert(capture.run(bufnr, { scope = "lines", range = { line, 0, line, 0 }, config = cfg }))
-    local fh = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
-    fh:write(table.concat(prose, "\n") .. "\n")
-    fh:close()
-    return result.id, result.root
+    local note = fixture.annotate({ bufnr = bufnr, line = line, prose = prose, config = opts() })
+    return note.id, note.root
 end
 
 ---Move the cursor as a user would, autocmds and all.

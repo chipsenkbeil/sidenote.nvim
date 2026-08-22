@@ -1,25 +1,7 @@
+local fixture = require("spec.fixture")
 local project = require("sidenote.store.project")
 
----Build a throwaway directory tree and return its root.
----
----A trailing slash makes a directory; anything else makes an empty file.
----@param paths string[]
----@return string
-local function tree(paths)
-    local root = vim.fn.tempname()
-    for _, rel in ipairs(paths) do
-        local full = root .. "/" .. rel
-        if rel:sub(-1) == "/" then
-            vim.fn.mkdir(full, "p")
-        else
-            vim.fn.mkdir(vim.fn.fnamemodify(full, ":h"), "p")
-            local fh = assert(io.open(full, "w"))
-            fh:write("")
-            fh:close()
-        end
-    end
-    return root
-end
+local tree = fixture.tree
 
 describe("project.MARKERS", function()
     it("leads with .sidenote, the marker an error names first", function()

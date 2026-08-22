@@ -2,50 +2,29 @@
 ---that leave it land.
 
 local browser = require("sidenote.browser")
-local capture = require("sidenote.capture")
+local fixture = require("spec.fixture")
 
----@param style? "split"|"float"|"current"|"tab"
+---@param style? string how the listing opens, a bottom split by default
 ---@return sidenote.Config
 local function opts(style)
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
+    return fixture.opts({
         pens = { blue = "SidenotePenBlue" },
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 60 },
         browser = { style = style or "split", position = "bottom" },
-    }
+    })
 end
 
-local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
-
----Build a project with one source file open in a buffer.
 ---@return integer bufnr
----@return string path
+---@return string path resolved absolute path of the annotated file
 local function project_buffer()
-    local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.sidenote", "p")
-    local path = root .. "/m.lua"
-    local fh = assert(io.open(path, "w"))
-    fh:write(table.concat(SOURCE, "\n") .. "\n")
-    fh:close()
-
-    local bufnr = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(bufnr, path)
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, SOURCE)
-    return bufnr, assert(vim.uv.fs_realpath(path))
+    local bufnr, _, path = fixture.project_buffer()
+    return bufnr, path
 end
 
 ---@param bufnr integer
 ---@param line integer
 ---@return sidenote.capture.Result
 local function annotate(bufnr, line)
-    return assert(
-        capture.run(bufnr, { scope = "lines", range = { line, 0, line, 0 }, config = opts() })
-    )
+    return fixture.annotate({ bufnr = bufnr, line = line, config = opts() })
 end
 
 ---@param keys string

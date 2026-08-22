@@ -1,37 +1,10 @@
 local capture = require("sidenote.capture")
+local fixture = require("spec.fixture")
 local store = require("sidenote.store")
 
-local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
+local project_buffer = fixture.project_buffer
 
----Build a project with one source file open in a buffer.
----@return integer bufnr
----@return string root symlink-resolved project root, as capture stores it
-local function project_buffer()
-    local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.sidenote", "p")
-    local path = root .. "/m.lua"
-    local fh = assert(io.open(path, "w"))
-    fh:write(table.concat(SOURCE, "\n") .. "\n")
-    fh:close()
-
-    local bufnr = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(bufnr, path)
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, SOURCE)
-    return bufnr, assert(vim.uv.fs_realpath(root))
-end
-
----@return sidenote.Config
-local function opts()
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 60 },
-    }
-end
+local opts = fixture.opts
 
 describe("capture.run", function()
     it("writes a sidecar pair into the project store", function()

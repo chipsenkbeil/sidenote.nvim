@@ -1,4 +1,5 @@
 local buffer = require("sidenote.buffer")
+local fixture = require("spec.fixture")
 
 ---Open a scratch buffer holding `lines`, named `name` or a fresh temp path.
 ---@param lines string[]
@@ -11,7 +12,7 @@ local function scratch(lines, name)
     return bufnr
 end
 
-local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
+local SOURCE = fixture.SOURCE
 
 describe("buffer.target file scope", function()
     it("captures the whole file with no position", function()

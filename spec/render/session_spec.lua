@@ -1,38 +1,14 @@
 local session = require("sidenote.session")
 local capture = require("sidenote.capture")
+local fixture = require("spec.fixture")
 local render = require("sidenote.render")
 local store = require("sidenote.store")
 
----@return sidenote.Config
-local function opts()
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 60 },
-    }
-end
+local opts = fixture.opts
 
-local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
+local SOURCE = fixture.SOURCE
 
----Build a project with one source file open in a buffer.
----@return integer bufnr
-local function project_buffer()
-    local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.sidenote", "p")
-    local path = root .. "/m.lua"
-    local fh = assert(io.open(path, "w"))
-    fh:write(table.concat(SOURCE, "\n") .. "\n")
-    fh:close()
-
-    local bufnr = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(bufnr, path)
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, SOURCE)
-    return bufnr
-end
+local project_buffer = fixture.project_buffer
 
 describe("session.entries", function()
     it("is empty for a buffer with no annotations", function()

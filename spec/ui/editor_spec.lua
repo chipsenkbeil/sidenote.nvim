@@ -1,5 +1,6 @@
 local capture = require("sidenote.capture")
 local editor = require("sidenote.editor")
+local fixture = require("spec.fixture")
 local highlight = require("sidenote.highlight")
 local session = require("sidenote.session")
 local store = require("sidenote.store")
@@ -7,19 +8,13 @@ local window = require("sidenote.window")
 
 ---@return sidenote.Config
 local function opts()
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
+    return fixture.opts({
         pens = { blue = "SidenotePenBlue" },
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 40 },
-    }
+        editor = { size = 40 },
+    })
 end
 
-local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
+local SOURCE = fixture.SOURCE
 
 ---Capture one annotation in a project of its own.
 ---@return sidenote.session.Entry

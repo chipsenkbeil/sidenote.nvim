@@ -1,4 +1,5 @@
 local editor = require("sidenote.editor")
+local fixture = require("spec.fixture")
 local sidenote = require("sidenote")
 local window = require("sidenote.window")
 
@@ -17,7 +18,7 @@ local function opts(template)
     }
 end
 
-local SOURCE = { "local M = {}", "", "function M.f()", "  return 1", "end" }
+local SOURCE = fixture.SOURCE
 
 ---Build a project with its source file current, ready to annotate.
 ---@return integer bufnr

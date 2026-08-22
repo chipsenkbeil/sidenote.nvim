@@ -1,38 +1,22 @@
 local browser = require("sidenote.browser")
-local capture = require("sidenote.capture")
+local fixture = require("spec.fixture")
 local store = require("sidenote.store")
 
 ---@return sidenote.Config
 local function opts()
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 60 },
-        browser = { style = "current" },
-    }
+    return fixture.opts({ browser = { style = "current" } })
 end
 
-local ALPHA = { "local M = {}", "", "function M.f()", "  return 1", "end" }
-local BETA = { "-- beta", "local x = 1", "return x" }
+local ALPHA = fixture.SOURCE
+local BETA = fixture.SECOND
 
----@class spec.browser.Tree
+---@class spec.browser.Annotated
 ---@field root string project root on disk
 ---@field alpha integer buffer holding alpha.lua
 
----@return spec.browser.Tree
-local function tree()
-    local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.sidenote", "p")
-    for name, lines in pairs({ ["alpha.lua"] = ALPHA, ["beta.lua"] = BETA }) do
-        local fh = assert(io.open(root .. "/" .. name, "w"))
-        fh:write(table.concat(lines, "\n") .. "\n")
-        fh:close()
-    end
-    root = assert(vim.uv.fs_realpath(root))
+---@return spec.browser.Annotated
+local function annotated()
+    local root = fixture.project({ ["alpha.lua"] = ALPHA, ["beta.lua"] = BETA })
 
     local alpha = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_name(alpha, root .. "/alpha.lua")
@@ -45,27 +29,18 @@ end
 ---@param prose string[]
 ---@return string id
 local function annotate(path, line, prose)
-    local bufnr = vim.fn.bufadd(path)
-    vim.fn.bufload(bufnr)
-
-    local cfg = opts()
-    local result =
-        assert(capture.run(bufnr, { scope = "lines", range = { line, 0, line, 0 }, config = cfg }))
-    local note = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
-    note:write(table.concat(prose, "\n") .. "\n")
-    note:close()
-    return result.id
+    return fixture.annotate({ path = path, line = line, prose = prose, config = opts() }).id
 end
 
 describe("browser.open_project", function()
     it("names the buffer after the project root, with a trailing slash", function()
-        local t = tree()
+        local t = annotated()
         local bufnr = assert(browser.open_project(t.root, { config = opts() }))
         assert.eq(vim.api.nvim_buf_get_name(bufnr), "sidenote://" .. t.root .. "/")
     end)
 
     it("lists annotations from every file in the project", function()
-        local t = tree()
+        local t = annotated()
         annotate(t.root .. "/alpha.lua", 4, { "in alpha" })
         annotate(t.root .. "/beta.lua", 2, { "in beta" })
 
@@ -76,7 +51,7 @@ describe("browser.open_project", function()
     end)
 
     it("sorts by path then line, so the listing reads the same every time", function()
-        local t = tree()
+        local t = annotated()
         annotate(t.root .. "/beta.lua", 3, { "third" })
         annotate(t.root .. "/alpha.lua", 4, { "second" })
         annotate(t.root .. "/alpha.lua", 1, { "first" })
@@ -93,27 +68,27 @@ describe("browser.open_project", function()
     end)
 
     it("shows each row's own file in its location column", function()
-        local t = tree()
+        local t = annotated()
         annotate(t.root .. "/beta.lua", 2, { "in beta" })
         local bufnr = assert(browser.open_project(t.root, { config = opts() }))
         assert.contains(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)[1], "beta.lua:2")
     end)
 
     it("accepts a file inside the project, not only the root", function()
-        local t = tree()
+        local t = annotated()
         annotate(t.root .. "/alpha.lua", 4, { "the note" })
         local bufnr = assert(browser.open_project(t.root .. "/beta.lua", { config = opts() }))
         assert.eq(assert(browser.state(bufnr)).path, t.root)
     end)
 
     it("reuses the buffer when the project is browsed again", function()
-        local t = tree()
+        local t = annotated()
         local first = assert(browser.open_project(t.root, { config = opts() }))
         assert.eq(browser.open_project(t.root, { config = opts() }), first)
     end)
 
     it("is a different buffer from the file listing for the same tree", function()
-        local t = tree()
+        local t = annotated()
         local file_view = assert(browser.open(t.alpha, { config = opts() }))
         local project_view = assert(browser.open_project(t.root, { config = opts() }))
         assert.neq(file_view, project_view)
@@ -128,7 +103,7 @@ describe("browser.open_project", function()
     end)
 
     it("opens with the prose folded, like the file listing", function()
-        local t = tree()
+        local t = annotated()
         annotate(t.root .. "/alpha.lua", 4, { "summary", "a body line" })
         assert(browser.open_project(t.root, { config = opts() }))
         assert.eq(vim.fn.foldclosed(1), -1)
@@ -151,13 +126,13 @@ describe("browser `-` goes up", function()
     end
 
     it("binds `-` inside the listing, where it is free", function()
-        local t = tree()
+        local t = annotated()
         local bufnr = assert(browser.open(t.alpha, { config = opts() }))
         assert.is_type(mapping(bufnr, "-"), "function")
     end)
 
     it("widens a file listing to the project it belongs to", function()
-        local t = tree()
+        local t = annotated()
         annotate(t.root .. "/beta.lua", 2, { "in another file" })
         local file_view = assert(browser.open(t.alpha, { config = opts() }))
 
@@ -168,7 +143,7 @@ describe("browser `-` goes up", function()
     end)
 
     it("does nothing in a listing that is already project-wide", function()
-        local t = tree()
+        local t = annotated()
         local project_view = assert(browser.open_project(t.root, { config = opts() }))
         assert(mapping(project_view, "-"))()
         assert.eq(vim.api.nvim_win_get_buf(vim.api.nvim_get_current_win()), project_view)
@@ -177,7 +152,7 @@ end)
 
 describe("browser project edits", function()
     it("applies a delete to an annotation in another file", function()
-        local t = tree()
+        local t = annotated()
         annotate(t.root .. "/alpha.lua", 4, { "keep me" })
         local doomed = annotate(t.root .. "/beta.lua", 2, { "delete me" })
 
@@ -199,7 +174,7 @@ describe("browser project edits", function()
     end)
 
     it("creates an annotation on whichever file `a` is told, and opens it", function()
-        local t = tree()
+        local t = annotated()
         local bufnr = assert(browser.open_project(t.root, { config = opts() }))
         vim.api.nvim_set_current_buf(bufnr)
 

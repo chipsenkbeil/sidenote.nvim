@@ -1,35 +1,16 @@
-local capture = require("sidenote.capture")
 local export = require("sidenote.export")
-local store = require("sidenote.store")
+local fixture = require("spec.fixture")
 
 local STAMP = "2026-08-19T12:00:00Z"
 
----@return sidenote.Config
-local function opts()
-    return {
-        filetype = "org",
-        strategy = { "project" },
-        project_dir = ".sidenote",
-        global_dir = vim.fn.tempname(),
-        indicator = { style = "sign" },
-        preview = { style = "float", max_lines = 20 },
-        editor = { style = "split", position = "right", size = 60 },
-    }
-end
+local opts = fixture.opts
 
-local ALPHA = { "local M = {}", "", "function M.f()", "  return 1", "end" }
-local BETA = { "-- beta", "local x = 1", "return x" }
+local ALPHA = fixture.SOURCE
+local BETA = fixture.SECOND
 
 ---@return string root
 local function project()
-    local root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.sidenote", "p")
-    for name, lines in pairs({ ["alpha.lua"] = ALPHA, ["beta.lua"] = BETA }) do
-        local fh = assert(io.open(root .. "/" .. name, "w"))
-        fh:write(table.concat(lines, "\n") .. "\n")
-        fh:close()
-    end
-    return assert(vim.uv.fs_realpath(root))
+    return fixture.project({ ["alpha.lua"] = ALPHA, ["beta.lua"] = BETA })
 end
 
 ---@class spec.agent.NoteOpts
@@ -41,26 +22,13 @@ end
 ---@param note spec.agent.NoteOpts
 ---@return string id
 local function annotate(root, note)
-    local path = root .. "/" .. note.name
-    local bufnr = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(bufnr, path)
-    local fh = assert(io.open(path, "r"))
-    local body = fh:read("*a")
-    fh:close()
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(body:gsub("\n$", ""), "\n"))
-
-    local cfg = opts()
-    local result = assert(capture.run(bufnr, {
-        scope = "lines",
-        range = { note.line, 0, note.line, 0 },
-        config = cfg,
-    }))
-    vim.api.nvim_buf_delete(bufnr, { force = true })
-
-    local out = assert(io.open(store.prose_path(result.root, result.id, cfg.filetype), "w"))
-    out:write(table.concat(note.prose, "\n") .. "\n")
-    out:close()
-    return result.id
+    return fixture.annotate({
+        path = root .. "/" .. note.name,
+        line = note.line,
+        prose = note.prose,
+        detach = true,
+        config = opts(),
+    }).id
 end
 
 ---@param root string
