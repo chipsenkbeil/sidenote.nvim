@@ -314,6 +314,48 @@ describe("the :Sidenote command", function()
         assert.eq(items[1].lnum, 2)
     end)
 
+    it("names its verbs in a winbar, and takes it down with them", function()
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,2")
+
+        vim.cmd("Sidenote qflist")
+        local dressed = vim.api.nvim_get_option_value("winbar", { win = 0, scope = "local" })
+
+        vim.fn.setqflist({}, " ", { title = "someone else", items = {} })
+        vim.cmd("doautocmd BufEnter")
+        local bare = vim.api.nvim_get_option_value("winbar", { win = 0, scope = "local" })
+        vim.cmd.cclose()
+
+        assert.contains(dressed, "jump")
+        assert.contains(dressed, "delete")
+        assert.eq(bare, "", "another tool's list wears no winbar of ours")
+    end)
+
+    it("names only keys the list really answers", function()
+        -- `<CR>` is stock quickfix and `f` stands in for the filter prefix;
+        -- every other key in the bar has to be a verb that is really bound
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,2")
+        vim.cmd("Sidenote qflist")
+
+        local bound = { ["<CR>"] = true, f = true }
+        for _, map in ipairs(vim.api.nvim_buf_get_keymap(0, "n")) do
+            bound[map.lhs] = true
+        end
+        local named = {}
+        for lhs in require("sidenote.list").winbar():gmatch("SidenoteBare#([^%%]+)") do
+            named[#named + 1] = lhs
+        end
+        vim.cmd.cclose()
+
+        assert.gt(#named, 0, "the winbar names nothing")
+        for _, lhs in ipairs(named) do
+            assert.truthy(bound[lhs], ("the winbar names %q, which is no verb"):format(lhs))
+        end
+    end)
+
     it("leaves another tool's quickfix list every one of its own keys", function()
         -- A buffer-local mapping is singular: claiming `d` on every quickfix
         -- buffer takes it from whoever filled this list, however inert ours is

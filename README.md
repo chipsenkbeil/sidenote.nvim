@@ -157,8 +157,12 @@ for the project, like `sb` and `sB`. Both verbs take the same filters, so
 `:Sidenote qflist kind=todo state=open` is a work queue you walk with
 `:cnext`.
 
-Inside a sidenote-titled list the keys grow verbs, guarded per press so
-every other list keeps its own. `t` and `T` cycle exactly as in the
+Inside a sidenote-titled list the keys grow verbs, and a winbar across the
+top names them: `<CR> jump  t cycle  o open  d delete  s scope  f filter
+g? help`. The verbs are bound only while the list is ours and taken back
+out when it is not, so a quickfix list some other tool filled keeps every
+key it mapped — a buffer-local mapping is singular, and whichever tool
+binds last would otherwise own it. `t` and `T` cycle exactly as in the
 browser: the word under the cursor inside the `[kind state pen]` bracket
 decides which field turns, and anywhere else on the line means state. `o`
 opens the prose, `d` deletes after the quoting confirmation, and `<CR>`

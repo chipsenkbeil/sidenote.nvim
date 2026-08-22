@@ -1,6 +1,7 @@
 local config = require("sidenote.config")
 local cycle = require("sidenote.cycle")
 local filter = require("sidenote.filter")
+local highlight = require("sidenote.highlight")
 local project = require("sidenote.store.project")
 local record = require("sidenote.core.record")
 local resolve = require("sidenote.core.resolve")
@@ -445,6 +446,66 @@ local function verbs()
     return actions
 end
 
+---What the winbar names, in the order it names them.
+---
+---A reminder, not the help: the filters collapse into one `f` and the rest is
+---behind `g?`. `<CR>` is stock quickfix and leads because it is what a reader
+---reaches for first. A test holds every other key here to a real verb.
+---@type {lhs: string, label: string}[]
+local BAR = {
+    { lhs = "<CR>", label = "jump" },
+    { lhs = "t", label = "cycle" },
+    { lhs = "o", label = "open" },
+    { lhs = "d", label = "delete" },
+    { lhs = "s", label = "scope" },
+    { lhs = "f", label = "filter" },
+    { lhs = "g?", label = "help" },
+}
+
+---The winbar a sidenote list wears, naming what its keys do.
+---@return string winbar statusline-format text
+function M.winbar()
+    local bar = "%#" .. highlight.WINBAR .. "#"
+    local key = "%#" .. highlight.BARE .. "#"
+    local parts = {}
+    for _, item in ipairs(BAR) do
+        parts[#parts + 1] = ("%s  %s%s%s %s"):format(
+            bar,
+            key,
+            item.lhs:gsub("%%", "%%%%"),
+            bar,
+            item.label
+        )
+    end
+    return table.concat(parts) .. bar
+end
+
+---@param bufnr integer
+---@return integer[] winids every window showing the buffer
+local function windows_of(bufnr)
+    local out = {}
+    for _, winid in ipairs(vim.api.nvim_list_wins()) do
+        if vim.api.nvim_win_get_buf(winid) == bufnr then
+            out[#out + 1] = winid
+        end
+    end
+    return out
+end
+
+---Put the winbar up, or take down only the one this put there.
+---@param bufnr integer
+---@param wanted string the winbar to show, empty to take ours down
+local function dress(bufnr, wanted)
+    local ours_now = M.winbar()
+    for _, winid in ipairs(windows_of(bufnr)) do
+        local showing = vim.api.nvim_get_option_value("winbar", { win = winid, scope = "local" })
+        -- Another tool's winbar is its own; only ever replace one of ours
+        if showing == "" or showing == ours_now then
+            vim.api.nvim_set_option_value("winbar", wanted, { win = winid, scope = "local" })
+        end
+    end
+end
+
 ---Answer the verbs in a sidenote-titled list, and leave every other list alone.
 ---
 ---One quickfix buffer serves every list a session shows, so this runs again
@@ -465,6 +526,7 @@ function M.bind(bufnr)
             nowait = true,
         })
     end
+    dress(bufnr, M.winbar())
 end
 
 ---Take the verbs back out, so the list's own tool answers its keys again.
@@ -473,6 +535,7 @@ function M.unbind(bufnr)
     for _, action in ipairs(verbs()) do
         pcall(vim.keymap.del, "n", action.lhs, { buffer = bufnr })
     end
+    dress(bufnr, "")
 end
 
 return M
