@@ -12,6 +12,7 @@ on:
     branches:
       - main
     paths:
+      - ".addons/**"
       - "lua/**"
       - "spec/**"
       - "cli/**"
@@ -27,6 +28,7 @@ on:
     branches:
       - main
     paths:
+      - ".addons/**"
       - "lua/**"
       - "spec/**"
       - "cli/**"
@@ -51,7 +53,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: latest
-          args: --check lua/ spec/ cli/ plugin/ harness/ scripts/
+          args: --check .addons/ lua/ spec/ cli/ plugin/ harness/ scripts/
 
   tests:
     strategy:

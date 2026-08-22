@@ -1,7 +1,7 @@
 .PHONY: help test lint fmt fmt-check style docs docs-check check
 
 NVIM ?= nvim
-LUA_DIRS := lua spec harness plugin cli scripts
+LUA_DIRS := lua spec harness plugin cli scripts .addons
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \

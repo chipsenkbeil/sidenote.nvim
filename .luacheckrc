@@ -27,6 +27,16 @@ globals = {
 -- it cannot is a string or an annotation that has to stay whole
 max_line_length = 120
 
+files[".addons/"] = {
+    -- Definition files for the language server: every function is a signature
+    -- with an empty body, so each of its parameters is "unused" by
+    -- construction. Dropping the names would leave the signatures unreadable
+    unused_args = false,
+    -- Declaring the runner's globals is the whole point of the file, and
+    -- `assert` is a standard one this deliberately extends
+    globals = { "assert", "describe", "it", "before_each", "after_each" },
+}
+
 files["spec/"] = {
     -- The handrolled runner installs these as globals before loading a spec.
     -- Declared for `spec/` alone: a `describe` in `lua/` would be a mistake,
