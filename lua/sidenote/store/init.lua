@@ -237,30 +237,6 @@ function M.ids(root)
     return ids
 end
 
----Rebuild the index by reading every record in the given `roots`.
----
----Earlier roots win on an id conflict, matching the read precedence of a
----strategy list.
----@param roots string[]
----@return sidenote.Index
-function M.rebuild(roots)
-    local index = require("sidenote.core.index")
-    local idx = index.new()
-    local seen = {}
-    for _, root in ipairs(roots) do
-        for _, id in ipairs(M.ids(root)) do
-            if not seen[id] then
-                local rec = M.read(root, id)
-                if rec and rec.path then
-                    seen[id] = true
-                    index.track(idx, rec.path, id)
-                end
-            end
-        end
-    end
-    return idx
-end
-
 ---@param root string
 ---@param id string
 ---@param filetype string
