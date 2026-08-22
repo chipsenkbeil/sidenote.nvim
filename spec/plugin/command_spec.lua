@@ -314,6 +314,29 @@ describe("the :Sidenote command", function()
         assert.eq(items[1].lnum, 2)
     end)
 
+    it("leaves another tool's quickfix list every one of its own keys", function()
+        -- A buffer-local mapping is singular: claiming `d` on every quickfix
+        -- buffer takes it from whoever filled this list, however inert ours is
+        local root = project()
+        vim.cmd.edit(root .. "/code.lua")
+        add("2,2")
+        vim.cmd("Sidenote qflist")
+
+        vim.fn.setqflist({}, " ", { title = "someone else", items = {} })
+        vim.cmd.copen()
+        vim.cmd("doautocmd BufEnter")
+
+        local mapped = {}
+        for _, map in ipairs(vim.api.nvim_buf_get_keymap(0, "n")) do
+            mapped[map.lhs] = true
+        end
+        vim.cmd.cclose()
+
+        for _, lhs in ipairs({ "t", "T", "o", "d", "s", "fk", "fs", "fa", "ff", "fc", "g?" }) do
+            assert.is_nil(mapped[lhs], ("%s is still claimed on a foreign list"):format(lhs))
+        end
+    end)
+
     it("gives the sidenote quickfix list its verbs", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")

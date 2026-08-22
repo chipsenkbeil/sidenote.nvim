@@ -425,12 +425,13 @@ vim.api.nvim_create_autocmd("BufWritePost", {
         end)
     end,
 })
-vim.api.nvim_create_autocmd("FileType", {
+vim.api.nvim_create_autocmd({ "FileType", "BufEnter" }, {
     group = group,
-    pattern = "qf",
-    desc = "Give sidenote-titled quickfix and location lists their verbs",
+    desc = "Give a sidenote-titled list its verbs, and every other list back its own",
     callback = function(event)
-        require("sidenote.list").bind(event.buf)
+        if vim.bo[event.buf].filetype == "qf" then
+            require("sidenote.list").bind(event.buf)
+        end
     end,
 })
 vim.api.nvim_create_autocmd("ColorScheme", {

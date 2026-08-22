@@ -362,13 +362,12 @@ local HELP_FOOTER = {
     "  The rest is stock quickfix: <CR> jumps, :cnext walks",
 }
 
----Bind the verbs into a quickfix buffer, guarded per keypress.
+---The verbs a sidenote-titled list answers, kept as data first.
 ---
----One qf buffer serves every list a session ever shows, so the keys decide
----at press time: in a sidenote-titled list they act, anywhere else they
----fall through to whatever the key normally does.
----@param bufnr integer quickfix buffer
-function M.bind(bufnr)
+---One list serves twice — the keymaps are built from it and `g?` renders it —
+---so the help can never drift from what the keys do.
+---@return {lhs: string, desc: string, fn: fun()}[]
+local function verbs()
     ---@type {lhs: string, desc: string, fn: fun()}[]
     local actions = {
         {
@@ -443,16 +442,36 @@ function M.bind(bufnr)
             require("sidenote.help").show(actions, { footer = HELP_FOOTER })
         end,
     }
+    return actions
+end
 
-    for _, action in ipairs(actions) do
-        vim.keymap.set("n", action.lhs, function()
-            if not ours() then
-                return action.lhs
-            end
-            -- Scheduled: an expression mapping may not edit anything itself
-            vim.schedule(action.fn)
-            return ""
-        end, { buffer = bufnr, desc = action.desc, expr = true, nowait = true })
+---Answer the verbs in a sidenote-titled list, and leave every other list alone.
+---
+---One quickfix buffer serves every list a session shows, so this runs again
+---whenever the window is entered, adding the verbs to our own list and taking
+---them back out of anyone else's. A buffer-local mapping is singular: merely
+---deciding at press time would still have claimed the key from whatever tool
+---filled the list this time, and left that tool's own `d` unreachable.
+---@param bufnr integer quickfix buffer
+function M.bind(bufnr)
+    if not ours() then
+        M.unbind(bufnr)
+        return
+    end
+    for _, action in ipairs(verbs()) do
+        vim.keymap.set("n", action.lhs, action.fn, {
+            buffer = bufnr,
+            desc = action.desc,
+            nowait = true,
+        })
+    end
+end
+
+---Take the verbs back out, so the list's own tool answers its keys again.
+---@param bufnr integer quickfix buffer
+function M.unbind(bufnr)
+    for _, action in ipairs(verbs()) do
+        pcall(vim.keymap.del, "n", action.lhs, { buffer = bufnr })
     end
 end
 
