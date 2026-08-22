@@ -10,11 +10,6 @@ local store = require("sidenote.store")
 ---@class sidenote.browser.apply
 local M = {}
 
----@return string
-local function now()
-    return os.date("!%Y-%m-%dT%H:%M:%SZ")
-end
-
 ---Make a location's path absolute, however the user wrote it.
 ---@param state sidenote.browser.State
 ---@param path string
@@ -195,7 +190,7 @@ local function reanchor(action, state)
             line_end = wanted.line_end,
             col_start = wanted.col_start,
             col_end = wanted.col_end,
-            now = now(),
+            now = record.now(),
         })
     )
 end

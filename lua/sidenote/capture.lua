@@ -63,7 +63,7 @@ function M.run(bufnr, opts)
         kind = kind,
         pen = pen.for_kind(kind, cfg),
         vcs = vcs.probe(target.path),
-        now = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        now = record.now(),
     })
 
     local ok, write_err = store.create(root, rec, cfg.filetype)

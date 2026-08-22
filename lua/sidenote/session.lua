@@ -275,7 +275,7 @@ function M.written(bufnr, cfg)
     local save = {
         content = target.content,
         file_sha = hash.sha256(target.content),
-        now = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        now = record.now(),
     }
 
     local written = 0

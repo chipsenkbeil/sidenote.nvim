@@ -1,4 +1,5 @@
 local project = require("sidenote.store.project")
+local record = require("sidenote.core.record")
 local scan = require("sidenote.scan")
 local store = require("sidenote.store")
 
@@ -94,7 +95,7 @@ function M.project(opts)
     return {
         schema = M.SCHEMA,
         project_key = project.key(root or opts.path),
-        generated = opts.now or os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        generated = opts.now or record.now(),
         annotations = annotations,
     }
 end

@@ -52,6 +52,18 @@ local M = {}
 ---Current on-disk schema version.
 M.SCHEMA = 1
 
+---Format every timestamp in a record is written in: UTC, to the second.
+---
+---Part of the on-disk contract rather than a display choice, which is why it
+---lives with the record and not with whoever happens to be stamping one.
+M.INSTANT = "!%Y-%m-%dT%H:%M:%SZ"
+
+---Read the clock in the format a record's timestamps use.
+---@return string
+function M.now()
+    return os.date(M.INSTANT) --[[@as string]]
+end
+
 ---Lines of surrounding context captured on each side of the anchor.
 M.CONTEXT = 3
 
