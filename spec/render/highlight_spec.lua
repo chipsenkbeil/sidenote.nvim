@@ -148,3 +148,64 @@ describe("highlight.rewash", function()
         assert.is_nil(washed())
     end)
 end)
+
+---Run `fn` with `vim.g.sidenote` set to `cfg`, restoring it afterwards.
+---@param cfg table<string, any> what `vim.g.sidenote` holds while fn runs
+---@param fn fun()
+local function configured(cfg, fn)
+    local before = vim.g.sidenote
+    vim.g.sidenote = cfg
+    local ok, err = pcall(fn)
+    vim.g.sidenote = before
+    assert(ok, err)
+end
+
+describe("highlight.washes", function()
+    it("is the seeded set when no pen carries shades", function()
+        configured({}, function()
+            assert.is_nil(highlight.washes().SidenotePenTeal)
+            assert.not_nil(highlight.washes().SidenotePenBlue)
+        end)
+    end)
+
+    it("carries a pen that named its own shades", function()
+        configured({ pens = { teal = { dark = "#1f4f4a", light = "#ccefe9" } } }, function()
+            assert.eq(highlight.washes().SidenotePenTeal.light, "#ccefe9")
+        end)
+    end)
+
+    it("lets a configured pen retint a seeded group rather than collide", function()
+        configured({ pens = { blue = { dark = "#000102", light = "#fdfeff" } } }, function()
+            assert.eq(highlight.washes().SidenotePenBlue.dark, "#000102")
+        end)
+    end)
+end)
+
+describe("highlight pens carrying shades", function()
+    it("inks a configured pen, and follows the background", function()
+        local restore = vim.o.background
+        configured({ pens = { teal = { dark = "#1f4f4a", light = "#ccefe9" } } }, function()
+            vim.api.nvim_set_hl(0, "SidenotePenTeal", {})
+            vim.o.background = "dark"
+            highlight.setup()
+            local dark = vim.api.nvim_get_hl(0, { name = "SidenotePenTeal" }).bg
+
+            vim.o.background = "light"
+            highlight.rewash()
+            local light = vim.api.nvim_get_hl(0, { name = "SidenotePenTeal" }).bg
+
+            assert.eq(dark, tonumber("1f4f4a", 16))
+            assert.eq(light, tonumber("ccefe9", 16))
+        end)
+        vim.o.background = restore
+    end)
+
+    it("links a shade that names a highlight group instead of a color", function()
+        configured({ pens = { themed = { dark = "DiffAdd", light = "DiffAdd" } } }, function()
+            vim.api.nvim_set_hl(0, "SidenotePenThemed", {})
+            highlight.setup()
+            local hl = vim.api.nvim_get_hl(0, { name = "SidenotePenThemed", link = true })
+            assert.eq(hl.link, "DiffAdd")
+        end)
+    end)
+end)

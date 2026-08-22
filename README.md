@@ -276,6 +276,23 @@ vim.g.sidenote = {
 }
 ```
 
+That group is yours to define. Give a pen its two shades instead and the
+plugin owns the group, inking it for the current `background` and re-inking
+it whenever you change it — the same following the seeded pens get:
+
+```lua
+vim.g.sidenote = {
+    pens = {
+        teal = { dark = "#1f4f4a", light = "#ccefe9" },
+        themed = { dark = "DiffAdd", light = "DiffChange" },
+    },
+}
+```
+
+A shade opening with `#` is a color of its own; anything else names a
+highlight group to follow, so a pen can track your theme rather than fix a
+color. Naming a seeded pen this way retints it.
+
 Custom entries merge over the seeded ones. Pick a pen up in the browser: `t`
 and `T` on its column cycle through `-` (none) and every configured pen, or
 type the name and `:w`. A penless note keeps the status ink; anchor health

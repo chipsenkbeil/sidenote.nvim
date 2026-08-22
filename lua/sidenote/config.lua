@@ -33,15 +33,35 @@
 ---@field cache_dir string where scans cache resolutions, never inside a store
 ---@field template? fun(ctx: sidenote.template.Context): string[]|nil seeds a new note's buffer
 ---@field pens table<string, string> mapping of pen name -> highlight group its ink uses
+---@field pen_washes table<string, sidenote.PenWash> mapping of group -> shades this plugin inks it with
 ---@field pen? string|{note?: string, todo?: string} pen fresh captures pick up, one name or split by kind
 ---@field indicator sidenote.IndicatorConfig how annotations appear in a source buffer
 ---@field preview sidenote.PreviewConfig how a note is glanced at
 ---@field editor sidenote.EditorConfig how a note opens for writing
 ---@field browser sidenote.BrowserConfig how a listing opens
 
+---What a pen inks, one shade per screen background.
+---
+---A shade opening with `#` is a color of its own; anything else names a
+---highlight group to follow.
+---@class sidenote.PenWash
+---@field dark string shade used while 'background' is dark
+---@field light string shade used while it is light
+
 ---User configuration, resolved from `vim.g.sidenote`.
 ---@class sidenote.config
 local M = {}
+
+---Highlight group minted for a pen that carries its own shades.
+---
+---Derived from the name so a pen keeps one group across sessions, and
+---sanitized because a pen name may hold characters a group name may not.
+---@param name string pen name
+---@return string
+function M.pen_group(name)
+    local suffix = name:gsub("%W", "_"):gsub("^%l", string.upper)
+    return "SidenotePen" .. suffix
+end
 
 local INDICATOR_STYLES = {
     sign = true,
@@ -169,10 +189,19 @@ local function validate(cfg)
         if type(name) ~= "string" or not name:match("^%w[%w_-]*$") then
             return fail("pens", ("%s is not a pen name; use a word"):format(tostring(name)))
         end
-        if type(group) ~= "string" then
+        if type(group) == "table" then
+            for _, shade in ipairs({ "dark", "light" }) do
+                if type(group[shade]) ~= "string" or group[shade] == "" then
+                    return fail(
+                        ("pens.%s.%s"):format(name, shade),
+                        "expected a #color or a highlight group name"
+                    )
+                end
+            end
+        elseif type(group) ~= "string" then
             return fail(
                 ("pens.%s"):format(name),
-                ("expected a highlight group name, got %s"):format(type(group))
+                ("expected a highlight group name or shades, got %s"):format(type(group))
             )
         end
     end
@@ -244,6 +273,23 @@ end
 ---
 ---Returns the defaults alongside any error, so a caller can report the problem
 ---and still run rather than leaving the user with no plugin at all.
+---Give every pen written as shades a group this plugin owns and inks.
+---
+---The rest of the plugin reads a pen as the name of a highlight group, so the
+---two ways of writing one converge here rather than at each of those readers.
+---@param cfg sidenote.Config
+local function mint_washes(cfg)
+    local washes = {}
+    for name, spec in pairs(cfg.pens) do
+        if type(spec) == "table" then
+            local group = M.pen_group(name)
+            cfg.pens[name] = group
+            washes[group] = spec
+        end
+    end
+    cfg.pen_washes = washes
+end
+
 ---@param raw? sidenote.Config|fun(): sidenote.Config
 ---@return sidenote.Config
 ---@return string|nil err
@@ -258,8 +304,11 @@ function M.resolve(raw)
     local merged = vim.tbl_deep_extend("force", M.defaults(), raw or {})
     local err = validate(merged)
     if err then
-        return M.defaults(), err
+        local fallback = M.defaults()
+        mint_washes(fallback)
+        return fallback, err
     end
+    mint_washes(merged)
     return merged, nil
 end
 

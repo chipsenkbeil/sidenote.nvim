@@ -230,3 +230,50 @@ describe("config.resolve markers", function()
         assert.contains(err, "vim.g.sidenote.markers")
     end)
 end)
+
+describe("config.resolve pens with shades", function()
+    it("keeps a pen named as a highlight group untouched", function()
+        local resolved = config.resolve({ pens = { blue = "MyBlue" } })
+        assert.eq(resolved.pens.blue, "MyBlue")
+        assert.eq_deep(resolved.pen_washes, {})
+    end)
+
+    it("mints a group for a pen carrying its own shades", function()
+        local resolved, err = config.resolve({
+            pens = { teal = { dark = "#1f4f4a", light = "#ccefe9" } },
+        })
+        assert.is_nil(err)
+        assert.eq(resolved.pens.teal, "SidenotePenTeal")
+        assert.eq(resolved.pen_washes.SidenotePenTeal.dark, "#1f4f4a")
+    end)
+
+    it("leaves every reader a group name, whichever way a pen was written", function()
+        local resolved = config.resolve({
+            pens = { teal = { dark = "#1f4f4a", light = "#ccefe9" } },
+        })
+        for name, group in pairs(resolved.pens) do
+            assert.is_type(group, "string", name)
+        end
+    end)
+
+    it("sanitizes a pen name that a highlight group could not hold", function()
+        assert.eq(config.pen_group("my-pen"), "SidenotePenMy_pen")
+    end)
+
+    it("accepts a highlight group as a shade, not only a color", function()
+        local _, err = config.resolve({
+            pens = { themed = { dark = "DiffAdd", light = "DiffChange" } },
+        })
+        assert.is_nil(err)
+    end)
+
+    it("rejects shades missing a background", function()
+        local _, err = config.resolve({ pens = { teal = { dark = "#1f4f4a" } } })
+        assert.contains(err, "vim.g.sidenote.pens.teal.light")
+    end)
+
+    it("rejects a pen that is neither a group nor shades", function()
+        local _, err = config.resolve({ pens = { teal = 5 } })
+        assert.contains(err, "vim.g.sidenote.pens.teal")
+    end)
+end)

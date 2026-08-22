@@ -78,7 +78,7 @@ local MARK_DEFAULTS = {
 ---
 ---A wash and nothing else: setting a foreground would paint over the code's
 ---own colors, which is not how a highlighter reads.
----@type table<string, {dark: string, light: string}>
+---@type table<string, sidenote.PenWash>
 local PEN_WASHES = {
     SidenotePenYellow = { dark = "#5f5320", light = "#ffef9e" },
     SidenotePenCoral = { dark = "#6b3a34", light = "#ffd6cc" },
@@ -134,6 +134,35 @@ M.BADGES = {
 ---What a badge's continuation lines show in the gutter.
 M.TAIL = "│"
 
+---Every wash in force: the seeded pens, plus any pen configured with shades.
+---
+---A configured pen wins the group it names, so seeding a pen with your own
+---shades is how you retint one rather than a collision with it.
+---@return table<string, sidenote.PenWash>
+function M.washes()
+    local configured = require("sidenote.config").get().pen_washes
+    if vim.tbl_isempty(configured) then
+        return PEN_WASHES
+    end
+    return vim.tbl_extend("force", PEN_WASHES, configured)
+end
+
+---Paint `group` with the shade `wash` gives for the current 'background'.
+---
+---A shade opening with `#` is a color of its own; anything else names a
+---highlight group to follow, which is how a pen can track a theme.
+---@param group string
+---@param wash sidenote.PenWash
+---@param default boolean whether an existing group is left as it is
+local function ink(group, wash, default)
+    local shade = vim.o.background == "light" and wash.light or wash.dark
+    if shade:sub(1, 1) == "#" then
+        vim.api.nvim_set_hl(0, group, { bg = shade, default = default })
+    else
+        vim.api.nvim_set_hl(0, group, { link = shade, default = default })
+    end
+end
+
 function M.setup()
     for status, group in pairs(M.GROUPS) do
         local link = "DiagnosticSign" .. SEVERITY[status]
@@ -146,9 +175,8 @@ function M.setup()
     for status, group in pairs(M.MARKS) do
         vim.api.nvim_set_hl(0, group, { link = MARK_DEFAULTS[status], default = true })
     end
-    local shade = vim.o.background == "light" and "light" or "dark"
-    for group, wash in pairs(PEN_WASHES) do
-        vim.api.nvim_set_hl(0, group, { bg = wash[shade], default = true })
+    for group, wash in pairs(M.washes()) do
+        ink(group, wash, true)
     end
     vim.api.nvim_set_hl(0, M.PROSE, { link = "Comment", default = true })
     vim.api.nvim_set_hl(0, M.CONTEXT, { link = "Comment", default = true })
@@ -166,10 +194,9 @@ end
 ---A wash nothing has inked yet is left undefined, so a background change in
 ---a session that never painted defines no groups.
 function M.rewash()
-    local shade = vim.o.background == "light" and "light" or "dark"
-    for group, wash in pairs(PEN_WASHES) do
+    for group, wash in pairs(M.washes()) do
         if not vim.tbl_isempty(vim.api.nvim_get_hl(0, { name = group })) then
-            vim.api.nvim_set_hl(0, group, { bg = wash[shade] })
+            ink(group, wash, false)
         end
     end
 end
