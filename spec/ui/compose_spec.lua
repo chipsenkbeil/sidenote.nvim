@@ -97,11 +97,11 @@ describe("sidenote.add composing", function()
         local cfg = opts()
         cfg.indicator = { style = "sign", highlight = "on" }
         local render = require("sidenote.render")
-        render.toggle(bufnr, "on")
-        assert.falsy(render.highlighted(bufnr, "on"))
+        render.toggle(bufnr, { configured = "on" })
+        assert.falsy(render.highlighted(bufnr, { configured = "on" }))
 
         added(cfg)
-        assert.truthy(render.highlighted(bufnr, "on"))
+        assert.truthy(render.highlighted(bufnr, { configured = "on" }))
     end)
 
     it("respects a config that keeps highlights off", function()
@@ -110,7 +110,7 @@ describe("sidenote.add composing", function()
         local cfg = opts()
         cfg.indicator = { style = "sign", highlight = "off" }
         added(cfg)
-        assert.falsy(require("sidenote.render").highlighted(bufnr, "off"))
+        assert.falsy(require("sidenote.render").highlighted(bufnr, { configured = "off" }))
     end)
 
     it("hands the template the annotation's own shape", function()

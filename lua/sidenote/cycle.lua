@@ -79,11 +79,15 @@ function M.set(entry, opts)
     return true
 end
 
+---@class sidenote.cycle.AtCursorOpts
+---@field field "kind"|"state"|"pen" which ring to rotate
+---@field offset integer 1 forward, -1 backward
+
 ---Rotate a field of the note under the cursor, telling the user where it landed.
----@param field "kind"|"state"|"pen"
----@param offset integer 1 forward, -1 backward
+---@param opts sidenote.cycle.AtCursorOpts
 ---@return boolean turned false when no note sits under the cursor or the write failed
-function M.at_cursor(field, offset)
+function M.at_cursor(opts)
+    local field, offset = opts.field, opts.offset
     local cfg = config.get()
     local entry = require("sidenote").at_cursor()
     if not entry then

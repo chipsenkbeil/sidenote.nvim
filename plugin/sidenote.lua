@@ -364,23 +364,23 @@ vim.keymap.set("n", "<Plug>(SidenoteQflistProject)", function()
 end, { desc = "The project's notes as the quickfix list" })
 
 vim.keymap.set("n", "<Plug>(SidenoteCycleKind)", function()
-    require("sidenote.cycle").at_cursor("kind", 1)
+    require("sidenote.cycle").at_cursor({ field = "kind", offset = 1 })
 end, { desc = "Flip the note under the cursor between note and todo" })
 
 vim.keymap.set("n", "<Plug>(SidenoteCycleState)", function()
-    require("sidenote.cycle").at_cursor("state", 1)
+    require("sidenote.cycle").at_cursor({ field = "state", offset = 1 })
 end, { desc = "Cycle the state of the note under the cursor" })
 
 vim.keymap.set("n", "<Plug>(SidenoteCycleStateBack)", function()
-    require("sidenote.cycle").at_cursor("state", -1)
+    require("sidenote.cycle").at_cursor({ field = "state", offset = -1 })
 end, { desc = "Cycle the state of the note under the cursor, backward" })
 
 vim.keymap.set("n", "<Plug>(SidenoteCyclePen)", function()
-    require("sidenote.cycle").at_cursor("pen", 1)
+    require("sidenote.cycle").at_cursor({ field = "pen", offset = 1 })
 end, { desc = "Cycle the pen of the note under the cursor" })
 
 vim.keymap.set("n", "<Plug>(SidenoteCyclePenBack)", function()
-    require("sidenote.cycle").at_cursor("pen", -1)
+    require("sidenote.cycle").at_cursor({ field = "pen", offset = -1 })
 end, { desc = "Cycle the pen of the note under the cursor, backward" })
 
 vim.keymap.set("n", "<Plug>(SidenoteView)", function()

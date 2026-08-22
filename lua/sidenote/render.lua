@@ -89,11 +89,15 @@ function M.edited(bufnr)
         and tick ~= vim.api.nvim_buf_get_changedtick(bufnr)
 end
 
----Whether range highlights show in a buffer, under the configured mode.
+---@class sidenote.render.OverlayOpts
+---@field configured "off"|"on"|"always"|"never"|nil what the config asks for, nil reading as off
+
+---Whether range highlights show in a buffer, under what the config asks for.
 ---@param bufnr integer
----@param mode "off"|"on"|"always"|"never"|nil nil reads as off
+---@param opts sidenote.render.OverlayOpts
 ---@return boolean
-function M.highlighted(bufnr, mode)
+function M.highlighted(bufnr, opts)
+    local mode = opts.configured
     if mode == "always" then
         return true
     end
@@ -116,13 +120,14 @@ end
 
 ---Flip a buffer's range highlights, the way `:set spell!` flips spelling.
 ---@param bufnr integer
----@param mode "off"|"on"|"always"|"never"|nil the configured default
----@return boolean|nil shown nil when the mode pins highlights on or off
-function M.toggle(bufnr, mode)
+---@param opts sidenote.render.OverlayOpts
+---@return boolean|nil shown nil when the config pins highlights on or off
+function M.toggle(bufnr, opts)
+    local mode = opts.configured
     if mode == "always" or mode == "never" then
         return nil
     end
-    overrides[bufnr] = not M.highlighted(bufnr, mode)
+    overrides[bufnr] = not M.highlighted(bufnr, opts)
     return overrides[bufnr]
 end
 
@@ -329,7 +334,7 @@ function M.paint(bufnr, entries, opts)
     -- so it adds nothing when highlight already is the style
     local overlay = opts.style ~= "highlight"
         and opts.style ~= "none"
-        and M.highlighted(bufnr, opts.highlight)
+        and M.highlighted(bufnr, { configured = opts.highlight })
 
     local count = vim.api.nvim_buf_line_count(bufnr)
     local placed = 0

@@ -59,7 +59,7 @@ function M.add(opts)
 
         -- A new mark left hidden by a toggle reads as a failed capture
         if render.suppressed(bufnr) then
-            render.toggle(bufnr, cfg.indicator.highlight)
+            render.toggle(bufnr, { configured = cfg.indicator.highlight })
             require("sidenote.session").refresh(bufnr, cfg)
             vim.notify("sidenote: highlights shown")
         end
@@ -237,7 +237,7 @@ end
 function M.toggle_highlight()
     local cfg = config()
     local bufnr = vim.api.nvim_get_current_buf()
-    local shown = require("sidenote.render").toggle(bufnr, cfg.indicator.highlight)
+    local shown = require("sidenote.render").toggle(bufnr, { configured = cfg.indicator.highlight })
     if shown == nil then
         vim.notify("sidenote: highlights are pinned " .. cfg.indicator.highlight)
         return nil

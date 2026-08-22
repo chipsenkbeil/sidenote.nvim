@@ -200,7 +200,7 @@ describe("browser gutter", function()
         vim.api.nvim_buf_set_lines(source, 0, -1, false, { "entirely", "different", "words" })
 
         local listing = assert(browser.open(source, { config = opts() }))
-        render.toggle(listing, "off")
+        render.toggle(listing, { configured = "off" })
         assert(browser.open(source, { config = opts() }))
 
         local marks = vim.api.nvim_buf_get_extmarks(listing, render.NAMESPACE, 0, -1, {
