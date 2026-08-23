@@ -63,41 +63,109 @@ local function clipped(text)
     return text
 end
 
+---Cut the middle out of `path`, keeping its head and as much tail as fits.
+---
+---The filename and the directory holding it are what a reader navigates by,
+---so the tail is filled in from the end until `room` runs out.
+---@param path string
+---@param room integer display columns available
+---@return string
+local function elided(path, room)
+    local parts = vim.split(path, "/", { plain = true })
+    local name = parts[#parts]
+    if #parts < 3 or vim.fn.strdisplaywidth(name) >= room then
+        return name
+    end
+
+    local head = parts[1]
+    local tail = { name }
+    local width = vim.fn.strdisplaywidth(head .. "/…/" .. name)
+    for i = #parts - 1, 2, -1 do
+        local wider = width + vim.fn.strdisplaywidth(parts[i] .. "/")
+        if wider > room then
+            break
+        end
+        table.insert(tail, 1, parts[i])
+        width = wider
+    end
+    return head .. "/…/" .. table.concat(tail, "/")
+end
+
+---Name `path` in the shortest form that still fits `room`.
+---
+---Tried in order, the first that fits winning: as stored, since a
+---project-relative path is already the shortest true name for it; relative to
+---the working directory, which is what every other window is naming it by;
+---and the home directory as `~`. When none of them fit, the middle goes.
+---
+---Display only. `location.format` is half of the browser's parse/render
+---round-trip, and that has to keep producing the stored path.
+---@param path string
+---@param room integer|nil display columns available, unbounded when absent
+---@return string
+local function fitted(path, room)
+    local tries = { path }
+    if path:sub(1, 1) == "/" then
+        -- Appended rather than listed: `relpath` answers nil for a path the
+        -- working directory does not hold, and a nil ends an ipairs at once
+        tries = {}
+        local rel = vim.fs.relpath(vim.fn.getcwd(), path)
+        if rel then
+            tries[#tries + 1] = rel
+        end
+        tries[#tries + 1] = vim.fn.fnamemodify(path, ":~")
+        tries[#tries + 1] = path
+    end
+
+    local shortest
+    for _, try in ipairs(tries) do
+        if not room or vim.fn.strdisplaywidth(try) <= room then
+            return try
+        end
+        if not shortest or #try < #shortest then
+            shortest = try
+        end
+    end
+    return elided(shortest or path, room or math.huge)
+end
+
+---Where a note points now, shortened to what the header has room for.
+---
+---The extent, not the record: an edit above the note moves the mark, and the
+---snippet already numbers its lines from there. A header naming the stored
+---line beside a snippet numbering the live one states two positions at once.
+---@param entry sidenote.editor.Note
+---@param room integer|nil display columns the location may take
+---@return string
+local function where(entry, room)
+    local rec = assert(entry.record)
+    local shown = vim.tbl_extend("force", {}, rec)
+    if entry.line_start and rec.scope ~= "file" then
+        shown.line_start, shown.line_end = entry.line_start, entry.line_end
+    end
+    shown.path = fitted(rec.path, room)
+    return location.format(shown)
+end
+
 ---A note's identity as chunks: location, kind, state, swatch and status.
 ---
 ---A chunk with no group takes the caller's own base color. The swatch
 ---carries the note's ink — the pen's wash, the status mark for a penless
 ---note, a squiggle under the `underline` style — and a short-of-exact
 ---status keeps its status color, with its confidence when graded.
+---
+---The location is built last and given whatever `room` the rest left it, so
+---the part that can shorten is the part that pays for a narrow window.
 ---@param entry sidenote.editor.Note
+---@param room? integer display columns the whole identity has
 ---@return {[1]: string, [2]: string|nil}[] chunks
----Where a note points, shortened to what a header has room for.
----
----A note captured outside any project stores an absolute path, long enough to
----push the rest of the identity off the end of a winbar; under the home
----directory it shortens to `~`. A project-relative path is already as short as
----it goes and is left alone — `fnamemodify` would resolve it against the
----working directory and hand back something longer that points nowhere.
----
----Display only. `location.format` is half of the browser's parse/render
----round-trip, and that has to keep producing the stored path.
----@param rec sidenote.Annotation
----@return string
-local function where(rec)
-    if rec.path:sub(1, 1) ~= "/" then
-        return location.format(rec)
-    end
-    local shown = vim.tbl_extend("force", {}, rec)
-    shown.path = vim.fn.fnamemodify(rec.path, ":~")
-    return location.format(shown)
-end
-
-function M.identity(entry)
+function M.identity(entry, room)
     local rec = assert(entry.record)
     local cfg = entry.config or config.get()
 
+    -- What the location is left with, once everything of fixed width has
+    -- taken its share
     local chunks = {
-        { where(rec) },
         { "  " .. rec.kind .. " · " .. rec.state .. " · " },
     }
     if rec.pen then
@@ -120,16 +188,23 @@ function M.identity(entry)
         chunks[#chunks + 1] = { " · " }
         chunks[#chunks + 1] = { label, highlight.GROUPS[status] }
     end
+
+    local taken = 1
+    for _, chunk in ipairs(chunks) do
+        taken = taken + vim.fn.strdisplaywidth(chunk[1])
+    end
+    table.insert(chunks, 1, { where(entry, room and math.max(room - taken, 1) or nil) })
     return chunks
 end
 
 ---The winbar line naming the open note: its identity, pinned.
 ---@param entry sidenote.editor.Note
+---@param room? integer display columns the bar has, unbounded when absent
 ---@return string winbar statusline-format text
-function M.headline(entry)
+function M.headline(entry, room)
     local bar = "%#" .. highlight.WINBAR .. "#"
     local parts = { bar, " " }
-    for _, chunk in ipairs(M.identity(entry)) do
+    for _, chunk in ipairs(M.identity(entry, room)) do
         local text = chunk[1]:gsub("%%", "%%%%")
         if chunk[2] then
             parts[#parts + 1] = "%#" .. chunk[2] .. "#" .. text .. bar
@@ -251,7 +326,12 @@ local function decorate(bufnr, winid, entry)
     if shape.relative ~= "" and vim.wo[winid].winbar == "" then
         vim.api.nvim_win_set_config(winid, { height = shape.height + 1 })
     end
-    vim.api.nvim_set_option_value("winbar", M.headline(entry), { win = winid, scope = "local" })
+    local room = vim.api.nvim_win_get_width(winid)
+    vim.api.nvim_set_option_value(
+        "winbar",
+        M.headline(entry, room),
+        { win = winid, scope = "local" }
+    )
 
     -- Reveal the header only while the view sits at the top; a re-draw must
     -- never scroll a note the user has moved down into

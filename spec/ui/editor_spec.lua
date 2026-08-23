@@ -176,6 +176,32 @@ describe("editor.headline", function()
         assert.falsy(bar:find(vim.env.HOME, 1, true), "the home directory was spelled out")
     end)
 
+    it("elides the middle when even ~ will not fit the bar", function()
+        local entry = annotated()
+        entry.record.path = vim.env.HOME .. "/settings/pi/status.lua"
+        local bar = editor.headline(noted(entry), 40):gsub("%%#%S-#", "")
+        assert.contains(bar, "~/…/pi/status.lua:4", "the tail a reader navigates by must survive")
+        assert.contains(bar, "note · open")
+    end)
+
+    it("falls back to the filename alone when nothing else fits", function()
+        local entry = annotated()
+        entry.record.path = vim.env.HOME .. "/settings/pi/status.lua"
+        local bar = editor.headline(noted(entry), 24):gsub("%%#%S-#", "")
+        assert.contains(bar, "status.lua:4")
+        assert.falsy(bar:find("…", 1, true), "an elision that saves nothing is just noise")
+    end)
+
+    it("names the line the note sits on now, not the one it was stored at", function()
+        -- The snippet already numbers from the live mark; a bar naming the
+        -- stored line beside it would state two positions at once
+        local entry = annotated()
+        entry.line_start, entry.line_end = 9, 9
+        local bar = editor.headline(noted(entry)):gsub("%%#%S-#", "")
+        assert.contains(bar, "m.lua:9")
+        assert.falsy(bar:find("m.lua:4", 1, true), "the bar kept the stored line")
+    end)
+
     it("shows a pen as a swatch in its own ink, named", function()
         local entry = annotated()
         entry.record.pen = "blue"
