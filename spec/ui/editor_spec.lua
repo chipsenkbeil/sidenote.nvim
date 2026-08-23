@@ -192,6 +192,63 @@ describe("editor.headline", function()
         assert.falsy(bar:find("…", 1, true), "an elision that saves nothing is just noise")
     end)
 
+    ---@param days integer
+    ---@return string
+    local function captured_days_ago(days)
+        return os.date("!%Y-%m-%dT%H:%M:%SZ", os.time() - days * 86400)
+    end
+
+    it("says how long the note has been sitting there", function()
+        local entry = annotated()
+        entry.record.captured = captured_days_ago(3)
+        assert.contains(editor.headline(noted(entry)):gsub("%%#%S-#", ""), " 3d ")
+    end)
+
+    it("counts an old note in weeks, and a very old one by month", function()
+        local entry = annotated()
+        entry.record.captured = captured_days_ago(20)
+        assert.contains(editor.headline(noted(entry)):gsub("%%#%S-#", ""), " 2w ")
+
+        entry.record.captured = "2026-02-11T09:00:00Z"
+        assert.contains(editor.headline(noted(entry)):gsub("%%#%S-#", ""), " 2026-02 ")
+    end)
+
+    it("names the change the note was written against, abbreviated", function()
+        local entry = annotated()
+        entry.record.vcs =
+            { kind = "jj", commit = ("a"):rep(40), dirty = false, change = "zzowxyzqmnop" }
+        local bar = editor.headline(noted(entry)):gsub("%%#%S-#", "")
+        assert.contains(bar, "zzowxyzq")
+        assert.falsy(bar:find("zzowxyzqmnop", 1, true), "a whole change id is more than a header")
+    end)
+
+    it("carries neither when the record has neither", function()
+        local entry = annotated()
+        entry.record.captured = nil
+        entry.record.vcs = nil
+        local bar = editor.headline(noted(entry)):gsub("%%#%S-#", "")
+        assert.contains(bar, "m.lua:4  note · open")
+    end)
+
+    it("gives up provenance before the location gives up directories", function()
+        -- The header exists to say where the note is; age and a change id are
+        -- worth a column only while it still can
+        local entry = annotated()
+        entry.record.path = vim.env.HOME .. "/.config/nvim/lua/senkwich/pi/status.lua"
+        entry.record.captured = captured_days_ago(3)
+        entry.record.vcs =
+            { kind = "jj", commit = ("a"):rep(40), dirty = false, change = "zzowxyzqmnop" }
+
+        local roomy = editor.headline(noted(entry), 80):gsub("%%#%S-#", "")
+        assert.contains(roomy, "3d")
+        assert.contains(roomy, "zzowxyzq")
+
+        local tight = editor.headline(noted(entry), 40):gsub("%%#%S-#", "")
+        assert.falsy(tight:find("zzowxyzq", 1, true), "the change outlasted the path")
+        assert.contains(tight, "status.lua:4")
+        assert.lte(vim.fn.strdisplaywidth(tight), 40)
+    end)
+
     it("names the line the note sits on now, not the one it was stored at", function()
         -- The snippet already numbers from the live mark; a bar naming the
         -- stored line beside it would state two positions at once

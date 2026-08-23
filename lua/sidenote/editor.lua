@@ -21,6 +21,9 @@ local SNIPPET_LINES = 3
 ---Display columns a header takes when it is drawn without a window to measure.
 local DIVIDER_WIDTH = 48
 
+---Columns the location keeps before the header gives up anything else.
+local LOCATION_FLOOR = 20
+
 ---Window an open note sits in, reused by the note opened after it.
 ---@type integer|nil
 local current
@@ -145,6 +148,34 @@ local function where(entry, room)
     return location.format(shown)
 end
 
+---How long ago `stamp` was, in the shortest form that is still true.
+---
+---A margin note accretes and is never expected to drain, so how long it has
+---been sitting there is most of what tells you whether it still matters.
+---@param stamp string ISO-8601 instant, as a record writes one
+---@return string|nil age nil when the stamp cannot be read
+local function aged(stamp)
+    local y, mo, d, h, mi, s = stamp:match("(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)Z")
+    if not y then
+        return nil
+    end
+    local at = os.time({ year = y, month = mo, day = d, hour = h, min = mi, sec = s })
+    -- `os.time` reads a table as local time; the stamp is UTC
+    local seconds = os.difftime(os.time(os.date("!*t")), at)
+
+    local days = math.floor(seconds / 86400)
+    if days < 1 then
+        return math.max(math.floor(seconds / 3600), 1) .. "h"
+    end
+    if days < 14 then
+        return days .. "d"
+    end
+    if days < 90 then
+        return math.floor(days / 7) .. "w"
+    end
+    return ("%s-%s"):format(y, mo)
+end
+
 ---A note's identity as chunks: location, kind, state, swatch and status.
 ---
 ---A chunk with no group takes the caller's own base color. The swatch
@@ -161,11 +192,17 @@ function M.identity(entry, room)
     local rec = assert(entry.record)
     local cfg = entry.config or config.get()
 
-    -- What the location is left with, once everything of fixed width has
-    -- taken its share
-    local chunks = {
-        { "  " .. rec.kind .. " · " .. rec.state .. " · " },
-    }
+    -- Provenance, in the order it is given up when the bar runs out of room
+    local extras = {}
+    local age = rec.captured and aged(rec.captured)
+    if age then
+        extras[#extras + 1] = { "  " .. age, highlight.BARE }
+    end
+    if rec.vcs and rec.vcs.change then
+        extras[#extras + 1] = { "  " .. rec.vcs.change:sub(1, 8), highlight.BARE }
+    end
+
+    local chunks = { { "  " .. rec.kind .. " · " .. rec.state .. " · " } }
     if rec.pen then
         chunks[#chunks + 1] = { rec.pen .. " " }
     end
@@ -187,10 +224,25 @@ function M.identity(entry, room)
         chunks[#chunks + 1] = { label, highlight.GROUPS[status] }
     end
 
-    local taken = 1
-    for _, chunk in ipairs(chunks) do
-        taken = taken + vim.fn.strdisplaywidth(chunk[1])
+    local function measure(list)
+        local width = 0
+        for _, chunk in ipairs(list) do
+            width = width + vim.fn.strdisplaywidth(chunk[1])
+        end
+        return width
     end
+
+    -- Provenance is worth a column only while the location still has room to
+    -- be a path; below that the header is failing at the one thing it is for
+    local taken = 1 + measure(chunks)
+    while room and #extras > 0 and room - taken - measure(extras) < LOCATION_FLOOR do
+        table.remove(extras)
+    end
+
+    for i, extra in ipairs(extras) do
+        table.insert(chunks, i, extra)
+    end
+    taken = 1 + measure(chunks)
     table.insert(chunks, 1, { where(entry, room and math.max(room - taken, 1) or nil) })
     return chunks
 end
