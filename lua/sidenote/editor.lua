@@ -15,13 +15,10 @@ local M = {}
 ---Where the context header's virtual lines live.
 M.NAMESPACE = vim.api.nvim_create_namespace("sidenote.context")
 
----Most display columns a header snippet line may take.
-local SNIPPET_MAX = 60
-
 ---Most snippet lines the header shows.
 local SNIPPET_LINES = 3
 
----Display columns the rule closing a header takes.
+---Display columns a header takes when it is drawn without a window to measure.
 local DIVIDER_WIDTH = 48
 
 ---Window an open note sits in, reused by the note opened after it.
@@ -52,13 +49,14 @@ end
 ---@field source? integer loaded buffer of the annotated file, for the snippet
 ---@field config? sidenote.Config pens and ink style, from `vim.g.sidenote` when absent
 
----Trim a snippet line and clip it to the header's width.
+---Trim a snippet line and clip it to `room`, saying so when it was cut.
 ---@param text string
+---@param room integer display columns the line has
 ---@return string
-local function clipped(text)
+local function clipped(text, room)
     text = vim.trim(text)
-    if vim.fn.strdisplaywidth(text) > SNIPPET_MAX then
-        text = vim.fn.strcharpart(text, 0, SNIPPET_MAX) .. "…"
+    if vim.fn.strdisplaywidth(text) > room then
+        text = vim.fn.strcharpart(text, 0, math.max(room - 1, 1)) .. "…"
     end
     return text
 end
@@ -223,14 +221,19 @@ end
 ---the stored anchor text. A drifted note keeps its stored first line on a
 ---`was:` row, since the snippet is then only the resolver's best idea. A
 ---file-wide note has no snippet at all; the winbar carries its identity.
+---The quote and the rule each get a blank line to themselves, so the header
+---reads as three things rather than one block: what the note is about, where
+---it stops, and what you came to write.
 ---@param entry sidenote.editor.Note
 ---@param source integer|nil loaded buffer of the annotated file
+---@param room integer|nil display columns the header has, a default when absent
 ---@return {[1]: string, [2]: string}[][] lines chunk lines, possibly empty
-function M.header(entry, source)
+function M.header(entry, source, room)
     local rec = assert(entry.record)
     if rec.scope == "file" then
         return {}
     end
+    local across = room and math.max(room, 8) or DIVIDER_WIDTH
 
     local live = source
             and vim.api.nvim_buf_is_valid(source)
@@ -242,11 +245,14 @@ function M.header(entry, source)
     local first = (live and entry.line_start or rec.line_start) or 1
     local width = #tostring(first + math.min(#body, SNIPPET_LINES) - 1)
 
-    local lines = {}
+    -- The quoted code sits in its own space rather than stacking straight
+    -- under the bar naming the note
+    local lines = { {} }
+    local gutter = width + 3
     for i = 1, math.min(#body, SNIPPET_LINES) do
         lines[#lines + 1] = {
             { ("%" .. width .. "d │ "):format(first + i - 1), "LineNr" },
-            { clipped(body[i]), highlight.CONTEXT },
+            { clipped(body[i], across - gutter), highlight.CONTEXT },
         }
     end
     if #body > SNIPPET_LINES then
@@ -256,10 +262,12 @@ function M.header(entry, source)
         lines[#lines + 1] = {
             { (" "):rep(width) .. " │ ", "LineNr" },
             { "was: ", highlight.GROUPS.drifted },
-            { clipped(vim.split(rec.text, "\n")[1]), highlight.CONTEXT },
+            { clipped(vim.split(rec.text, "\n")[1], across - gutter - 5), highlight.CONTEXT },
         }
     end
-    lines[#lines + 1] = { { ("─"):rep(DIVIDER_WIDTH), highlight.CONTEXT } }
+    lines[#lines + 1] = {}
+    lines[#lines + 1] = { { ("─"):rep(across), highlight.CONTEXT } }
+    lines[#lines + 1] = {}
     return lines
 end
 
@@ -308,7 +316,8 @@ end
 ---@param winid integer editor window
 ---@param entry sidenote.editor.Note
 local function decorate(bufnr, winid, entry)
-    local lines = M.header(entry, entry.source)
+    local room = vim.api.nvim_win_get_width(winid)
+    local lines = M.header(entry, entry.source, room)
     vim.api.nvim_buf_clear_namespace(bufnr, M.NAMESPACE, 0, -1)
     if #lines > 0 then
         -- No gravity: typing from the very top of an empty note must not
@@ -326,7 +335,6 @@ local function decorate(bufnr, winid, entry)
     if shape.relative ~= "" and vim.wo[winid].winbar == "" then
         vim.api.nvim_win_set_config(winid, { height = shape.height + 1 })
     end
-    local room = vim.api.nvim_win_get_width(winid)
     vim.api.nvim_set_option_value(
         "winbar",
         M.headline(entry, room),

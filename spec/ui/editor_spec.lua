@@ -240,18 +240,44 @@ describe("editor.headline", function()
 end)
 
 describe("editor.header", function()
+    ---Every line of a header as one string, so a test names content not rows.
+    ---@param lines {[1]: string, [2]: string}[][]
+    ---@return string
+    local function drawn(lines)
+        local out = {}
+        for _, line in ipairs(lines) do
+            out[#out + 1] = text_of(line)
+        end
+        return table.concat(out, "\n")
+    end
+
     it("quotes the code with its own line numbers, as it reads now", function()
         local entry, source = annotated()
-        local lines = editor.header(entry, source)
-        local quoted = text_of(lines[1])
+        local quoted = drawn(editor.header(entry, source))
         assert.contains(quoted, "4 │ ")
         assert.contains(quoted, "return 1")
     end)
 
     it("closes the quote with a divider, so snippet never bleeds into prose", function()
         local entry, source = annotated()
+        assert.contains(drawn(editor.header(entry, source)), "─")
+    end)
+
+    it("gives the quote and the prose a line of their own on either side", function()
+        -- The header reads as three things — what the note is about, where it
+        -- stops, and what you came to write — not one block
+        local entry, source = annotated()
         local lines = editor.header(entry, source)
-        assert.contains(text_of(lines[#lines]), "─")
+        assert.eq_deep(lines[1], {}, "no room above the quote")
+        assert.eq_deep(lines[#lines], {}, "the prose butts against the rule")
+        assert.contains(text_of(lines[#lines - 1]), "─")
+        assert.eq_deep(lines[#lines - 2], {}, "no room below the quote")
+    end)
+
+    it("rules across the width it is given", function()
+        local entry, source = annotated()
+        local lines = editor.header(entry, source, 24)
+        assert.eq(vim.fn.strdisplaywidth(text_of(lines[#lines - 1])), 24)
     end)
 
     it("keeps the stored text on a was: line when the note drifted", function()
@@ -261,19 +287,27 @@ describe("editor.header", function()
         entry.resolution =
             { status = "drifted", line_start = 4, line_end = 4, confidence = 0.85, tier = "L6" }
 
-        local lines = editor.header(entry, source)
-        assert.contains(text_of(lines[1]), "waited", "the snippet reads the buffer as it is now")
-        local was = text_of(lines[#lines - 1])
-        assert.contains(was, "was:")
-        assert.contains(was, "return 1")
+        local shown = drawn(editor.header(entry, source))
+        assert.contains(shown, "waited", "the snippet reads the buffer as it is now")
+        assert.contains(shown, "was:")
+        assert.contains(shown, "return 1")
     end)
 
     it("marks a snippet cut short vertically", function()
         -- A five-line span shows three lines and admits the rest exists
         local entry, source = annotated()
         entry.line_start, entry.line_end = 1, 5
-        local lines = editor.header(entry, source)
-        assert.contains(text_of(lines[#lines - 1]), "⋯")
+        assert.contains(drawn(editor.header(entry, source)), "⋯")
+    end)
+
+    it("marks a snippet line cut short sideways", function()
+        local entry, source = annotated()
+        vim.api.nvim_buf_set_lines(source, 3, 4, false, { ("x"):rep(200) })
+        local shown = drawn(editor.header(entry, source, 30))
+        assert.contains(shown, "…", "a clipped line must say it was clipped")
+        for _, line in ipairs(vim.split(shown, "\n")) do
+            assert.lte(vim.fn.strdisplaywidth(line), 30)
+        end
     end)
 
     it("has no snippet for a file-wide note; the winbar carries identity", function()
@@ -357,7 +391,13 @@ describe("editor DWIM context", function()
         local marks = vim.api.nvim_buf_get_extmarks(bufnr, editor.NAMESPACE, 0, -1, {
             details = true,
         })
-        assert.contains(marks[1][4].virt_lines[1][1][1], "5", "the quote follows the code")
+        local shown = ""
+        for _, line in ipairs(marks[1][4].virt_lines) do
+            for _, chunk in ipairs(line) do
+                shown = shown .. chunk[1]
+            end
+        end
+        assert.contains(shown, "5", "the quote follows the code")
     end)
 
     it("re-reads the record, so a cycle elsewhere shows through", function()
