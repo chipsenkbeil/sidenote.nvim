@@ -159,6 +159,23 @@ describe("editor.headline", function()
         assert.falsy(bar:find("attached", 1, true), "a healthy anchor needs no label")
     end)
 
+    it("leaves a project-relative path exactly as it is stored", function()
+        -- It is already as short as it goes; resolving it against the working
+        -- directory would hand back something longer that points nowhere
+        local entry = annotated()
+        local bar = editor.headline(noted(entry)):gsub("%%#%S-#", "")
+        assert.contains(bar, " m.lua:4 ")
+        assert.falsy(bar:find("/m.lua", 1, true), "the stored path grew a directory")
+    end)
+
+    it("shortens an absolute path under the home directory", function()
+        local entry = annotated()
+        entry.record.path = vim.env.HOME .. "/settings/pi/status.lua"
+        local bar = editor.headline(noted(entry)):gsub("%%#%S-#", "")
+        assert.contains(bar, "~/settings/pi/status.lua:4")
+        assert.falsy(bar:find(vim.env.HOME, 1, true), "the home directory was spelled out")
+    end)
+
     it("shows a pen as a swatch in its own ink, named", function()
         local entry = annotated()
         entry.record.pen = "blue"

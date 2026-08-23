@@ -169,9 +169,37 @@ describe("preview.show identity", function()
     it("marks a cut float with how much it held back", function()
         local case = annotated(string.rep("line\n", 40))
         show(case, { style = "float", max_lines = 5 })
-        local placed = marks(preview_buf())
-        assert.eq(#placed, 1)
-        assert.contains(placed[1][4].virt_lines[1][1][1], "35 more")
+        local said = {}
+        for _, mark in ipairs(marks(preview_buf())) do
+            said[#said + 1] = mark[4].virt_lines[1][1][1]
+        end
+        assert.truthy(
+            vim.iter(said):any(function(text)
+                return text:find("35 more", 1, true) ~= nil
+            end),
+            "no mark said how much was held back"
+        )
+        preview.hide()
+    end)
+
+    it("rules the prose off from the identity above it", function()
+        show(annotated("why this returns one\n"), { style = "float" })
+        local rule = marks(preview_buf())[1]
+        assert.eq(rule[2], 0, "the rule sits above the first prose line")
+        assert.truthy(rule[4].virt_lines_above)
+        local drawn = rule[4].virt_lines[1][1][1]
+        assert.contains(drawn, "──")
+        assert.eq((drawn:gsub("─", "")), "", "the rule is nothing but the rule")
+        preview.hide()
+    end)
+
+    it("keeps the rule out of the prose a reader could yank", function()
+        -- Virtual, so the buffer holds the note and nothing else
+        show(annotated("why this returns one\n"), { style = "float" })
+        assert.eq_deep(
+            vim.api.nvim_buf_get_lines(preview_buf(), 0, -1, false),
+            { "why this returns one" }
+        )
         preview.hide()
     end)
 end)

@@ -71,12 +71,33 @@ end
 ---status keeps its status color, with its confidence when graded.
 ---@param entry sidenote.editor.Note
 ---@return {[1]: string, [2]: string|nil}[] chunks
+---Where a note points, shortened to what a header has room for.
+---
+---A note captured outside any project stores an absolute path, long enough to
+---push the rest of the identity off the end of a winbar; under the home
+---directory it shortens to `~`. A project-relative path is already as short as
+---it goes and is left alone — `fnamemodify` would resolve it against the
+---working directory and hand back something longer that points nowhere.
+---
+---Display only. `location.format` is half of the browser's parse/render
+---round-trip, and that has to keep producing the stored path.
+---@param rec sidenote.Annotation
+---@return string
+local function where(rec)
+    if rec.path:sub(1, 1) ~= "/" then
+        return location.format(rec)
+    end
+    local shown = vim.tbl_extend("force", {}, rec)
+    shown.path = vim.fn.fnamemodify(rec.path, ":~")
+    return location.format(shown)
+end
+
 function M.identity(entry)
     local rec = assert(entry.record)
     local cfg = entry.config or config.get()
 
     local chunks = {
-        { location.format(rec) },
+        { where(rec) },
         { "  " .. rec.kind .. " · " .. rec.state .. " · " },
     }
     if rec.pen then

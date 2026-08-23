@@ -183,10 +183,10 @@ function M.show(entry, opts)
     local style = opts.style == "split" and "split" or "float"
     current = window.open(bufnr, { style = style, position = "right", size = WINDOW_WIDTH })
     if entry.record then
-        -- A float sized to its content has no row for the winbar yet
+        -- A float sized to its content has no room for the winbar and the rule
         local shape = vim.api.nvim_win_get_config(current)
         if shape.relative ~= "" then
-            vim.api.nvim_win_set_config(current, { height = shape.height + 1 })
+            vim.api.nvim_win_set_config(current, { height = shape.height + 2 })
         end
         local note = vim.tbl_extend("keep", { config = opts.config }, entry)
         vim.api.nvim_set_option_value(
@@ -194,6 +194,18 @@ function M.show(entry, opts)
             editor.headline(note),
             { win = current, scope = "local" }
         )
+
+        -- The winbar names the note and the buffer holds it; the rule is what
+        -- says where one ends. Virtual, so it cannot be yanked out of the prose
+        vim.api.nvim_buf_set_extmark(bufnr, M.NAMESPACE, 0, 0, {
+            virt_lines_above = true,
+            virt_lines = { { { ("─"):rep(WINDOW_WIDTH), highlight.CONTEXT } } },
+        })
+        -- A line above row 0 is invisible at scroll-top until the view asks
+        -- for the filler row it sits in
+        vim.api.nvim_win_call(current, function()
+            vim.fn.winrestview({ topline = 1, topfill = 1 })
+        end)
     end
     dismiss_later()
 end
