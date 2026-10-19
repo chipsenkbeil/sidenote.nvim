@@ -13,7 +13,7 @@ agent can read and act on.
 
 A comment changes the code. A note does not. You can annotate a vendored
 dependency, a file you have no business editing, or a function you are still
-deciding about, and nothing you write lands in a diff.
+deciding about, and the file itself never changes.
 
 The cost is anchoring: a note has to find its code again after the code moves.
 See [Anchoring](#anchoring).
@@ -22,28 +22,32 @@ See [Anchoring](#anchoring).
 
 Neovim 0.11 or newer, for `vim.fs.relpath`. No dependencies.
 
-Optional, each independently useful:
+Optional:
 
 | optional | buys |
 |---|---|
-| nvim-orgmode | org editing, because the prose file ends in `.org` |
-| git or jj | provenance stamping, never used for resolution |
+| nvim-orgmode | org editing of prose, with `filetype = "org"` |
+| git | the commit a note was captured at, never used for resolution |
+| jj | the change id as well, in a repository colocated with git |
 
 ## Install
 
-With [lazy.nvim](https://github.com/folke/lazy.nvim):
+There is no `setup()` to call. Configuration is `vim.g.sidenote`, a table or a
+function returning one, and every field has a default. With
+[lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 { "chipsenkbeil/sidenote.nvim" }
 ```
 
-There is no `setup()` to call. Configuration is `vim.g.sidenote`, and every
-field has a default.
-
 ## Getting started
 
-Map what you want. A full set that avoids the common collisions — `]s` is
-spell, and `]a`, `]b`, `]q`, `]d` are Neovim defaults:
+Map what you want, then annotate a line. The note opens beside it for you to
+write and save, and a sign marks the line in the gutter. The sign follows the
+code as you edit it, reformat it, or move it down the file.
+
+This set avoids the common collisions (`]s` is spell, and `]a`, `]b`, `]q`, `]d`
+are Neovim defaults):
 
 ```lua
 vim.keymap.set({ "n", "x" }, "<Leader>sa", "<Plug>(SidenoteAdd)")
@@ -66,10 +70,6 @@ vim.keymap.set("n", "<Leader>sQ", "<Plug>(SidenoteQflistProject)")
 vim.keymap.set("n", "]n", "<Plug>(SidenoteNext)")
 vim.keymap.set("n", "[n", "<Plug>(SidenotePrev)")
 ```
-
-Annotate a line and the note opens beside it; write, save. A sign appears in
-the gutter. Edit the code around it, reformat it, move it down the file: the
-sign follows.
 
 ## Mappings
 
@@ -113,16 +113,16 @@ Inside a browser buffer only:
 | `<CR>` | open this note's prose for writing |
 | `gf` | jump to the code the note is about |
 | `a` | create a note on a file, and open it |
-| `t` `T` | cycle state forward and back — or kind or pen, on their columns |
+| `t` `T` | cycle state forward and back, or kind or pen on their columns |
 | `fk` `fs` `fa` | filter by kind, state, or anchor status |
 | `ff` | filter by path substring |
 | `fc` | clear every filter |
-| `<Tab>` | toggle this note's body, org-style |
-| `<S-Tab>` | toggle every body: the index, or all the prose |
+| `<Tab>` | toggle this note's prose, org-style |
+| `<S-Tab>` | toggle every note: the index, or all the prose |
 | `-` | widen to every annotation in the project |
 | `g?` | this table, as a float |
 
-Fold verbs need no mapping. The folds are real.
+Fold commands need no mapping. The folds are real.
 
 ## Commands
 
@@ -136,7 +136,41 @@ Fold verbs need no mapping. The folds are real.
 ```
 <!-- /gen:commands -->
 
-`browse` and `project` take filters, which complete, validate, and combine:
+`browse` lists this file's notes. `project` lists the whole project's, from the
+project holding the current file or from a path you give it.
+
+`add` annotates the current line, or the range the command was given. `add
+scope=file` annotates the whole file, and `add kind=todo` files a todo instead
+of a note. The two combine.
+
+`loclist` fills the window's location list with this buffer's notes, and
+`qflist` fills the quickfix list with the whole project's. `scope=file` or
+`scope=project` overrides either default, and the four list mappings cover both
+lists at both scopes. `:Sidenote qflist kind=todo state=open` is a work queue
+you walk with `:cnext`.
+
+Inside a list titled `sidenote`, a winbar names the verbs its keys gain. `t`
+and `T` cycle a field exactly as in the browser: the word under the cursor
+inside the `[kind state pen]` bracket decides which one turns, and anywhere
+else on the line means state. `o` opens the prose, `d` deletes after a
+confirmation that quotes the prose, `s` flips between this buffer's notes and
+the project's, and `fk`, `fs`, `fa`, `ff` and `fc` filter as in the browser.
+`g?` lists the verbs. Each change redraws the list in place with the cursor
+held, so cycling a pen is pressing `t` on its word until the color is right.
+
+The verbs are bound only while the list is sidenote's own, and a quickfix list
+another tool filled keeps every key that tool mapped. Each item carries its
+identity in `user_data`, for any other list-driven tool to read.
+
+`show` narrows what every buffer paints. `:Sidenote show kind=todo` leaves only
+the todos' marks, `state=resolved` shows what is done, and a bare `:Sidenote
+show` widens back out. Hidden notes are still tracked, saved and listed, and
+`next` and `prev` skip them. `vim.g.sidenote_state.show` mirrors the narrowing
+for your statusline.
+
+`browse`, `project`, `loclist`, `qflist` and `show` take the same filters
+(`kind`, `state`, `status`, `path`, `change`, `commit`), which complete,
+validate and combine:
 
 ```vim
 :Sidenote browse  kind=todo
@@ -144,43 +178,6 @@ Fold verbs need no mapping. The folds are real.
 :Sidenote project kind=todo state=open
 :Sidenote project path=lua/net
 ```
-
-`project` also takes a path, defaulting to the project holding the current
-file. `add scope=file` annotates the whole file rather than a line, and
-`add kind=todo` files a todo instead of a note; the two combine.
-
-`loclist` fills the window's location list with this buffer's notes, and
-`qflist` fills the quickfix list with the whole project's; `scope=file`
-and `scope=project` flip either default, and the four `<Plug>` mappings
-pair the containers with both scopes — lowercase for the file, capital
-for the project, like `sb` and `sB`. Both verbs take the same filters, so
-`:Sidenote qflist kind=todo state=open` is a work queue you walk with
-`:cnext`.
-
-Inside a sidenote-titled list the keys grow verbs, and a winbar across the
-top names them: `<CR> jump  t cycle  o open  d delete  s scope  f filter
-g? help`. The verbs are bound only while the list is ours and taken back
-out when it is not, so a quickfix list some other tool filled keeps every
-key it mapped — a buffer-local mapping is singular, and whichever tool
-binds last would otherwise own it. `t` and `T` cycle exactly as in the
-browser: the word under the cursor inside the `[kind state pen]` bracket
-decides which field turns, and anywhere else on the line means state. `o`
-opens the prose, `d` deletes after the quoting confirmation, and `<CR>`
-jumps as ever. The browser's filter keys work here too — `fk`, `fs`, `fa`,
-`ff` and `fc` — and `s` flips the list between this buffer's notes and the
-whole project's without leaving it. `g?` answers with the table of verbs,
-in the list as in the browser. Each change redraws the list in place,
-cursor held — so cycling a pen is pressing `t` on its word until the color
-is right. Items carry their identity in `user_data`, the idiom any other
-list-driven tool can borrow.
-
-`show` narrows what every buffer paints, all at once: `:Sidenote show
-kind=todo` leaves only the todos' marks, `state=resolved` flips you to
-reviewing what's done, filters combine, and bare `:Sidenote show` widens
-back. The hidden notes are still there — tracked, saved, listed — merely
-unpainted, and `]n`/`[n` honor the narrowing so a jump never lands on
-something invisible. `vim.g.sidenote_state.show` mirrors the view for your
-statusline.
 
 ## Configuration
 
@@ -235,44 +232,56 @@ vim.g.sidenote = {
 ```
 <!-- /gen:config -->
 
-Three display knobs, because they answer three questions: how you know a note
-exists, how you glance at it, and where you write it. A transient float for
-previewing and a persistent right split for editing is a normal combination
-that one setting cannot express.
+Four display settings answer four questions: `indicator` is how you know a note
+exists, `preview` is how you glance at it, `editor` is where you write it, and
+`browser` is where a listing opens. A transient preview float next to a
+persistent editor split is a normal combination that one setting could not
+express.
 
-A glance names what it shows: the preview float carries the note's identity
-— location, kind, state, ink — in its winbar, and the virtual-lines style
-leads with the same line. A note longer than `max_lines` is cut with a
-marker saying how much was held back; reading it all is what opening the
-note is for.
+A preview names what it shows. The float carries the note's location, kind,
+state and ink in its winbar, and the `virt_lines` style leads with the same
+line. A note longer than `max_lines` is cut, with a marker saying how many lines
+were held back.
 
-Signs span every line of a multi-line note, and when notes overlap the worst
-anchor status wins the gutter. A healthy todo signs as `☐`, checked off to
-`☑` once it is no longer open; notes keep the `▍` stripe, and every hurt
-status keeps its own glyph — hurt is louder than kind. Bars extend and
-badges mark once: a stripe repeats down its span, while a checkbox or a
-`?`/`!`/`✗` shows on the first line alone with a `│` tail carrying the
-rest, so a three-line todo never reads as three todos. A healthy note with
-no prose yet shows a dimmed sign — a bare anchor is a deletion candidate,
-and looks like one.
-The `summary` style goes further and puts prose line one at the end of the
-line, in the note's own pen: margin notes you read without asking.
+With the `sign` style, a sign spans every line of a note, and where notes overlap
+the worst anchor status wins the gutter. A healthy note signs `▍`, and a healthy
+todo signs `☐`, checked to `☑` once it is no longer open. A hurt anchor shows its
+status instead of its kind: `╎` drifted, `?` ambiguous, `!` orphaned, `✗`
+filegone. A stripe (`▍`, `╎`) repeats down the span, while a badge shows on the
+first line alone with a `│` tail below it, so a three-line todo reads as one. A
+healthy note with no prose yet shows a dimmed sign, which marks it as a deletion
+candidate.
 
-`:Sidenote highlight` additionally marks the annotated text itself — ink
-over the words, a range by its exact columns — per buffer, the way
-`:set spell!` toggles: `on` flips the default, `always` and `never` pin it.
-Capturing while a toggle has them hidden reveals them again, so a fresh
-mark never looks like a failed capture. By default the ink is the
-`SidenoteMark*` groups, one per anchor status, yours to restyle.
+The `summary` style puts the first line of prose at the end of the annotated
+line, in the note's pen when it has one.
+
+`indicator.highlight` adds ink over the annotated text itself (a range by its
+exact columns), in the note's pen or else the `SidenoteMark*` group for its
+anchor status. `:Sidenote highlight` toggles it per buffer, the way `:set
+spell!` does. `on` and `off` set where the toggle starts, and `always` and
+`never` pin it. A capture made while the toggle has highlights hidden shows
+them again.
+
+A `template` function seeds the buffer a new note opens into. `ctx` carries
+`path`, `filetype`, `scope`, `line_start`, `line_end` and `text`. The seed is an
+unsaved edit, and the prose file stays empty until you write the buffer:
+
+```lua
+vim.g.sidenote = {
+    template = function(ctx)
+        return { "* TODO " .. ctx.path, "" }
+    end,
+}
+```
 
 <!-- vimdoc:tag sidenote-pens -->
 
 ### Pens
 
-A note can carry a pen, coloring its ink like a highlighter. Four come
-seeded — `yellow`, `coral`, `blue` and `green`, background washes in the
-`SidenotePen*` groups — and adding your own is one config entry naming the
-highlight group its ink should use:
+A note can carry a pen, which colors its ink like a highlighter. Four come
+seeded (`yellow`, `coral`, `blue` and `green`, background washes in the
+`SidenotePen*` groups), and custom entries merge over them. A pen named by a
+highlight group uses that group, which is yours to define:
 
 ```lua
 vim.g.sidenote = {
@@ -280,9 +289,10 @@ vim.g.sidenote = {
 }
 ```
 
-That group is yours to define. Give a pen its two shades instead and the
-plugin owns the group, inking it for the current `background` and re-inking
-it whenever you change it — the same following the seeded pens get:
+A pen given two shades instead gets a group the plugin owns and re-inks
+whenever `background` changes, as it does for the seeded pens. A shade opening
+with `#` is a color, and anything else names a highlight group to follow, so a
+pen can track your theme. Naming a seeded pen this way retints it:
 
 ```lua
 vim.g.sidenote = {
@@ -293,19 +303,18 @@ vim.g.sidenote = {
 }
 ```
 
-A shade opening with `#` is a color of its own; anything else names a
-highlight group to follow, so a pen can track your theme rather than fix a
-color. Naming a seeded pen this way retints it.
+In the browser, `t` and `T` on the pen column cycle through `-` (none) and every
+configured pen, or you can type the name and `:w`. A penless note keeps the
+status ink. Anchor health stays on the sign either way, so a drifted note is
+visible whatever pen it carries.
 
-Custom entries merge over the seeded ones. Pick a pen up in the browser: `t`
-and `T` on its column cycle through `-` (none) and every configured pen, or
-type the name and `:w`. A penless note keeps the status ink; anchor health
-stays on the sign either way, so a drifted note is visible whatever color it
-wears.
+New notes take the **active pen**. `:Sidenote pen` changes it for the session.
+Bare, it offers `none` and every pen, and with a name (`:Sidenote pen coral`,
+`:Sidenote pen none`) it sets that one. `<Plug>(SidenotePen)` rotates through
+the same ring. A pen chosen either way wins over the config.
 
-New notes are inked with the **active pen**. It starts as `pen` in your
-config — one name for everything, or split by kind, so a todo lands in a
-different color than a note:
+Until you choose one, the active pen is `pen` from your config, either one name
+or split by kind:
 
 ```lua
 vim.g.sidenote = {
@@ -313,17 +322,14 @@ vim.g.sidenote = {
 }
 ```
 
-`:Sidenote pen` changes it for the session: bare, it offers the ring; with
-a name (`:Sidenote pen coral`, `:Sidenote pen none`) it sets directly, and
-a chosen pen wins over both kind defaults — you are holding it.
-`<Plug>(SidenotePen)` rotates through `none` and every configured pen.
-
 <!-- vimdoc:tag sidenote-statusline -->
 
 #### The pen in your statusline
 
-Live state is mirrored into `vim.g.sidenote_state`, a read-only table your
-statusline can consume without calling Lua:
+Live state is mirrored into `vim.g.sidenote_state`, a table your statusline can
+read without calling Lua. The plugin never writes `vim.g.sidenote`, so
+`vim.g.sidenote.pen` is the pen a session starts with and
+`vim.g.sidenote_state.pen` is the one it holds now:
 
 ```vim
 set statusline+=%{get(get(g:,'sidenote_state',{}),'pen','')}
@@ -336,188 +342,166 @@ vim.o.statusline = vim.o.statusline
     .. "%{%v:lua.require'sidenote'.statusline()%}"
 ```
 
-Config is input and state is output: `vim.g.sidenote.pen` is what a session
-starts with, `vim.g.sidenote_state.pen` is where it is now. The plugin
-never writes the former, and yours never needs to write the latter.
-
-A `template` function seeds the buffer a new note opens into:
-
-```lua
-vim.g.sidenote = {
-    template = function(ctx)
-        return { "* TODO " .. ctx.path, "" }
-    end,
-}
-```
-
-The seed is an unsaved edit — the prose file stays empty until you write the
-buffer yourself. `ctx` carries `path`, `filetype`, `scope`, `line_start`,
-`line_end` and `text`.
-
 <!-- vimdoc:tag sidenote-context-header -->
 
 ### The note editor
 
-A note opens under its identity, pinned in the window's winbar on a
-statusline-like background: location, kind and state, plus a swatch drawn
-in the note's actual ink — the pen's wash, or a squiggle when the indicator
-style is `underline`. Beneath it, a quoted snippet of the annotated code
-*as it reads right now*, each line behind its own source line number and a
-`│`, closed with a divider so the quote never blends into your prose. An
-anchor short of exact shows its status and confidence in the status color,
-keeping the originally captured line on a `was:` row — the one place you
-write about code also tells you honestly where that code stands.
+A note opens under a winbar that names it: location, kind, state, and a swatch
+in the note's ink (the pen's wash, or a squiggle with the `underline` style),
+then its age and the change it was written against while the bar has room.
+Below the winbar is a quote of the annotated code as it reads now, each line
+behind its source line number and a `│`, closed with a divider. An anchor short
+of exact shows its status and confidence in the status color, with the
+originally captured line on a `was:` row.
 
-The header stays true while you work: editing the annotated code re-draws
-the quote, and a change made in the browser shows through on return. A
-note buffer also knows what it is — `b:sidenote` carries its id and
-source — so browsing from inside a note lists the *annotated file's*
-notes, never the store directory, and the note the editor moves away from
-is saved on its way out.
+Editing the annotated code redraws the quote, and a change made in the browser
+shows on return. A note buffer carries `b:sidenote` (its id, store root and
+source buffer), so browsing from inside a note lists the annotated file's notes.
+When the editor moves to another note, it saves the one it leaves.
 
 <!-- vimdoc:tag sidenote-follow -->
 
 ### Follow
 
-`:Sidenote follow` pins that window and keeps it pointed at the note under
-your cursor. Crossing into another annotation re-points it — never focusing
-it — and prose you edited is saved the moment the panel moves on, so the
-store never lies to a reader outside the editor. Over unannotated code the
-panel holds the last note rather than blanking; the context header is what
-keeps a held-over note legible as such. Closing the panel turns following
-off.
+`:Sidenote follow` keeps the note editor pointed at the note under your cursor.
+Crossing into another annotation re-points the editor without focusing it, and
+prose you edited is saved before it moves, so the store on disk stays current
+for the CLI and for agents. Over unannotated code the editor keeps the last
+note. Closing the editor turns following off.
 
 <!-- vimdoc:tag sidenote-menu -->
 
 ### Changing a note where you stand
 
-`<Plug>(SidenoteMenu)` pops a small menu over the note under the cursor:
-every kind, state and pen it could take with the current ones marked, plus
-open, view and delete. Pick with `j`/`k` and `<CR>`, with the single keys
-the action rows name, or with the mouse. Picking a value writes it at once
-and keeps the menu up, so kind, state and pen can all be set in one visit;
-deleting confirms first, quoting the prose it would destroy.
+`<Plug>(SidenoteMenu)` opens a small menu on the note under the cursor. It lists
+every kind, state and pen the note could take with the current ones marked,
+plus open, view and delete. Pick a row with `j`/`k` and `<CR>`, with the key an
+action row names, or with the mouse. Picking a value writes it at once and keeps
+the menu open, so kind, state and pen can all change in one visit. Delete
+confirms first and quotes the prose it would destroy.
 
-For single keystrokes instead, the cycle plugs rotate one field of the
-note under the cursor, org-style: `(SidenoteCycleKind)`,
-`(SidenoteCycleState)` and `(SidenoteCyclePen)`, the latter two with
-`…Back)` variants. `<Plug>(SidenoteDelete)` is the menu's delete standing
-alone — the same confirmation, the same quote.
+The cycle mappings change one field of the note under the cursor with a single
+key: `<Plug>(SidenoteCycleKind)`, `<Plug>(SidenoteCycleState)` and
+`<Plug>(SidenoteCyclePen)`, the last two with `…Back` variants.
+`<Plug>(SidenoteDelete)` is the menu's delete on its own, with the same
+confirmation.
 
 <!-- vimdoc:tag sidenote-storage -->
 
 ### Where notes are stored
 
-`strategy` is a string, a function, or a list tried in order:
+`strategy` is a store name, a function, or a list of them tried in order:
 
 | strategy | resolves to | fails when |
 |---|---|---|
 | `project` | `<root>/.sidenote/` | no project root is found |
-| `global` | `<global_dir>/<key>/` | never |
+| `global` | `<global_dir>/<project-key>/` | never |
 | a function | whatever `fun(path)` returns | it returns `nil` |
 
-Each entry is strict on its own terms. `project` errors rather than quietly
-falling back, because silent fallback is wrong when you meant to commit your
-notes. Write the fallback you want in the list.
+Each entry is strict on its own terms. A lone `project` errors when there is no
+project root instead of falling back, and the fallback you want is written into
+the list, as the default `{ "project", "global" }` does. That keeps a note you
+meant to commit from landing in the global store unnoticed.
 
 The list is also the read order. Reads union every store in it, earlier entries
-winning; writes go to the first that resolves.
+winning, and writes go to the first that resolves. The plugin writes only files,
+so an in-repo store is committed unless you ignore it.
 
-A project root is the **nearest** directory at or above the file holding a
-marker: `.sidenote/` itself, `.git` / `.jj` / `.hg`, or `Cargo.toml` /
-`package.json` / `go.mod` / `pyproject.toml` / `*.rockspec`. Any one of them is
-enough, so the list ranks nothing — a `.git` below your `.sidenote` is the
-nearer root, and takes the notes of the files beneath it.
+A project root is the **nearest** directory at or above the file holding any
+marker: `.sidenote/`, `.git`, `.jj`, `.hg`, `Cargo.toml`, `package.json`,
+`go.mod`, `pyproject.toml` or a `*.rockspec`. The list ranks nothing, so a
+`.git` below your `.sidenote/` is the nearer root and takes the notes of the
+files beneath it.
 
 `markers` replaces that list. An entry is a name, a `*` glob, or a
-`fun(dir): boolean` that decides a directory for itself. To add to the
-built-ins rather than replace them, configure a function instead of a list: it
-is handed a copy of them and returns the set you want.
+`fun(dir): boolean` that decides a directory for itself. `.sidenote/` marks a
+root whatever you configure, so `mkdir .sidenote` is enough with no repo and no
+config. To add to the built-ins instead of replacing them, configure a
+function. It receives a copy of them and returns the set you want:
 
-    vim.g.sidenote = {
-        markers = function(defaults)
-            return vim.list_extend(defaults, { "WORKSPACE" })
-        end,
-    }
-
-`.sidenote/` marks a root whatever you configure, so `mkdir .sidenote` is
-always enough, with no repo and no config.
-
-In-repo notes are committed by default. The plugin writes files and nothing
-else.
+```lua
+vim.g.sidenote = {
+    markers = function(defaults)
+        return vim.list_extend(defaults, { "WORKSPACE" })
+    end,
+}
+```
 
 <!-- vimdoc:tag sidenote-sidecar -->
 
 ### What a note is on disk
 
-Two files:
+A note is two files named by its ULID, the prose and the plugin's record.
+`filetype` picks the prose file's extension, and that is the entire format
+decision. The record is always JSON. Capture creates the prose file empty, and
+after that the plugin writes it only when you edit prose in the browser and
+confirm. Every record carries its project key and a project-relative path, so
+moving a store from global to in-repo is a `mv`.
 
 ```
-01J9F3K2X7Q4V8M2ZC5T0BQWE.org             your prose
-01J9F3K2X7Q4V8M2ZC5T0BQWE.metadata.json   our record
+01J9F3K2X7Q4V8M2ZC5T0BQWE8.txt             your prose
+01J9F3K2X7Q4V8M2ZC5T0BQWE8.metadata.json   the plugin's record
 ```
-
-The plugin never opens the prose file for writing except when you edit it in
-the browser and confirm. The extension is the entire format decision; metadata
-is always JSON.
-
-Every record carries its own project key and a project-relative path, so moving
-a store from global to in-repo is a `mv`.
 
 <!-- vimdoc:tag sidenote-browser -->
 
 ## The browser
 
-An editable listing, in the spirit of oil.nvim:
+An editable listing, in the spirit of oil.nvim. Each note is a header line
+(kind, state, pen and location) above its prose, and every note starts folded,
+so a closed fold shows the summary. Anchor status is the one thing the machine
+owns, and it lives in the gutter: nothing while a note is healthy, a status
+glyph once it is not.
 
 ```
-▍ note  open     yellow  lua/lobby.lua:42-57    race in lobby join
-▍ todo  open     -       lua/lobby.lua:88       move onto the new API
-! note  wontfix  -       lua/lobby.lua          the old retry loop
+  note  open     yellow  lua/lobby.lua:42-57
+  race in lobby join ⋯
+  todo  open     -       lua/lobby.lua:88
+  move onto the new API ⋯
+! note  wontfix  -       lua/lobby.lua:120
+  the old retry loop ⋯
 ```
 
-Every column is yours to edit. Anchor status is the one thing the machine
-owns, and it lives in the gutter — silently while a note is healthy, as a
-status glyph the moment one is not.
+The header is an ordinary line you can edit, move over and search. The prose
+beneath it is one real fold, so `za`, `zR`, `zM` and your own fold mappings work
+on it. Expanded, the prose sits verbatim at the margin with the summary as its
+first line, editable in place and copyable exactly as stored.
 
-The listing opens in a short split beneath you, sized to its rows.
-`vim.g.sidenote.browser` picks another surface — a `float`, a `tab`, or
-`current` to take the window over — with `position` and `size` when the
-default fits badly. From its own split or float, the verbs that leave the
-listing — `gf`, `<CR>`, a create — land in the window you came from, the
-way a quickfix jump does: the split stays open, a float closes behind you.
-
-A note's header is always a visible, ordinary line — edit it, move over
-it, search it. The prose beneath is one real fold that reads as its own
-summary while closed, the way org folds a headline; `za`, `zR`, `zM` and
-your own fold mappings all work on it. Expanded, the prose sits verbatim
-at the margin with the summary as its first line, editable in place and
-copyable exactly as stored.
+The listing opens in a split below, sized to its rows. `vim.g.sidenote.browser`
+picks another surface (`float`, `tab`, or `current` to take over the window),
+with `position` and `size` when the default fits badly. From a split or float,
+the keys that leave the listing (`gf`, `<CR>`, `a`) land in the window you came
+from, the way a quickfix jump does. A split stays open and a float closes behind
+you.
 
 On `:w`:
 
 | edit | result |
 |---|---|
-| any prose line, including the summary | rewrites that note |
+| any prose line, including the summary | rewrites that note's prose |
 | `kind`, `state` or the pen | updates the record |
-| the position in the location | re-scopes, re-anchored |
+| the position in the location | re-scopes it, re-anchored |
 | the path in the location | moves it, re-anchored |
 | deleting a note's lines | deletes the note |
 
-Deleting a note means deleting all its lines. An operator motion over a
-closed fold includes the whole fold, so `dj` on a header takes the header
-and however long a prose in one stroke. Deleting just the header
-cannot corrupt a neighbor: prose left behind reads as glued onto the note
-above, and the write is refused until those lines go too.
+Deleting a note means deleting all its lines. An operator motion over a closed
+fold takes the whole fold, so `dj` on a header takes the header and all its
+prose. Deleting only the header cannot corrupt a neighbor: the prose left
+behind would read as part of the note above, so the write is refused until
+those lines go too.
 
-Only `:w` applies anything, and closing an edited listing simply discards:
-the listing is a projection of the store, not a document, so vim never asks
-you to save it.
+Only `:w` applies anything. The listing is a projection of the store, so
+closing an edited listing discards the edits and vim never asks you to save it.
 
-Nothing applies until you confirm, and anything lossy is listed apart:
+`-` widens to every annotation in the project, sorted by path then line. `a`
+creates a file-wide note and opens it for writing, on the listed file or, in a
+project listing, on a file you name (the row under the cursor is suggested).
+
+Nothing applies until you confirm, and anything that loses information is
+listed apart. Widening a note to the whole file drops its anchor:
 
 ```
-sidenote: apply 5 changes?
+sidenote: apply 6 changes?
 
   WRITE    2 notes' prose
   CHANGE   kind   note -> todo
@@ -525,27 +509,22 @@ sidenote: apply 5 changes?
 
   ── these lose information ──
   RESCOPE  lua/lobby.lua:42-57 -> lua/lobby.lua   (DROPS ANCHOR)
-  DELETE   1 annotation   (REMOVES PROSE FILE)
+  DELETE   "the old retry loop"   (REMOVES PROSE FILE)
 ```
-
-`-` widens to every annotation in the project, sorted by path then line. `a`
-creates a file-wide note — on the listed file, or in a project listing on
-whichever file you name, suggesting the row under the cursor — and opens it
-for writing.
 
 <!-- vimdoc:tag sidenote-filtering -->
 
 ### Filtering
 
 Either listing narrows by `kind`, `state`, anchor `status`, or a `path`
-substring. A `change=` or `commit=` filter keeps only notes stamped with a
-matching version-control id prefix — every capture inside a jj repository
-records the working copy's change id. Filters combine, and re-filtering
-narrows the listing you have rather than opening another. `-` carries the filter with it. Inside a listing
-the `f` keys ask interactively — `fk`, `fs`, `fa`, `ff` — and `fc` widens all
-the way back out.
+substring. `change=` and `commit=` keep only notes whose version-control stamp
+starts with the given prefix (see [Reviewing a change](#reviewing-a-change)).
+Filters combine. Filtering a listing again narrows that listing in place, and
+`-` carries the filter with it. Inside a listing the `f` keys ask interactively
+(`fk`, `fs`, `fa`, `ff`) and `fc` clears them all. They refuse while the
+listing holds edits you have not applied.
 
-A filtered-out row is absent, not hidden. Saving a filtered listing cannot
+A filtered-out row is absent, not hidden, so saving a filtered listing cannot
 touch an annotation it did not show you.
 
 Cleanup is `:Sidenote project status=orphaned`, then `VGd` and `:w`.
@@ -630,7 +609,21 @@ Toggle the note editor following the cursor from note to note.
 ## For agents
 
 The store is plain files, so `rg` over `*.metadata.json` and the prose files is
-a supported interface. There is also a headless resolver:
+a supported interface. Agents read everything. When an agent finishes a todo it
+may write exactly two things: a dated response appended beneath your prose, and
+the `state` field (`resolved`, or `wontfix` with the reason in the response).
+Everything else stays human.
+
+A ready-made agent skill at [skills/sidenote/SKILL.md](skills/sidenote/SKILL.md)
+covers how to read a store, which line numbers to trust, and what an agent must
+never touch. Copy or symlink it into `~/.claude/skills/` (or your agent's
+equivalent).
+
+There is also a headless resolver, `cli/sidenote.lua` in the plugin's
+directory. `export`
+prints the whole store as JSON on stdout. `list` prints one tab-separated line
+per annotation (location, status, kind, state, summary), narrowed by
+`--status`, `--change` or `--commit`:
 
 ```bash
 nvim --headless -l cli/sidenote.lua export /path/to/proj
@@ -638,56 +631,48 @@ nvim --headless -l cli/sidenote.lua list /path/to/proj
 nvim --headless -l cli/sidenote.lua list /path/to/proj --status orphaned
 ```
 
-`export` prints JSON on stdout. `list` prints one tab-separated line per
-annotation: location, status, kind, state, summary.
-
-There is a ready-made agent skill in
-[skills/sidenote/SKILL.md](skills/sidenote/SKILL.md) covering all of this —
-how to read a store, what the gate means, and what an agent must never touch.
-Copy or symlink it into `~/.claude/skills/` (or your agent's equivalent).
-
 ### Reviewing a change
 
-An offline review is annotation plus a filter. Check out the change, read
-it, and file todos where you would leave review comments; every capture
-inside a jj repository is stamped with the working copy's change id, which
-survives the rewrites a commit does not. One change's comments are then a
-work queue:
+An offline review is annotation plus a filter. Check out the change, read it,
+and file todos where you would leave review comments. Every capture in a jj
+repository colocated with git is stamped with the working copy's change id,
+which survives the rewrites a commit id does not. An agent scopes itself with
+`list <project> --change zzo`, does the work, appends a dated reply beneath your
+prose, and flips each todo to resolved, so you review how each one was
+addressed. In a committed store the comments travel with the working copy,
+inside the change they review.
+
+In a plain git repository the stamp is the commit sha, and `commit=` (or
+`--commit` on the CLI) filters the same way. Use the sha you started the review
+from as its key. Git has no id that survives an amend, so comments made after
+you commit mid-review carry a different stamp.
+
+One change's open comments, as a work queue:
 
 ```vim
 :Sidenote qflist change=zzo kind=todo state=open
 ```
 
-An agent scopes itself the same way — `list <project> --change zzo` — does
-the work, appends a dated reply beneath your prose, and flips each todo to
-resolved, so you review *how* it was addressed rather than hunting for
-whether anything happened. In a committed store the comments travel with
-the working copy, landing inside the very change they review.
-
-In a plain git repository the stamp is the commit sha — `commit=` in the
-editor and `--commit` on the CLI filter the same way. Take the sha you
-started the review from as its key: git has no id that survives an amend,
-so comments made after you commit mid-review carry a different stamp.
-
 <!-- vimdoc:tag sidenote-export-gate -->
 
-### The export gate
+### What an export withholds
 
 An annotation whose code no longer exists is never given a line number.
-
 `attached` and `drifted` export with a position and a confidence. `ambiguous`,
 `orphaned` and `filegone` export with `code_no_longer_exists: true`, no
-`line_start`, and their original `anchor_text`, so an agent can search for what
-the note was written against instead of being pointed at whatever now sits on
-that line.
+`line_start` or `line_end`, and their original `anchor_text`, so an agent
+searches for what the note was written against instead of editing whatever now
+sits on those lines. A naive single-line fuzzy matcher measured 8% precision
+against ground truth (51 placements, 4 of them correct).
 
-A naive single-line fuzzy matcher measured 8% precision against ground truth:
-51 firings for 4 correct placements. A guess presented as a location sends an
-agent to edit code that was never the subject.
+`code_no_longer_exists` is always present, so branching on it needs no nil
+check. The document holds `schema`, `project_key`, `generated` and the
+`annotations` list, and a record carries `change` and `commit` when the note
+was stamped. One record:
 
 ```json
 {
-  "id": "01J9F3K2X7Q4V8M2ZC5T0BQWE",
+  "id": "01J9F3K2X7Q4V8M2ZC5T0BQWE8",
   "kind": "todo",
   "state": "open",
   "path": "lua/lobby.lua",
@@ -695,36 +680,42 @@ agent to edit code that was never the subject.
   "confidence": 1,
   "code_no_longer_exists": false,
   "line_start": 42,
-  "line_end": 57,
+  "line_end": 42,
   "anchor_text": "function M.join_lobby(id)",
   "prose": "race in lobby join"
 }
 ```
 
-`code_no_longer_exists` is always present, so branching on it needs no nil
-check. `line_start` is the field that disappears.
-
-Agents read everything, and when they finish a todo they may write exactly
-two things: a dated response appended beneath your prose — never touching
-it — and the `state` field that marks the todo resolved. The GitHub review
-loop, thread and resolution together: you read how it was addressed rather
-than hunting for whether it was. Everything else stays human.
-
 ## Anchoring
 
 A note records the bytes it was attached to, the lines around it, and several
-hashes. Finding it again runs a ladder, first unique win taking it:
+hashes. Finding it again runs a ladder, and the first tier to place it uniquely
+wins. A file-wide note is `attached` while its file exists.
 
 | tier | test | outcome |
 |---|---|---|
-| L0 | the whole file is unchanged | placed at the stored lines |
-| L1 | the bytes at those lines still match | `attached` |
+| L0 | the whole file is unchanged | `attached`, at the stored lines |
+| L1 | the bytes at the stored lines still match | `attached` |
 | L2 | the text appears exactly once | `attached` |
-| L3 | several matches, context decides | `attached`, or `ambiguous` |
-| L4 | matches once ignoring whitespace | `attached`, reformatted |
-| L6 | scored fuzzy match >= 0.80 | `drifted`, with a confidence |
-| | below 0.60, or nothing found | `orphaned` |
+| L3 | it appears several times, and context decides | `attached`, or `ambiguous` |
+| L4 | L2 and L3 again, ignoring whitespace | `attached`, or `ambiguous` |
+| L6 | a scored fuzzy match of 0.80 or more | `drifted`, with a confidence |
+| | anything less, or nothing found | `orphaned` |
 | | the file itself is gone | `filegone` |
+
+There is no L5. The number was reserved for a treesitter tier that was cut
+before it was built.
+
+A fuzzy match scoring at least 0.60 but under 0.80 is kept as a guess and
+never placed,
+since a low-confidence guess presented as truth is worse than an honest orphan.
+Both thresholds are measured. `harness/` samples real repository history and
+grades placements against `git blame --reverse`, with the results checked in.
+
+Project-wide scans (the CLI, the project listing and project-wide lists) cache
+their resolutions under `cache_dir`, keyed by the file content and the record
+together. The cache never lives inside a store, and deleting it costs a rescan
+and nothing else.
 
 The statuses, in worsening order:
 
@@ -734,67 +725,48 @@ attached | drifted | ambiguous | orphaned | filegone
 ```
 <!-- /gen:statuses -->
 
-There is no L5: the number was reserved for a treesitter tier that was cut
-before it was built.
-
-Two thresholds rather than one, because a low-confidence guess presented as
-truth rates worse with users than an honest orphan.
-
-The 0.80 and 0.60 thresholds are measured. `harness/` samples real repository
-history and grades placements against `git blame --reverse`, with the results
-checked in.
-
-Project-wide scans — the CLI, the project browser, `export` — cache their
-resolutions under `cache_dir`, keyed by file content and record together, so
-repeating one is cheap. The cache never lives inside a store, and deleting it
-costs a rescan and nothing else.
-
 <!-- vimdoc:tag sidenote-live-tracking -->
 
 ### While you edit
 
 In an open buffer the ladder runs when the file is read and again after each
 save. Between the two, the marks it placed track your edits directly: typing
-inside a span grows it, deleting inside shrinks it, and edits above move it,
-exactly as the text moves. Saving writes that back — the record re-baselines
-to the span the mark tracked, so the note follows the content wherever your
-editing took it.
+inside a span grows it, deleting inside shrinks it, and edits above move it.
+Saving writes that back, and the record re-baselines to the span the mark
+tracked.
 
-Two things never re-baseline. A mark placed on a guess — a drifted note —
-stays a guess, so editing near it cannot launder the placement into truth.
-And typing over or deleting a whole span collapses its mark, sending the
-ladder back to the stored text to decide — which is what lets a line cut
-here be found again at the place you pasted it.
+Two things never re-baseline. A mark placed on a guess (a drifted note) stays a
+guess, so editing near it cannot turn the placement into truth. Typing over or
+deleting a whole span collapses its mark and hands the decision back to the
+ladder, which is what lets a line cut here be found again where you paste it.
 
 <!-- vimdoc:tag sidenote-never-deleted -->
 
 ### Nothing is ever auto-deleted
 
-Losing the anchor changes a note's status, never its existence. Orphaning only
-adds fields. Deletion is always something you asked for.
+Losing the anchor changes a note's status, never its existence. The status is
+computed on every resolve and never written to the record. Deletion is always
+something you asked for.
 
 <!-- vimdoc:tag sidenote-limitations -->
 
 ## Limitations
 
-Stated as contract rather than left to be discovered:
-
-- Annotations live outside undo. `u` restores your code, never a deleted
-  note — but the store is plain files, so commit it and recovery is your
-  VCS's.
-- Saving re-baselines an attached note to the span its mark tracked, so a
-  save also asserts where your notes now live. Typing over a whole span
-  breaks that assertion on purpose, and the resolver decides instead.
-- The browser's concealed ids need `:syntax on`; without it every row
-  shows its raw ULID.
+- Annotations live outside undo. `u` restores your code, never a deleted note.
+  The store is plain files, so commit it and your VCS can recover one.
+- A jj repository with no colocated `.git` records no provenance, so its notes
+  carry no change id to filter on.
+- The browser's concealed ids need `:syntax on`. Without it every row shows its
+  raw ULID.
 - On macOS, `/tmp` and `/var` resolve into `/private`. Stored paths use the
   resolved form, so outside tooling comparing paths should realpath first.
 
 ## Health
 
-`:checkhealth sidenote` reports configuration validity, whether the global
-store is writable, the project store it found, and which optional tools are
-present.
+`:checkhealth sidenote` reports whether the configuration is valid, whether the
+global store is writable, the project store at or above the working directory,
+whether a capture there records provenance, and, when `filetype` is `org`,
+whether nvim-orgmode is installed.
 
 ## License
 
