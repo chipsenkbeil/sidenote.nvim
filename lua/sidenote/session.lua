@@ -136,7 +136,7 @@ function M.view(filter)
     view = filter or {}
 
     local parts = {}
-    for _, key in ipairs({ "kind", "state", "status", "path" }) do
+    for _, key in ipairs({ "kind", "state", "status", "path", "change", "commit" }) do
         if view[key] then
             parts[#parts + 1] = key .. "=" .. view[key]
         end

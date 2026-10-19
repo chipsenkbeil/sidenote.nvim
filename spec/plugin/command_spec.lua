@@ -228,6 +228,14 @@ describe("the :Sidenote command", function()
         assert.eq(vim.g.sidenote_state.show, "")
     end)
 
+    it("mirrors a change or commit narrowing into the shown state", function()
+        vim.cmd("Sidenote show change=zzo commit=ab12 kind=todo")
+        assert.eq(vim.g.sidenote_state.show, "kind=todo change=zzo commit=ab12")
+
+        vim.cmd("Sidenote show")
+        assert.eq(vim.g.sidenote_state.show, "")
+    end)
+
     it("keeps jumps on the visible notes alone", function()
         local root = project()
         vim.cmd.edit(root .. "/code.lua")
