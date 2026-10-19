@@ -15,7 +15,9 @@ Each one is two files in a store directory:
 ```
 
 The store is `<project>/.sidenote/` when the project carries one, else
-`~/.local/share/sidenote/<project-key>/`.
+`<global_dir>/<project-key>/`. `global_dir` defaults to
+`stdpath("data") .. "/sidenote"`, which is `~/.local/share/nvim/sidenote/`
+unless `$XDG_DATA_HOME` or `$NVIM_APPNAME` moves it.
 
 ## Reading annotations
 
