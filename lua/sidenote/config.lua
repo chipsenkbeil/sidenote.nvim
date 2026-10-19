@@ -269,10 +269,6 @@ local function validate(cfg)
     return nil
 end
 
----Merge user input over the defaults and validate the result.
----
----Returns the defaults alongside any error, so a caller can report the problem
----and still run rather than leaving the user with no plugin at all.
 ---Give every pen written as shades a group this plugin owns and inks.
 ---
 ---The rest of the plugin reads a pen as the name of a highlight group, so the
@@ -290,6 +286,10 @@ local function mint_washes(cfg)
     cfg.pen_washes = washes
 end
 
+---Merge user input over the defaults and validate the result.
+---
+---Returns the defaults alongside any error, so a caller can report the problem
+---and still run rather than leaving the user with no plugin at all.
 ---@param raw? sidenote.Config|fun(): sidenote.Config
 ---@return sidenote.Config
 ---@return string|nil err
